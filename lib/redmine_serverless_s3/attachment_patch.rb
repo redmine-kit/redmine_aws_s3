@@ -15,14 +15,23 @@ module RedmineServerlessS3
     end
 
     # Uploads through Lambda (REST API, mail, forms): after Redmine has
-    # written the file and computed its SHA256, put it to S3. If PutObject
-    # fails, the exception stops the save.
+    # written the file and computed its SHA256, put it to S3, through the
+    # malware scan when it is on. If PutObject fails, the exception stops the
+    # save; a file the scan refuses is a validation error.
     def files_to_final_location
       had_file = instance_variable_get(:@temp_file).present?
       super
       return unless had_file && RedmineServerlessS3.enabled? && disk_filename.present?
 
-      RedmineServerlessS3.storage.put_file(s3_key, local_diskfile)
+      if RedmineServerlessS3::MalwareScan.required?
+        RedmineServerlessS3::MalwareScan.put_scanned(local_diskfile, s3_key, filename: filename, user: author)
+      else
+        RedmineServerlessS3.storage.put_file(s3_key, local_diskfile)
+      end
+    rescue RedmineServerlessS3::MalwareScan::Error => e
+      FileUtils.rm_f(local_diskfile)
+      errors.add(:base, e.message)
+      throw :abort
     end
 
     # The path in the /tmp cache, fetched from S3 for a saved attachment

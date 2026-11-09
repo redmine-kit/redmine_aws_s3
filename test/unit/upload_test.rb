@@ -156,4 +156,42 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       end
     end
   end
+
+  def test_complete_waits_for_a_clean_scan
+    tags = scan_tag('NO_THREATS_FOUND')
+    with_s3(stub_client(get_object_tagging: tags, head_object: [head_of(CONTENT), 'NotFound'])) do |client|
+      with_malware_scan do
+        attachment = upload.complete(presign[:ticket])
+
+        assert attachment.persisted?
+        assert_equal %i[get_object_tagging head_object], client.api_requests.pluck(:operation_name).first(2)
+      end
+    end
+  end
+
+  def test_complete_while_the_scan_runs_is_pending
+    with_s3(stub_client(get_object_tagging: scan_tag(nil))) do |client|
+      with_malware_scan do
+        ticket = presign[:ticket]
+
+        assert_raises(RedmineServerlessS3::Upload::Pending) { upload.complete(ticket) }
+        assert_equal [:get_object_tagging], client.api_requests.pluck(:operation_name)
+      end
+    end
+  end
+
+  def test_complete_refuses_a_threat
+    with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do |client|
+      with_malware_scan do
+        assert_no_difference 'Attachment.count' do
+          error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+          assert_includes error.message, 'threat'
+        end
+        assert_includes client.api_requests.pluck(:operation_name), :delete_objects
+        assert_not_includes client.api_requests.pluck(:operation_name), :head_object
+      end
+    end
+  ensure
+    Setting.plugin_redmine_serverless_s3 = {}
+  end
 end

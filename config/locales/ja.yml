@@ -10,6 +10,10 @@ ja:
   label_redmine_serverless_s3_ok: OK
   label_redmine_serverless_s3_failed: 失敗
   label_redmine_serverless_s3_reconciliation: 突き合わせ
+  label_redmine_serverless_s3_malware_findings: マルウェアのスキャンで断ったファイル
+  field_redmine_serverless_s3_malware_scan: GuardDuty のマルウェアのスキャンを待つ
+  error_redmine_serverless_s3_malware_found: マルウェアのスキャンで脅威が見つかったので、ファイルを受け付けませんでした。
+  error_redmine_serverless_s3_malware_not_scanned: "マルウェアのスキャンで確認できなかったので、ファイルを受け付けませんでした(%{status})。"
   button_redmine_serverless_s3_read_write: 読み書きを確認する
   button_redmine_serverless_s3_delivery: CloudFront からの配信を確認する
   button_redmine_serverless_s3_reconcile: 突き合わせる

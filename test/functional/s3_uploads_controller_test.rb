@@ -117,4 +117,35 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
       end
     end
   end
+
+  def test_complete_answers_202_while_the_scan_runs
+    with_s3(stub_client(get_object_tagging: { tag_set: [] })) do
+      with_malware_scan do
+        post :presign, params: presign_params
+        ticket = response.parsed_body['ticket']
+
+        assert_no_difference 'Attachment.count' do
+          post :complete, params: { ticket: ticket, attachment_id: 1, format: 'js' }, xhr: true
+        end
+        assert_response :accepted
+        assert_equal 'scanning', response.parsed_body['status']
+        assert_equal '2', response.headers['Retry-After']
+      end
+    end
+  end
+
+  def test_complete_through_the_api_answers_202_while_the_scan_runs
+    @request.session[:user_id] = nil
+    with_settings rest_api_enabled: '1' do
+      with_s3(stub_client(get_object_tagging: { tag_set: [] })) do
+        with_malware_scan do
+          key = User.find(2).api_key
+          post :presign, params: presign_params.merge(format: 'json', key: key)
+          post :complete, params: { ticket: response.parsed_body['ticket'], format: 'json', key: key }
+
+          assert_response :accepted
+        end
+      end
+    end
+  end
 end

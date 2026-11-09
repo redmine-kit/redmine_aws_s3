@@ -6,7 +6,8 @@
  * SHA-256 in pieces (Web Crypto needs the whole file in memory), then
  *   1. POST /s3_uploads/presign  -> a CloudFront signed URL and a ticket
  *   2. PUT the file to the URL with x-amz-checksum-sha256; S3 checks it
- *   3. POST /s3_uploads/complete -> the same script as POST /uploads.js
+ *   3. POST /s3_uploads/complete -> the same script as POST /uploads.js;
+ *      202 while GuardDuty's malware scan has not finished, then again
  * The progress bar shows hashing as the first half and the PUT as the second.
  */
 (function() {
@@ -158,6 +159,30 @@
     });
   }
 
+  // POST /s3_uploads/complete, again while the malware scan answers 202
+  // (each request already waits on the server), then runs the script that
+  // Redmine's POST /uploads.js would return.
+  var COMPLETE_RETRY_DELAYS = [1000, 2000, 4000, 8000, 15000, 30000];
+
+  function complete(url, ticket, attempt) {
+    return new Promise(function(resolve, reject) {
+      $.ajax(url, { type: 'POST', dataType: 'text', data: { ticket: ticket } })
+        .done(function(text, status, xhr) {
+          if (xhr.status !== 202) {
+            $.globalEval(text);
+            resolve(text);
+          } else if (attempt < COMPLETE_RETRY_DELAYS.length) {
+            setTimeout(function() {
+              complete(url, ticket, attempt + 1).then(resolve, reject);
+            }, COMPLETE_RETRY_DELAYS[attempt]);
+          } else {
+            reject('The file is still being scanned for malware. Try again later.');
+          }
+        })
+        .fail(function(xhr) { reject(errorText(xhr, 'Upload failed')); });
+    });
+  }
+
   var originalUploadBlob = null;
 
   function s3UploadBlob(blob, uploadUrl, attachmentId, options) {
@@ -183,10 +208,8 @@
         put(presigned.url, presigned.headers, blob, $.noop, function(e) {
           if (e.lengthComputable) { progress(size + e.loaded * size / Math.max(e.total, 1)); }
         }).then(function() {
-          $.ajax(completeUrl + '?attachment_id=' + encodeURIComponent(attachmentId), {
-            type: 'POST', dataType: 'script', data: { ticket: presigned.ticket }
-          }).done(function(result) { deferred.resolve(result); })
-            .fail(function(xhr) { fail(errorText(xhr, 'Upload failed')); });
+          complete(completeUrl + '?attachment_id=' + encodeURIComponent(attachmentId), presigned.ticket, 0)
+            .then(function(script) { deferred.resolve(script); }, function(text) { fail(text); });
         }, function(xhr) {
           fail(errorText(xhr, 'Upload failed (' + (xhr.status || 'network error') + ')'));
         });
@@ -207,7 +230,10 @@
     }
   }
 
-  window.RedmineS3Upload = { Sha256: Sha256, base64: base64, hashBlob: hashBlob, uploadBlob: s3UploadBlob };
+  window.RedmineS3Upload = {
+    Sha256: Sha256, base64: base64, hashBlob: hashBlob, complete: complete, uploadBlob: s3UploadBlob,
+    retryDelays: COMPLETE_RETRY_DELAYS
+  };
   document.addEventListener('DOMContentLoaded', install);
   ['change', 'drop', 'paste'].forEach(function(type) { document.addEventListener(type, install, true); });
 })();

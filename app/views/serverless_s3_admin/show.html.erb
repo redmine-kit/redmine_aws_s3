@@ -12,6 +12,7 @@
     <tr><th><%= l(:field_redmine_serverless_s3_domain) %> (<code><%= RedmineServerlessS3::ENV_DOMAIN %></code>)</th><td><%= RedmineServerlessS3.cloudfront_domain || '-' %></td></tr>
     <tr><th><%= l(:field_redmine_serverless_s3_key_pair_id) %> (<code><%= RedmineServerlessS3::ENV_KEY_PAIR_ID %></code>)</th><td><%= RedmineServerlessS3.key_pair_id || '-' %></td></tr>
     <tr><th><%= l(:field_redmine_serverless_s3_private_key) %> (<code><%= RedmineServerlessS3::ENV_PRIVATE_KEY %></code>)</th><td><%= l(RedmineServerlessS3.private_key? ? :label_redmine_serverless_s3_set : :label_redmine_serverless_s3_not_set) %></td></tr>
+    <tr><th><%= l(:field_redmine_serverless_s3_malware_scan) %> (<code><%= RedmineServerlessS3::ENV_MALWARE_SCAN %></code>)</th><td><%= l(RedmineServerlessS3.malware_scan? ? :general_text_Yes : :general_text_No) %></td></tr>
     <tr><th><%= l(:field_redmine_serverless_s3_storage_path) %></th><td><code><%= Attachment.storage_path %></code></td></tr>
   </tbody>
 </table>
@@ -44,6 +45,22 @@
   <% end %>
   </tbody>
 </table>
+<% end %>
+
+<% if RedmineServerlessS3.malware_scan? || RedmineServerlessS3::MalwareScan.findings.any? %>
+<h3><%= l(:label_redmine_serverless_s3_malware_findings) %></h3>
+<% if (findings = RedmineServerlessS3::MalwareScan.findings).empty? %>
+  <p class="nodata"><%= l(:label_no_data) %></p>
+<% else %>
+<table class="list" id="serverless-s3-malware">
+  <thead><tr><th><%= l(:field_created_on) %></th><th><%= l(:field_status) %></th><th><%= l(:field_filename) %></th><th><%= l(:field_login) %></th></tr></thead>
+  <tbody>
+  <% findings.each do |finding| %>
+    <tr><td><%= finding['time'] %></td><td><%= finding['status'] %></td><td><%= finding['filename'] %></td><td><%= finding['user'] %></td></tr>
+  <% end %>
+  </tbody>
+</table>
+<% end %>
 <% end %>
 
 <h3><%= l(:label_redmine_serverless_s3_reconciliation) %></h3>

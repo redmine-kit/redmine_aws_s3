@@ -53,6 +53,48 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
     end
   end
 
+  def test_uploads_through_lambda_wait_for_the_malware_scan
+    with_s3(stub_client(get_object_tagging: scan_tag('NO_THREATS_FOUND'))) do |client|
+      with_malware_scan do
+        a = Attachment.create!(container: Issue.find(1), author: User.find(1),
+                               file: mock_file(filename: 'scanned.txt', content: 'scanned'))
+        requests = client.api_requests.index_by { |request| request[:operation_name] }
+
+        assert_match %r{\Aincoming/}, requests[:put_object][:params][:key]
+        assert_equal a.s3_key, requests[:copy_object][:params][:key]
+      end
+    end
+  end
+
+  def test_a_threat_in_an_upload_through_lambda_is_a_validation_error
+    with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do
+      with_malware_scan do
+        a = Attachment.new(container: Issue.find(1), author: User.find(1),
+                           file: mock_file(filename: 'virus.txt', content: 'x'))
+
+        assert_not a.save
+        assert_includes a.errors.full_messages.join, 'threat'
+        assert_not Attachment.exists?(filename: 'virus.txt')
+        assert_not File.exist?(a.local_diskfile)
+      end
+    end
+  ensure
+    Setting.plugin_redmine_serverless_s3 = {}
+  end
+
+  def test_attachments_of_received_mail_are_not_waited_for
+    with_s3(stub_client) do |client|
+      with_malware_scan do
+        RedmineServerlessS3::MalwareScan.skip do
+          Attachment.create!(container: Issue.find(1), author: User.find(1),
+                             file: mock_file(filename: 'mail.txt', content: 'mail'))
+        end
+
+        assert_not_includes operations(client), :get_object_tagging
+      end
+    end
+  end
+
   def test_saving_without_a_new_file_puts_nothing
     with_s3(stub_client) do |client|
       a = Attachment.find(1)

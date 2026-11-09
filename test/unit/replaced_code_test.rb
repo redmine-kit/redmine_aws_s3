@@ -28,6 +28,7 @@ class RedmineServerlessS3ReplacedCodeTest < ActiveSupport::TestCase
     'Import#file_exists?' => 'f15c3d5b959609e41ade42a05e81c868f8c5338da55150b1cd72d7c24ad01d2c',
     'Import#filepath' => 'db9251dfaa6d8784c433fc523be573f5836fa1730e9ac573b6ca442472db751f',
     'Import#remove_file' => '4660ab4540e968e5058b576672829017310570b8e88dde74034b7f3083682edd',
+    'MailHandler#receive' => '6db5ad4dc00eac4c6cf68367bbc69654a58f178a9c0e57e26c1440c4e1f67f86',
     'SettingsController#plugin' => 'afe34e0132b3743946110b8feff0aaa4f5ccd72ec6dddbe9c09cf16db89ceab1'
   }.freeze
 

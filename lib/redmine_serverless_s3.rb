@@ -12,6 +12,7 @@ module RedmineServerlessS3
   ENV_DOMAIN = 'REDMINE_CLOUDFRONT_DOMAIN'
   ENV_KEY_PAIR_ID = 'REDMINE_CLOUDFRONT_KEY_PAIR_ID'
   ENV_PRIVATE_KEY = 'REDMINE_CLOUDFRONT_PRIVATE_KEY'
+  ENV_MALWARE_SCAN = 'REDMINE_S3_MALWARE_SCAN'
 
   # Defaults of the plugin settings.
   DEFAULT_SETTINGS = {
@@ -34,6 +35,7 @@ module RedmineServerlessS3
       end
       Import.prepend(ImportPatch) unless Import < ImportPatch
       SettingsController.prepend(SettingsControllerPatch) unless SettingsController < SettingsControllerPatch
+      MailHandler.prepend(MailHandlerPatch) unless MailHandler < MailHandlerPatch
       # Loaded here so that the listener registers itself in every environment.
       Hooks.name
       RedmineServerlessAdmin.register_tab(:s3, label: :label_redmine_serverless_s3_admin,
@@ -56,6 +58,11 @@ module RedmineServerlessS3
 
     def region
       ENV[ENV_REGION].presence || ENV['AWS_REGION'].presence || ENV.fetch('AWS_DEFAULT_REGION', nil).presence
+    end
+
+    # Whether objects wait for GuardDuty's scan before use.
+    def malware_scan?
+      ENV.fetch(ENV_MALWARE_SCAN, '').strip.casecmp?('true')
     end
 
     def cloudfront_domain

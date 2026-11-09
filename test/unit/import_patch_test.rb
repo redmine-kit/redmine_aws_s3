@@ -54,6 +54,30 @@ class RedmineServerlessS3ImportPatchTest < ActiveSupport::TestCase
     end
   end
 
+  def test_the_file_is_read_after_a_clean_scan
+    with_s3(stub_client(get_object_tagging: [scan_tag(nil), scan_tag('NO_THREATS_FOUND')])) do
+      with_malware_scan do
+        import = new_import
+
+        assert_not Import.find(import.id).file_exists?
+        assert Import.find(import.id).file_exists?
+      end
+    end
+  end
+
+  def test_a_threat_in_an_import_file
+    with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do
+      with_malware_scan do
+        import = new_import
+
+        assert_not Import.find(import.id).file_exists?
+        assert_not File.exist?(import.filepath)
+      end
+    end
+  ensure
+    Setting.plugin_redmine_serverless_s3 = {}
+  end
+
   def test_off_without_the_bucket
     client = stub_client
     RedmineServerlessS3.client = client

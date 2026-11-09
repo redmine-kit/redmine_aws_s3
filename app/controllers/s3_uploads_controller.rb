@@ -30,6 +30,8 @@ class S3UploadsController < ApplicationController
         end
       end
     end
+  rescue RedmineServerlessS3::Upload::Pending => e
+    scanning(e.message)
   rescue RedmineServerlessS3::Upload::Error => e
     respond_to do |format|
       format.js do
@@ -40,6 +42,17 @@ class S3UploadsController < ApplicationController
   end
 
   private
+
+  # 202: the malware scan has not finished; the same request can be sent again.
+  def scanning(message)
+    response.headers['Retry-After'] = '2'
+    respond_to do |format|
+      format.js do
+        render json: { status: 'scanning', message: message }, status: :accepted, content_type: 'application/json'
+      end
+      format.api { head :accepted }
+    end
+  end
 
   def require_s3
     render_404 unless RedmineServerlessS3.enabled?

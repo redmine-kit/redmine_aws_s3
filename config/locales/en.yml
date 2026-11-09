@@ -10,6 +10,10 @@ en:
   label_redmine_serverless_s3_ok: OK
   label_redmine_serverless_s3_failed: Failed
   label_redmine_serverless_s3_reconciliation: Reconciliation
+  label_redmine_serverless_s3_malware_findings: Files refused by the malware scan
+  field_redmine_serverless_s3_malware_scan: Wait for the GuardDuty malware scan
+  error_redmine_serverless_s3_malware_found: The file was refused because the malware scan found a threat in it.
+  error_redmine_serverless_s3_malware_not_scanned: "The file was refused because the malware scan could not check it (%{status})."
   button_redmine_serverless_s3_read_write: Check reading and writing
   button_redmine_serverless_s3_delivery: Check delivery through CloudFront
   button_redmine_serverless_s3_reconcile: Reconcile

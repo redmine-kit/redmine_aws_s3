@@ -11,6 +11,13 @@ module RedmineServerlessS3
   class Upload
     class Error < StandardError; end
 
+    # The malware scan has not finished; the client calls complete again.
+    class Pending < Error
+      def initialize(message = 'the file is still being scanned for malware')
+        super
+      end
+    end
+
     SHA256_BASE64 = %r{\A[A-Za-z0-9+/]{43}=\z}
     TICKET_PURPOSE = :redmine_serverless_s3_upload
 
@@ -49,6 +56,7 @@ module RedmineServerlessS3
       key = data['key']
       raise Error, 'the key is not an upload' unless key.to_s.start_with?('incoming/')
 
+      scan!(key, data)
       head = storage.head(key, checksum: true)
       raise Error, 'the upload is not in S3' unless head
 
@@ -67,6 +75,17 @@ module RedmineServerlessS3
       return unless size > max
 
       raise Error, ::I18n.t(:error_attachment_too_big, max_size: max)
+    end
+
+    # Waits for GuardDuty's tag when the scan is on (docs/attachments.md#malware-scan).
+    def scan!(key, data)
+      return unless RedmineServerlessS3::MalwareScan.required?
+
+      RedmineServerlessS3::MalwareScan.check!(key, filename: data['filename'], user: user)
+    rescue RedmineServerlessS3::MalwareScan::Pending
+      raise Pending
+    rescue RedmineServerlessS3::MalwareScan::Error => e
+      raise Error, e.message
     end
 
     def verify!(head, data, key)
@@ -101,31 +120,12 @@ module RedmineServerlessS3
                  false
                else
                  attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
-                 attachment.disk_filename = free_name(attachment.filename, attachment.disk_directory)
+                 attachment.disk_filename = DiskName.free(attachment.filename, attachment.disk_directory)
                  storage.copy(key, attachment.s3_key)
                  true
                end
       storage.delete(key)
       copied
-    end
-
-    # A name like Redmine's Attachment.create_diskfile, not used in S3 yet.
-    def free_name(filename, directory)
-      timestamp = Time.zone.now.strftime('%y%m%d%H%M%S')
-      ascii = if /\A[a-zA-Z0-9_.-]*\z/.match?(filename) && filename.length <= 50
-                filename
-              else
-                hashed = ActiveSupport::Digest.hexdigest(filename)
-                ext = filename[/(\.[a-zA-Z0-9]+)\z/, 1]
-                ext && (hashed.length + ext.length) <= 50 ? hashed + ext : hashed
-              end
-      loop do
-        name = "#{timestamp}_#{ascii}"
-        return name unless storage.exists?(RedmineServerlessS3.file_key(directory, name)) ||
-                           Attachment.exists?(disk_directory: directory, disk_filename: name)
-
-        timestamp = timestamp.succ
-      end
     end
 
     def storage

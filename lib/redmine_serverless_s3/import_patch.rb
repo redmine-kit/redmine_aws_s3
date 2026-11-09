@@ -12,11 +12,27 @@ module RedmineServerlessS3
       RedmineServerlessS3.storage.put_file(s3_import_key, filepath)
     end
 
+    # The file is read only after the malware scan has found it clean, when
+    # the scan is on; it is fetched from S3 if this environment does not
+    # have it.
     def file_exists?
       return super unless RedmineServerlessS3.enabled? && filepath.present?
+      return false unless malware_scanned?
       return true if File.exist?(filepath)
 
       RedmineServerlessS3.storage.download(s3_import_key, filepath)
+    end
+
+    def malware_scanned?
+      return true if @s3_malware_scanned || !RedmineServerlessS3::MalwareScan.required?
+
+      RedmineServerlessS3::MalwareScan.check!(s3_import_key, filename: filename, user: user)
+      @s3_malware_scanned = true
+    rescue RedmineServerlessS3::MalwareScan::Pending
+      false
+    rescue RedmineServerlessS3::MalwareScan::Error
+      FileUtils.rm_f(filepath)
+      false
     end
 
     def s3_import_key
