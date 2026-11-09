@@ -6,6 +6,8 @@ Redmine Serverless S3 の管理画面です。Redmine の管理者だけが開�
 
 ## 添付ファイルの S3
 
+![「読み書きを確認する」のあとの「添付ファイルの S3」のタブ。環境、設定、読み書きの確認の結果、マルウェアの検出、最後の突き合わせ](./images/s3-admin.png)
+
 | 項目 | 中身 | 取得元 |
 | --- | --- | --- |
 | 環境変数 | バケットの名前、リージョン、CloudFront のドメインとキーペアの ID、秘密鍵があるかどうか、手元のキャッシュのディレクトリ | 環境変数([setup.md](setup.md#configuration))。表示だけ。秘密鍵そのものは出さない |
@@ -46,3 +48,5 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 ## テスト
 
 画面には Redmine の機能のテストがあります。システムのテストはまだ書いていません([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
+
+このページの画面のスクリーンショットは、`bin/screenshots` で撮ります(Docker の中のヘッドレスの Chromium と、Redmine のテストのデータと、テストの S3。バケット、CloudFront の値、検出、突き合わせは例)。画面を変えたら実行します。

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Takes the screenshots of the docs (docs/images/, docs/ja/images/) in headless
+# Chromium, from Redmine 7.0.3 with this plugin and Redmine's test data
+# (test/screenshots/screens.rb, not named *_test.rb so that bin/test leaves
+# it out). Run it after changing a screen.
+#   bin/screenshots
+# Commands that run inside the container are in single quotes on purpose.
+# shellcheck disable=SC2016
+set -euo pipefail
+cd "$(dirname "$0")/.."
+plugin=redmine_serverless_s3
+image=redmine-serverless-s3-test
+project=redmine-serverless-s3-test
+compose=(docker compose -f test/compose.yml -p "$project" --profile system)
+"${compose[@]}" up -d --wait >/dev/null
+trap '"${compose[@]}" stop chrome >/dev/null' EXIT
+docker buildx build --load -q -t "$image" -f test/Dockerfile . >/dev/null
+mkdir -p docs/images docs/ja/images
+# The browser in the chrome container opens the test server of this container
+# by its network alias.
+docker run --rm --network "${project}_default" --network-alias redmine-screenshots \
+  -e SELENIUM_REMOTE_URL=http://chrome:4444 -e CAPYBARA_SERVER_HOST=0.0.0.0 -e CAPYBARA_SERVER_PORT=3001 \
+  -e CAPYBARA_APP_HOST=http://redmine-screenshots:3001 -e GOOGLE_CHROME_OPTS_ARGS=--headless=new,--force-device-scale-factor=2 \
+  -e PARALLEL_WORKERS=1 -e S3_TEST_ENDPOINT=http://moto:5000 -e AWS_REGION=us-east-1 \
+  -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -v "$PWD/docs:/redmine/plugins/$plugin/docs" "$image" \
+  sh -c 'bin/rails db:drop db:create db:migrate redmine:plugins:migrate >/dev/null && bin/rails test "$1"' \
+  screenshots "plugins/$plugin/test/screenshots/screens.rb"

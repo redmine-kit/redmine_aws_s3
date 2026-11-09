@@ -4,6 +4,8 @@ This is the administration page of Redmine Serverless S3. Only Redmine administr
 
 ## Attachments in S3
 
+![The Attachments in S3 tab after Check reading and writing: the environment, the settings, the results of the check, a malware finding and the last reconciliation](./images/s3-admin.png)
+
 | Item | Contents | Source |
 | --- | --- | --- |
 | Environment variables | Bucket name, Region, CloudFront domain and key pair ID, whether the private key is set, the local cache directory | Environment variables ([setup.md](setup.md#configuration)), display only. The private key itself is not shown |
@@ -36,3 +38,5 @@ For the reconciliation job, the role that runs jobs gets permission to list the 
 ## Tests
 
 The page has Redmine functional tests; system tests are not written yet ([testing.md](https://redmine-kit.github.io/serverless/testing.html#administration-pages)).
+
+The screenshot on this page is taken with `bin/screenshots` (headless Chromium in Docker, with Redmine's test data and the S3 of the tests; the bucket, the CloudFront values, the finding and the reconciliation are examples). Run it after changing the page.
