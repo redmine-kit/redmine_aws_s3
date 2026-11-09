@@ -29,28 +29,6 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
     RedmineServerlessS3.storage.keys(prefix)
   end
 
-  # HeadObject as S3 answers it for an object uploaded with a SHA256
-  # checksum, where the backend does not return the checksum (moto).
-  def emulate_s3_checksums
-    RedmineServerlessS3::Storage.class_eval do
-      alias_method :head_without_checksum, :head
-      define_method(:head) do |key, checksum: false|
-        result = head_without_checksum(key, checksum: checksum)
-        return result unless result && checksum && result.checksum_sha256.nil?
-
-        data = client.get_object(bucket: bucket, key: key).body.read
-        Struct.new(:content_length, :checksum_sha256, :checksum_type)
-              .new(result.content_length, Digest::SHA256.base64digest(data), 'FULL_OBJECT')
-      end
-    end
-    yield
-  ensure
-    RedmineServerlessS3::Storage.class_eval do
-      alias_method :head, :head_without_checksum
-      remove_method :head_without_checksum
-    end
-  end
-
   # The browser's PUT, sent to S3 as CloudFront does through OAC.
   def put_upload(url, headers, data)
     key = URI(url).path.delete_prefix('/')

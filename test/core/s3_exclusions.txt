@@ -1,0 +1,28 @@
+# Redmine tests left out of `bin/test core-s3` (Redmine's attachment tests
+# with the plugin on), with the reason. One test per line:
+#   Class#test_name  # reason
+# The plugin's own tests check the replacing behavior (docs/setup.md#what-the-tests-check).
+#
+# Downloads redirect to a CloudFront signed URL instead of sending the file,
+# so the response has no file contents, content type or X-Sendfile header.
+AttachmentsControllerTest#test_download_text_file  # redirect, no contents
+AttachmentsControllerTest#test_download_js_file  # redirect, no contents
+AttachmentsControllerTest#test_download_version_file_with_issue_tracking_disabled  # redirect, no contents
+AttachmentsControllerTest#test_download_should_assign_content_type_if_blank  # the type is in response-content-type of the URL
+AttachmentsControllerTest#test_download_should_assign_better_content_type_than_application_octet_stream  # same
+AttachmentsControllerTest#test_download_should_assign_application_octet_stream_if_content_type_is_not_determined  # same
+AttachmentsTest#test_download_should_set_sendfile_header  # no X-Sendfile; CloudFront serves the file
+AttachmentsTest#test_upload_as_js_and_preview_as_inline_attachment  # the preview is a redirect to the signed URL
+Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/download/:id/:filename_should_return_the_attachment_content  # redirect, no contents
+#
+# Thumbnails redirect to a signed URL under /thumbnails/.
+AttachmentsControllerTest#test_thumbnail  # redirect, no image
+AttachmentsControllerTest#test_thumbnail_for_pdf_should_be_png  # redirect, no image
+Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/thumbnail/:id_should_return_the_thumbnail  # redirect, no image
+# The test makes generation fail, but the bucket keeps the thumbnail an
+# earlier test stored for the same digest, and the plugin serves that one.
+AttachmentsControllerTest#test_thumbnail_should_return_404_if_thumbnail_generation_failed  # thumbnail already in S3
+#
+# "Download all" stores the zip in S3 and redirects to it under /tmp/bulk/.
+AttachmentsControllerTest#test_download_all_with_valid_container  # redirect, no zip in the response
+AttachmentsTest#test_download_all_for_journal_should_check_visibility  # redirect, no zip in the response

@@ -28,3 +28,14 @@ services:
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
       SERVICES: s3
     # The image has its own health check.
+
+  # Headless Chromium for the system tests (bin/test system), only with the
+  # "system" profile. Multi-architecture, so it runs on arm64 too.
+  chrome:
+    image: selenium/standalone-chromium:155.0-chromedriver-155.0-grid-4.51.0-20261010@sha256:c7c17cd79c62819a8329df00e610dbc4073c279da034a6f37135d454eb0d8870
+    profiles: ["system"]
+    shm_size: 2gb
+    healthcheck:
+      test: ["CMD", "/opt/bin/check-grid.sh", "--host", "0.0.0.0", "--port", "4444"]
+      interval: 2s
+      retries: 60

@@ -4,6 +4,9 @@
 # from moto otherwise.
 #   bin/test                  # the plugin's tests, with coverage in coverage/
 #   bin/test core             # Redmine's own tests with the plugin installed (off)
+#   bin/test system           # the plugin's system tests, in headless Chromium
+#   bin/test core-s3          # Redmine's attachment tests with the plugin on
+#                             # (test/core/s3_exclusions.txt lists those left out)
 #   bin/test <files...>       # some of the plugin's tests
 #   PARALLEL_WORKERS=1 bin/test
 # Commands that run inside containers are in single quotes on purpose.
@@ -13,7 +16,11 @@ cd "$(dirname "$0")/.."
 image=redmine-serverless-s3-test
 network=redmine-serverless-s3-test_default
 
-bin/services >/dev/null
+if [[ "${1:-}" == "system" ]]; then
+  bin/services --system >/dev/null
+else
+  bin/services >/dev/null
+fi
 docker buildx build --load -q -t "$image" -f test/Dockerfile . >/dev/null
 workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
@@ -30,7 +37,29 @@ run() {
 }
 
 extra=()
-if [[ "${1:-}" == "core" ]]; then
+if [[ "${1:-}" == "system" ]]; then
+  shift
+  # The browser in the chrome container opens the test server of this
+  # container by its network alias.
+  extra=(--network-alias redmine-test -e SELENIUM_REMOTE_URL=http://chrome:4444
+    -e CAPYBARA_SERVER_HOST=0.0.0.0 -e CAPYBARA_SERVER_PORT=3001 -e CAPYBARA_APP_HOST=http://redmine-test:3001)
+  workers=1
+  run bin/rails test plugins/redmine_serverless_s3/test/system "$@"
+elif [[ "${1:-}" == "core-s3" ]]; then
+  shift
+  # The tests whose names are in s3_exclusions.txt assume Redmine's local
+  # storage; the file gives the reason for each.
+  exclude=$(grep -v '^#' test/core/s3_exclusions.txt | sed 's/  *# .*//' | grep . | paste -sd '|' - || true)
+  extra=(-e REDMINE_S3_TEST_CORE=1 -e REDMINE_S3_BUCKET="redmine-core-test-$RANDOM")
+  files=(test/unit/attachment_test.rb test/unit/attachment_transaction_test.rb
+    test/functional/attachments_controller_test.rb test/functional/attachments_visibility_test.rb
+    test/integration/attachments_test.rb test/integration/api_test/attachments_test.rb)
+  if [[ -n "$exclude" ]]; then
+    run bin/rails test "${files[@]}" --exclude "/\\A(?:$exclude)\\z/" "$@"
+  else
+    run bin/rails test "${files[@]}" "$@"
+  fi
+elif [[ "${1:-}" == "core" ]]; then
   shift
   run bin/rails test "$@"
 elif (($#)); then
@@ -41,5 +70,5 @@ else
   rm -rf coverage && mkdir coverage
   workers=1
   extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_serverless_s3/coverage")
-  run bin/rails test plugins/redmine_serverless_s3/test
+  run bin/rails test plugins/redmine_serverless_s3/test/{unit,functional,integration}
 fi

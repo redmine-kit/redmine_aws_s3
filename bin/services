@@ -9,6 +9,11 @@ compose=(docker compose -f test/compose.yml -p redmine-serverless-s3-test)
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   compose+=(--profile localstack)
 fi
+# bin/services --system also starts Chromium for the system tests.
+if [[ "${1:-}" == "--system" ]]; then
+  compose+=(--profile system)
+  shift
+fi
 if [[ "${1:-}" == "--down" ]]; then
   "${compose[@]}" down -v
   exit 0

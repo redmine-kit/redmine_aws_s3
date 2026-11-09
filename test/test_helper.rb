@@ -71,14 +71,14 @@ module RedmineServerlessS3
     end
 
     # A client of the S3 of the tests; skips the test without it.
-    def test_s3_client
+    def s3_test_client
       skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
       Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true, region: 'us-east-1',
                           credentials: Aws::Credentials.new('test', 'test'))
     end
 
     def with_test_s3(&)
-      client = test_s3_client
+      client = s3_test_client
       bucket = "redmine-test-#{SecureRandom.hex(6)}"
       client.create_bucket(bucket: bucket)
       with_s3(client, bucket: bucket, &)
@@ -88,6 +88,33 @@ module RedmineServerlessS3
         client.delete_objects(bucket: bucket, delete: { objects: keys }) if keys.any?
         client.delete_bucket(bucket: bucket)
       end
+    end
+
+    # HeadObject as S3 answers it for an object uploaded with a SHA256
+    # checksum, where the backend does not return the checksum (moto).
+    # On only inside emulate_s3_checksums, from any thread (the system tests'
+    # server runs in its own).
+    module EmulatedChecksums
+      class << self
+        attr_accessor :enabled
+      end
+
+      def head(key, checksum: false)
+        result = super
+        return result unless EmulatedChecksums.enabled && result && checksum && result.checksum_sha256.nil?
+
+        data = client.get_object(bucket: bucket, key: key).body.read
+        Struct.new(:content_length, :checksum_sha256, :checksum_type)
+              .new(result.content_length, Digest::SHA256.base64digest(data), 'FULL_OBJECT')
+      end
+    end
+
+    def emulate_s3_checksums
+      Storage.prepend(EmulatedChecksums) unless Storage < EmulatedChecksums
+      EmulatedChecksums.enabled = true
+      yield
+    ensure
+      EmulatedChecksums.enabled = false
     end
 
     def sha256_base64(data)

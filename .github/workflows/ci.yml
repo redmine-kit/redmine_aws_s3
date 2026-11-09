@@ -38,6 +38,13 @@ jobs:
       - run: bin/test
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+      # Redmine's own attachment tests with the plugin on, and the browser.
+      - run: bin/test core-s3
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+      - run: bin/test system
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
       # Not failing the run while the Codecov GitHub App is not installed.
       - uses: codecov/codecov-action@v7.1.1
         with:
@@ -45,6 +52,6 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
       - if: always()
-        run: bin/services --down
+        run: bin/services --system --down
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}

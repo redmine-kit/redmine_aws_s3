@@ -24,4 +24,5 @@ RUN printf "group :test do\n  gem 'simplecov-cobertura', require: false\nend\n" 
 # so the tests run with the newest versions the Gemfiles allow.
 RUN bundle install --jobs 4
 COPY . plugins/redmine_serverless_s3/
+COPY test/core/additional_environment.rb config/additional_environment.rb
 ENV RAILS_ENV=test
