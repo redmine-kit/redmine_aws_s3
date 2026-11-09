@@ -10,13 +10,22 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ## Installation
 
-**Getting the plugin:** with Docker, copy it from the plugin's image on ghcr.io, pinned by digest (tags: `main` and `sha-<commit>` for every push to `main`, `v*` for releases):
+**Getting the plugin:** Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). No version is published yet. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files; Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
-```dockerfile
-COPY --from=ghcr.io/redmine-kit/redmine_serverless_s3:main@sha256:<digest> /redmine_serverless_s3 plugins/redmine_serverless_s3/
+```ruby
+# Redmine's Gemfile.local
+source 'https://rubygems.pkg.github.com/redmine-kit' do
+  gem 'redmine_serverless_s3'
+end
 ```
 
-Without Docker, clone the repository (`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`) or, once releases are published, extract a release archive into `plugins/redmine_serverless_s3`.
+```sh
+bundle config set --global rubygems.pkg.github.com <user>:<token>   # or the variable BUNDLE_RUBYGEMS__PKG__GITHUB__COM
+bundle install
+ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s3
+```
+
+Without the gem, clone the repository into `plugins/redmine_serverless_s3` (`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`).
 
 1. Put the plugin in `plugins/redmine_serverless_s3` and run `bundle install` (the plugin's `Gemfile` adds `aws-sdk-s3`; Redmine's `Gemfile` loads it).
 2. No migrations are needed.
