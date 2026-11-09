@@ -34,9 +34,13 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 - **変数の名前:** 環境変数の名前は、コードを書くときに決めます(未定)。
 
+<a id="aws-resources"></a>
+
+## AWS のリソース
+
 <a id="the-bucket"></a>
 
-## バケット
+### バケット
 
 バケットは 1 つで、キーは [attachments.md](attachments.md#bucket-layout) のとおりです。
 
@@ -53,7 +57,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 <a id="the-cloudfront-distribution"></a>
 
-## CloudFront のディストリビューション
+### CloudFront のディストリビューション
 
 プラグインは、Redmine 自身のディストリビューションを使い、2 つめのディストリビューションは要りません。次のものを足します。
 
@@ -75,13 +79,17 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 プラグインを入れた Redmine を動かすプロセス(画面の要求、ジョブ、rake)には、どれもバケットへの同じ権限を渡します。ブラウザーはこの認証情報を使いません。アップロードとダウンロードは、CloudFront の秘密鍵で署名した URL で、CloudFront を通ります。
 
-| 権限 | リソース | 使いみち |
+| 操作 | 対象 | 理由 |
 | --- | --- | --- |
 | `s3:GetObject`、`s3:PutObject`、`s3:DeleteObject` | バケットの `files/*`、`thumbnails/*`、`imports/*`、`incoming/*`、`tmp/*` | 添付ファイルとサムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `incoming/` からの写し、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
 | `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、突き合わせ、接続の確認の `HeadBucket` |
 | CloudFront の秘密鍵を読む | それを入れた秘密の値(Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
 
-ポリシーの例です。
+<a id="example-policy"></a>
+
+### 例のポリシー
+
+プラグインを入れた Redmine を動かす、すべてのプロセスのポリシーです。
 
 ```json
 {
@@ -108,6 +116,10 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
   ]
 }
 ```
+
+<a id="resource-based-policies"></a>
+
+### リソースベースのポリシー
 
 OAC を通した CloudFront を許すバケットポリシーです。
 
@@ -157,6 +169,12 @@ TLS でない要求を拒むバケットポリシーです。
 }
 ```
 
+<a id="not-checked-yet"></a>
+
+### 未確認のこと
+
+- OAC を使う CloudFront が、チェックサムのヘッダーを付けた `incoming/` への PUT を通すか。ほかは [attachments.md](attachments.md#to-verify) の項目です。
+
 <a id="network"></a>
 
 ## ネットワーク
@@ -172,3 +190,9 @@ TLS でない要求を拒むバケットポリシーです。
 ## テスト
 
 Redmine の標準のプラグインのテスト(`bin/rake redmine:plugins:test NAME=redmine_serverless_s3`)です。S3 は、ユニットと機能のテストでは SDK の `stub_responses`、統合とシステムのテストでは moto で再現します。Redmine 本体の添付ファイルのテストも、プラグインを有効にして実行します([Serverless の testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3-redmine_serverless_s3))。
+
+<a id="to-verify"></a>
+
+## 確認すること
+
+設計で決まっていないことは、[attachments.md](attachments.md#to-verify) にあります。

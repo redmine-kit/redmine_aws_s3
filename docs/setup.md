@@ -28,7 +28,9 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 - **Variable names:** The names of the environment variables are decided when the code is written (not decided yet).
 
-## The bucket
+## AWS resources
+
+### The bucket
 
 One bucket, with the keys in [attachments.md](attachments.md#bucket-layout).
 
@@ -43,7 +45,7 @@ One bucket, with the keys in [attachments.md](attachments.md#bucket-layout).
 
 - **Who reaches the bucket:** CloudFront through OAC, and the roles of the processes that run Redmine. Browsers never get S3 presigned URLs.
 
-## The CloudFront distribution
+### The CloudFront distribution
 
 The plugin uses Redmine's own distribution; no second distribution is needed. Add these to it:
 
@@ -63,13 +65,15 @@ The plugin uses Redmine's own distribution; no second distribution is needed. Ad
 
 Every process that runs Redmine with the plugin (web requests, jobs, rake) gets the same permissions on the bucket. Browsers do not use these credentials: uploads and downloads go through CloudFront with URLs signed by the CloudFront private key.
 
-| Permission | Resource | Use |
+| Action | Resource | Why |
 | --- | --- | --- |
 | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `files/*`, `thumbnails/*`, `imports/*`, `incoming/*`, `tmp/*` in the bucket | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
 | `s3:ListBucket` | The bucket | `HeadObject` on a missing object returns 404 instead of 403. Deleting thumbnails by prefix, reconciliation, `HeadBucket` in the connection check |
 | Reading the CloudFront private key | The secret that holds it (on Serverless, `ssm:GetParametersByPath` on `/<instance>/env/`, through [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/)) | Signing CloudFront URLs |
 
-Example policy:
+### Example policy
+
+For every process that runs Redmine with the plugin:
 
 ```json
 {
@@ -96,6 +100,8 @@ Example policy:
   ]
 }
 ```
+
+### Resource-based policies
 
 Bucket policy that allows CloudFront through OAC:
 
@@ -145,6 +151,10 @@ Bucket policy that denies requests without TLS:
 }
 ```
 
+### Not checked yet
+
+- Whether CloudFront with OAC passes a PUT to `incoming/` with the checksum header, and the other items in [attachments.md](attachments.md#to-verify).
+
 ## Network
 
 | From | To | In a VPC without internet access |
@@ -156,3 +166,7 @@ Bucket policy that denies requests without TLS:
 ## Tests
 
 Redmine's standard plugin tests (`bin/rake redmine:plugins:test NAME=redmine_serverless_s3`), with S3 reproduced by the SDK's `stub_responses` in unit and functional tests, and by moto in integration and system tests. Redmine's own attachment tests also run with the plugin on ([Serverless testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3-redmine_serverless_s3)).
+
+## To verify
+
+The open questions of the design are in [attachments.md](attachments.md#to-verify).
