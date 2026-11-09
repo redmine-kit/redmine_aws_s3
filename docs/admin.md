@@ -29,7 +29,7 @@ Every Redmine Serverless plugin ships the same small shared part: `lib/redmine_s
 
 ## Maximum attachment size
 
-Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. When the plugin is on, it adds a note on the practical limit next to the setting, with a small script on the settings page: uploads through CloudFront are limited by the CloudFront Function on `/incoming/*`, which must use the same value, and by what CloudFront accepts for one PUT; on Lambda, the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
+Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. When the plugin is on, it adds a note on the practical limit next to the setting, with a small script on the settings page: uploads through CloudFront are limited by the CloudFront Function on `/tmp/*` (uploads under `/tmp/incoming/`), which must use the same value, and by what CloudFront accepts for one PUT; on Lambda, the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
 
 ## Permissions
 

@@ -6,8 +6,8 @@ Every process that runs Redmine with the plugin (web requests, jobs, rake) gets 
 
 | Action | Resource | Why |
 | --- | --- | --- |
-| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | In the bucket:<br>`files/*`<br>`thumbnails/*`<br>`imports/*`<br>`incoming/*`<br>`tmp/*` | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
-| `s3:GetObjectTagging` | In the bucket:<br>`incoming/*`<br>`imports/*` | Reading GuardDuty's scan result, when the malware scan is on ([attachments.md](attachments.md#malware-scan)) |
+| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | In the bucket:<br>`files/*`<br>`imports/*`<br>`tmp/*` | Storing and deleting attachments, Markdown previews and thumbnails, `HeadObject` with the checksum and copying from `tmp/incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | In the bucket:<br>`tmp/incoming/*`<br>`imports/*` | Reading GuardDuty's scan result, when the malware scan is on ([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | The bucket | `HeadObject` on a missing object returns 404 instead of 403. Deleting thumbnails by prefix, reconciliation, `HeadBucket` in the connection check |
 | Reading the CloudFront private key | The secret that holds it (on Serverless, `ssm:GetParametersByPath` on `/<instance>/env/`, through [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/)) | Signing CloudFront URLs |
 
@@ -25,9 +25,7 @@ For every process that runs Redmine with the plugin:
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": [
         "arn:aws:s3:::<bucket>/files/*",
-        "arn:aws:s3:::<bucket>/thumbnails/*",
         "arn:aws:s3:::<bucket>/imports/*",
-        "arn:aws:s3:::<bucket>/incoming/*",
         "arn:aws:s3:::<bucket>/tmp/*"
       ]
     },
@@ -35,7 +33,7 @@ For every process that runs Redmine with the plugin:
       "Sid": "ScanResults",
       "Effect": "Allow",
       "Action": "s3:GetObjectTagging",
-      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
+      "Resource": ["arn:aws:s3:::<bucket>/tmp/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
     },
     {
       "Sid": "Bucket",
@@ -62,7 +60,7 @@ Bucket policy that allows CloudFront through OAC:
       "Action": "s3:GetObject",
       "Resource": [
         "arn:aws:s3:::<bucket>/files/*",
-        "arn:aws:s3:::<bucket>/thumbnails/*",
+        "arn:aws:s3:::<bucket>/tmp/thumbnails/*",
         "arn:aws:s3:::<bucket>/tmp/bulk/*"
       ],
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
@@ -72,7 +70,7 @@ Bucket policy that allows CloudFront through OAC:
       "Effect": "Allow",
       "Principal": { "Service": "cloudfront.amazonaws.com" },
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::<bucket>/incoming/*",
+      "Resource": "arn:aws:s3:::<bucket>/tmp/incoming/*",
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
     }
   ]
@@ -90,7 +88,7 @@ Bucket policy that denies reading uploads and import files before the malware sc
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:GetObject",
-      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
+      "Resource": ["arn:aws:s3:::<bucket>/tmp/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
       "Condition": {
         "StringNotEquals": {
           "s3:ExistingObjectTag/GuardDutyMalwareScanStatus": "NO_THREATS_FOUND",
@@ -122,4 +120,4 @@ Bucket policy that denies requests without TLS:
 
 ## Not checked yet
 
-- Whether CloudFront with OAC passes a PUT to `incoming/` with the checksum header, and the other items in [attachments.md](attachments.md#to-verify).
+- Whether CloudFront with OAC passes a PUT to `tmp/incoming/` with the checksum header, and the other items in [attachments.md](attachments.md#to-verify).

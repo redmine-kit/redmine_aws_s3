@@ -8,8 +8,8 @@
 
 | 操作 | 対象 | 理由 |
 | --- | --- | --- |
-| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`thumbnails/*`<br>`imports/*`<br>`incoming/*`<br>`tmp/*` | 添付ファイルとサムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `incoming/` からのコピー、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
-| `s3:GetObjectTagging` | バケットの<br>`incoming/*`<br>`imports/*` | マルウェアのスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
+| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`imports/*`<br>`tmp/*` | 添付ファイル、Markdown のプレビュー、サムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `tmp/incoming/` からのコピー、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | バケットの<br>`tmp/incoming/*`<br>`imports/*` | マルウェアのスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、突き合わせ、接続の確認の `HeadBucket` |
 | CloudFront の秘密鍵を読む | それを入れた秘密の値(Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
 
@@ -29,9 +29,7 @@
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": [
         "arn:aws:s3:::<bucket>/files/*",
-        "arn:aws:s3:::<bucket>/thumbnails/*",
         "arn:aws:s3:::<bucket>/imports/*",
-        "arn:aws:s3:::<bucket>/incoming/*",
         "arn:aws:s3:::<bucket>/tmp/*"
       ]
     },
@@ -39,7 +37,7 @@
       "Sid": "ScanResults",
       "Effect": "Allow",
       "Action": "s3:GetObjectTagging",
-      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
+      "Resource": ["arn:aws:s3:::<bucket>/tmp/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
     },
     {
       "Sid": "Bucket",
@@ -68,7 +66,7 @@ OAC を通した CloudFront を許すバケットポリシーです。
       "Action": "s3:GetObject",
       "Resource": [
         "arn:aws:s3:::<bucket>/files/*",
-        "arn:aws:s3:::<bucket>/thumbnails/*",
+        "arn:aws:s3:::<bucket>/tmp/thumbnails/*",
         "arn:aws:s3:::<bucket>/tmp/bulk/*"
       ],
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
@@ -78,7 +76,7 @@ OAC を通した CloudFront を許すバケットポリシーです。
       "Effect": "Allow",
       "Principal": { "Service": "cloudfront.amazonaws.com" },
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::<bucket>/incoming/*",
+      "Resource": "arn:aws:s3:::<bucket>/tmp/incoming/*",
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
     }
   ]
@@ -96,7 +94,7 @@ OAC を通した CloudFront を許すバケットポリシーです。
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:GetObject",
-      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
+      "Resource": ["arn:aws:s3:::<bucket>/tmp/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
       "Condition": {
         "StringNotEquals": {
           "s3:ExistingObjectTag/GuardDutyMalwareScanStatus": "NO_THREATS_FOUND",
@@ -130,4 +128,4 @@ TLS でない要求を拒むバケットポリシーです。
 
 ## 未確認の事項
 
-- OAC を使う CloudFront が、チェックサムのヘッダーを付けた `incoming/` への PUT を通すか。ほかは [attachments.md](attachments.md#to-verify) の項目です。
+- OAC を使う CloudFront が、チェックサムのヘッダーを付けた `tmp/incoming/` への PUT を通すか。ほかは [attachments.md](attachments.md#to-verify) の項目です。

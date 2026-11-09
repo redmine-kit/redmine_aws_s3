@@ -29,7 +29,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.1 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.2 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -63,7 +63,7 @@ bundle install
 | --- | --- | --- |
 | `REDMINE_S3_BUCKET` | 添付ファイルのバケット。これでプラグインが有効になる。なければ、Redmine は標準のとおりに動く | 必須 |
 | `REDMINE_S3_REGION` | バケットのリージョン | 省略可。既定は `AWS_REGION`、次に `AWS_DEFAULT_REGION` |
-| `REDMINE_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
+| `REDMINE_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/tmp/thumbnails/`、`/tmp/bulk/`、`/tmp/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
 | `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | ディストリビューションの信頼されたキーグループの公開鍵の ID | 必須 |
 | `REDMINE_CLOUDFRONT_PRIVATE_KEY` | CloudFront の URL に署名する PEM の秘密鍵。ファイルやログには書かず、管理画面にも出さない | 必須。秘密の値。Serverless では SSM の SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
 | `REDMINE_S3_MALWARE_SCAN` | アップロードとインポートのファイルを使う前に、GuardDuty Malware Protection for S3 の結果を待つ([attachments.md](attachments.md#malware-scan)) | 省略可。`true` で有効。ほかの値やないときは無効 |
@@ -73,7 +73,7 @@ bundle install
 | 署名付き URL の有効期限 | 既定は、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
 | 手元のキャッシュの大きさ | 既定は 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
 | `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
-| 添付ファイルの最大の大きさ | これまでどおり変えられる。`/incoming/*` の CloudFront Functions は、同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
+| 添付ファイルの最大の大きさ | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
 Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロールです。プラグインが自分でアクセスキーを読むことはありません。
 
@@ -92,12 +92,12 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | 項目 | 設定 |
 | --- | --- |
 | バージョニング | 有効。古いバージョンは 30 日で消す |
-| ライフサイクル | `incoming/` と `tmp/` は 1 日、`imports/` は 7 日、古いバージョンは 30 日で消す |
+| ライフサイクル | `tmp/incoming/`、`tmp/bulk/`、`tmp/healthcheck/` は 1 日、`imports/` は 7 日、古いバージョンは 30 日で消す。サムネイル(`tmp/thumbnails/`)は消さない |
 | 暗号化 | SSE-S3(S3 の既定) |
 | 公開 | S3 のパブリックアクセスのブロックを有効にする。TLS でない要求は、バケットポリシーで拒む(`aws:SecureTransport` が `false`) |
 | CORS | なし。ブラウザーは Redmine のドメインだけを使う |
-| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`thumbnails/`、`tmp/bulk/` の読み取りと、`incoming/` への書き込みを許す。マルウェアのスキャンを使うときは、問題がないとわかる前の `incoming/` と `imports/` の読み取りを拒む |
-| マルウェアのスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
+| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許す。マルウェアのスキャンを使うときは、問題がないとわかる前の `tmp/incoming/` と `imports/` の読み取りを拒む |
+| マルウェアのスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `tmp/incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
 
 バケットに届くのは、OAC を通した CloudFront と、Redmine を動かすプロセスのロールだけです。ブラウザーに S3 の署名付き URL は渡しません。
 
@@ -110,12 +110,12 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | 項目 | 設定 |
 | --- | --- |
 | オリジン | 添付ファイルのバケット。要求に署名するオリジンアクセスコントロール(OAC)を付ける |
-| ビヘイビア<br>`/files/*`<br>`/thumbnails/*`<br>`/tmp/bulk/*` | GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。キャッシュのキーとオリジンへの要求に、クエリーの `response-content-disposition` と `response-content-type` を入れ、Cookie と `Authorization` のヘッダーは入れない。レスポンスヘッダーポリシーで `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付ける |
-| ビヘイビア `/incoming/*` | すべてのメソッド(PUT が要る)。署名付き URL を必須にする。キャッシュしない。オリジンへの要求で `x-amz-checksum-sha256` のヘッダーを渡す。ビューワーリクエストの CloudFront Functions で、アップロードの上限を超える `Content-Length` を断る |
+| ビヘイビア `/files/*` | 添付ファイル。GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。キャッシュのキーとオリジンへの要求に、クエリーの `response-content-disposition` と `response-content-type` を入れ、Cookie と `Authorization` のヘッダーは入れない。レスポンスヘッダーポリシーで `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付ける |
+| ビヘイビア `/tmp/*` | サムネイル(`/tmp/thumbnails/`)と zip(`/tmp/bulk/`)を GET で、アップロード(`/tmp/incoming/`)を PUT で受ける。すべてのメソッド、HTTPS だけ。署名付き URL を必須にする。キャッシュのポリシーと応答のヘッダーのポリシーは `/files/*` と同じ(PUT はキャッシュしない)。オリジンへの要求で `x-amz-checksum-sha256` のヘッダーも渡す。ビューワーリクエストの CloudFront Functions が、`/tmp/incoming/` への PUT で `Content-Length` がアップロードの上限を超えるものを拒む |
 | 信頼されたキーグループ | Redmine が URL の署名に使う秘密鍵の、公開鍵 |
 | ほかのビヘイビア | 今までどおり Redmine。本文のハッシュを入れる関数は、これらだけに付ける |
 
-これらのビヘイビアが Redmine の画面を隠すことはありません。Redmine には、`/files`、`/thumbnails`、`/tmp` で始まるルートがないためです(2026-11-09 に Redmine 7.0.3 で確認。[attachments.md](attachments.md#download))。
+これらのビヘイビアが Redmine の画面を隠すことはありません。Redmine には、`/files`、`/tmp` で始まるルートがないためです(2026-11-09 に Redmine 7.0.3 で確認。[attachments.md](attachments.md#download))。
 
 sandbox の CSP は外さないでください。添付ファイルは Redmine のオリジンから返るので、そこでスクリプトを動かさないようにしているのは、このポリシーです。ディストリビューションを変えるたびに、`/files/` の下の応答にこのポリシーが付いていることを確認します。
 
@@ -174,11 +174,11 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 
 | 対象 | 確認すること | 使うもの |
 | --- | --- | --- |
-| `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアのスキャンを使うときは `incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
+| `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアのスキャンを使うときは `tmp/incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
 | `readable?`<br>`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
-| `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
-| `/s3_uploads/presign` | 権限、拡張子、サイズ、SHA256 の形を確認する。URL はちょうど `/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
+| `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `tmp/thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
+| `/s3_uploads/presign` | 権限、拡張子、サイズ、SHA256 の形を確認する。URL はちょうど `/tmp/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
 | `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。`ChecksumSHA256`(`FULL_OBJECT`)と `ContentLength` が申告と等しく、そうでなければオブジェクトを消す。同じ内容は共有する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
 | `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
 | CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアのスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |

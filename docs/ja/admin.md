@@ -35,7 +35,7 @@ Redmine Serverless S3 の管理画面です。Redmine の管理者だけが開�
 
 ## 添付ファイルサイズの上限
 
-Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、管理 › 設定 › ファイル)は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に上限の目安の説明を足します。CloudFront を通したアップロードは、`/incoming/*` の CloudFront Functions(同じ値を使う必要がある)と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです([attachments.md](attachments.md#upload))。
+Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、管理 › 設定 › ファイル)は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に上限の目安の説明を足します。CloudFront を通したアップロードは、`/tmp/*` の CloudFront Functions(`/tmp/incoming/` へのアップロードに同じ値を使う必要がある)と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです([attachments.md](attachments.md#upload))。
 
 <a id="permissions"></a>
 

@@ -23,7 +23,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.1. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.2. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
 ```ruby
 # Redmine's Gemfile.local
@@ -53,7 +53,7 @@ bundle install
 | --- | --- | --- |
 | `REDMINE_S3_BUCKET` | The attachment bucket. Turns the plugin on; without it, Redmine behaves as standard | Required |
 | `REDMINE_S3_REGION` | The bucket's Region | Optional. Default: `AWS_REGION`, then `AWS_DEFAULT_REGION` |
-| `REDMINE_CLOUDFRONT_DOMAIN` | The domain of Redmine's distribution, for signed URLs under `/files/`, `/thumbnails/`, `/tmp/bulk/` and `/incoming/` | Required. Example: `redmine.example.com` |
+| `REDMINE_CLOUDFRONT_DOMAIN` | The domain of Redmine's distribution, for signed URLs under `/files/`, `/tmp/thumbnails/`, `/tmp/bulk/` and `/tmp/incoming/` | Required. Example: `redmine.example.com` |
 | `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | The ID of the public key in the distribution's trusted key group | Required |
 | `REDMINE_CLOUDFRONT_PRIVATE_KEY` | The private key in PEM that signs the CloudFront URLs. Never written to files or logs, and not shown on the administration page | Required. A secret. On Serverless, the SSM SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
 | `REDMINE_S3_MALWARE_SCAN` | Waits for GuardDuty Malware Protection for S3 before using uploads and import files ([attachments.md](attachments.md#malware-scan)) | Optional. `true` turns it on; anything else, or not set: off |
@@ -63,7 +63,7 @@ bundle install
 | Signed URL expiry | Default: 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) | Plugin settings ([administration page](admin.md#attachments-in-s3)) |
 | Size of the local cache | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
-| Maximum attachment size | Can still be changed; the CloudFront Function on `/incoming/*` must use the same limit ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
+| Maximum attachment size | Can still be changed; the CloudFront Function on `/tmp/*` must use the same limit for uploads ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 
 On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
 
@@ -78,12 +78,12 @@ One bucket, with the keys in [attachments.md](attachments.md#bucket-layout).
 | Item | Setting |
 | --- | --- |
 | Versioning | Enabled. Old versions are removed after 30 days |
-| Lifecycle | `incoming/` and `tmp/` after 1 day, `imports/` after 7 days, noncurrent versions after 30 days |
+| Lifecycle | `tmp/incoming/`, `tmp/bulk/` and `tmp/healthcheck/` after 1 day, `imports/` after 7 days, noncurrent versions after 30 days. Thumbnails (`tmp/thumbnails/`) are not expired |
 | Encryption | SSE-S3 (the S3 default) |
 | Public access | S3 Block Public Access on. A bucket policy denies requests without TLS (`aws:SecureTransport` is `false`) |
 | CORS | None. Browsers use only Redmine's domain |
-| Bucket policy | Deny requests without TLS. Allow Redmine's CloudFront distribution, through its origin access control (OAC), to read `files/`, `thumbnails/` and `tmp/bulk/` and to write `incoming/`. With the malware scan, deny reading `incoming/` and `imports/` before the scan finds the object clean |
-| Malware scan (optional) | A GuardDuty Malware Protection plan for S3 on the bucket, for the prefixes `incoming/` and `imports/`, with tagging of the scanned objects on, and `REDMINE_S3_MALWARE_SCAN=true` ([attachments.md](attachments.md#malware-scan)) |
+| Bucket policy | Deny requests without TLS. Allow Redmine's CloudFront distribution, through its origin access control (OAC), to read `files/`, `tmp/thumbnails/` and `tmp/bulk/` and to write `tmp/incoming/`. With the malware scan, deny reading `tmp/incoming/` and `imports/` before the scan finds the object clean |
+| Malware scan (optional) | A GuardDuty Malware Protection plan for S3 on the bucket, for the prefixes `tmp/incoming/` and `imports/`, with tagging of the scanned objects on, and `REDMINE_S3_MALWARE_SCAN=true` ([attachments.md](attachments.md#malware-scan)) |
 
 Only CloudFront through OAC and the roles of the processes that run Redmine reach the bucket. Browsers never get S3 presigned URLs.
 
@@ -94,12 +94,12 @@ The plugin uses Redmine's own distribution; no second distribution is needed. Ad
 | Item | Setting |
 | --- | --- |
 | Origin | The attachments bucket, with an origin access control (OAC) that signs requests |
-| Behaviors<br>`/files/*`<br>`/thumbnails/*`<br>`/tmp/bulk/*` | GET and HEAD. Signed URLs required (the trusted key group below). The cache key and the origin request include the query strings `response-content-disposition` and `response-content-type`; no cookies, no `Authorization` header. A response headers policy with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff` |
-| Behavior `/incoming/*` | All methods (PUT is needed). Signed URLs required. No caching. The origin request forwards the `x-amz-checksum-sha256` header. A CloudFront Function on viewer request rejects a `Content-Length` over the upload limit |
+| Behavior `/files/*` | Attachments. GET and HEAD. Signed URLs required (the trusted key group below). The cache key and the origin request include the query strings `response-content-disposition` and `response-content-type`; no cookies, no `Authorization` header. A response headers policy with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff` |
+| Behavior `/tmp/*` | Thumbnails (`/tmp/thumbnails/`) and zips (`/tmp/bulk/`) with GET, uploads (`/tmp/incoming/`) with PUT: all methods, HTTPS only. Signed URLs required. The same cache policy and response headers policy as `/files/*` (a PUT is never cached). The origin request also forwards the `x-amz-checksum-sha256` header. A CloudFront Function on viewer request rejects a PUT under `/tmp/incoming/` whose `Content-Length` is over the upload limit |
 | Trusted key group | A public key whose private key Redmine uses to sign URLs |
 | Other behaviors | Redmine, as before. The function that adds the body hash stays on them only |
 
-These behaviors hide none of Redmine's pages: Redmine has no routes that start with `/files`, `/thumbnails` or `/tmp` (checked in Redmine 7.0.3 on 2026-11-09; [attachments.md](attachments.md#download)).
+These behaviors hide none of Redmine's pages: Redmine has no routes that start with `/files` or `/tmp` (checked in Redmine 7.0.3 on 2026-11-09; [attachments.md](attachments.md#download)).
 
 Keep the sandbox CSP. Attachments are served from Redmine's origin, and this policy is what keeps them from running scripts there. After every change to the distribution, check that a response under `/files/` still has it.
 
@@ -146,11 +146,11 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 
 | Target | What is checked | With |
 | --- | --- | --- |
-| `files_to_final_location` | Uploads through Redmine (REST API, forms) are put to `files/<year>/<month>/` with a SHA256 checksum, the digest stays SHA256, and a failed PutObject stops the save. With the malware scan, the file goes through `incoming/` and a threat is a validation error | Stubs, LocalStack or moto |
+| `files_to_final_location` | Uploads through Redmine (REST API, forms) are put to `files/<year>/<month>/` with a SHA256 checksum, the digest stays SHA256, and a failed PutObject stops the save. With the malware scan, the file goes through `tmp/incoming/` and a threat is a validation error | Stubs, LocalStack or moto |
 | `readable?`<br>`diskfile` | The local file is used when it is there; otherwise `HeadObject`, and `diskfile` fetches the object through a temporary file and a rename. New records fetch nothing | Stubs, LocalStack or moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | The object and its thumbnails are deleted, but not a file another attachment uses. Identical content (digest and size) is shared and the newer object deleted | Stubs, LocalStack or moto |
-| `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `thumbnails/`. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
-| `/s3_uploads/presign` | Permission, extension, size and SHA256 format are checked; the URL is a CloudFront signed URL for exactly `/incoming/<UUID>`, verified with the public key | Stubs |
+| `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `tmp/thumbnails/`. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
+| `/s3_uploads/presign` | Permission, extension, size and SHA256 format are checked; the URL is a CloudFront signed URL for exactly `/tmp/incoming/<UUID>`, verified with the public key | Stubs |
 | `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. `ChecksumSHA256` (`FULL_OBJECT`) and `ContentLength` must equal the declared values, otherwise the object is deleted. Identical content is shared. With the malware scan: `202` while there is no tag, refusal and deletion for `THREATS_FOUND` and the other statuses. The same through the REST API | Stubs, LocalStack or moto |
 | `download`<br>`download_all` | Redmine's permission checks, then a redirect to a signed URL with `response-content-disposition` (Japanese names) and `response-content-type`; only PDFs inline. The zip is written to `/tmp` one file at a time, put to `tmp/bulk/` and reused for the same set | Stubs, LocalStack or moto |
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
