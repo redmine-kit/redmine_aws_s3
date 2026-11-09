@@ -1,6 +1,6 @@
 # Attachments and S3
 
-This is the design for storing Redmine attachments in S3. Browsers reach the files only through Redmine's own CloudFront distribution, never the S3 domain. Uploads are PUT through CloudFront to S3, which checks the SHA256 that the browser computed. For downloads, Redmine checks permissions, then redirects to a signed URL under `/files/`, and CloudFront reads the object from S3 and adds the same sandbox CSP as Redmine. File contents do not pass through Lambda.
+This is how Redmine Serverless S3 stores Redmine attachments in S3. The plugin is in early development; what still needs a real CloudFront distribution to check is in [To verify](#to-verify). Browsers reach the files only through Redmine's own CloudFront distribution, never the S3 domain. Uploads are PUT through CloudFront to S3, which checks the SHA256 that the browser computed. For downloads, Redmine checks permissions, then redirects to a signed URL under `/files/`, and CloudFront reads the object from S3 and adds the same sandbox CSP as Redmine. File contents do not pass through Lambda.
 
 It is the plugin Redmine Serverless S3 (`redmine_serverless_s3`), built following the approach of the Redmine S3 plugins below. No external plugins are installed. It also works outside Lambda, without [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/); on Lambda, [Serverless](https://redmine-kit.github.io/serverless/) installs both.
 
@@ -31,7 +31,7 @@ No plugin stating support for 7.0 was found in the range searched (GitHub, and a
 
 ### Differences from that plugin
 
-| Item | Plugin | This design | Reason |
+| Item | Plugin | This plugin | Reason |
 | --- | --- | --- | --- |
 | Upload | Rails receives the file and sends it to S3 | The browser PUTs it through CloudFront to S3, and S3 checks its SHA256 | Lambda's 6 MB limit |
 | Download | Redirect to an S3 presigned URL | Redirect to a CloudFront signed URL on Redmine's domain (`/files/...`), served from S3 | S3 cannot add the sandbox CSP that Redmine adds to attachments (below) |
@@ -55,8 +55,8 @@ There is one bucket (written as `redmine-files` in this document; this is the ex
 | --- | --- | --- |
 | `files/<year>/<month>/<file name>` | Attachments. Same form as Redmine's `disk_directory` and `disk_filename` | Redmine deletes the attachment |
 | `thumbnails/<digest>_<size>_<width>.thumb` | Thumbnails. Named by the same rule as Redmine | The original attachment is deleted |
-| `tmp/bulk/<UUID>.zip` | zip files for downloading all attachments | After 1 day, by lifecycle |
-| `imports/<hex>` | CSV import files | The import finishes. Leftovers after 7 days, by lifecycle |
+| `tmp/bulk/<SHA256>.zip` | zip files for downloading all attachments, named by the SHA256 of the attachment IDs and digests | After 1 day, by lifecycle |
+| `imports/<file name>` | CSV import files, under Redmine's name for them (hexadecimal) | The import finishes. Leftovers after 7 days, by lifecycle |
 | `incoming/<UUID>` | Files sent by the browser (before registration) | On registration. Leftovers after 1 day, by lifecycle |
 
 - **Versioning:** Enabled. Deleting a file creates a delete marker, and old versions are removed by lifecycle after 30 days. A file deleted by mistake can be restored within those 30 days.
@@ -84,21 +84,22 @@ sequenceDiagram
   C->>C: Reject a body over the upload limit (CloudFront Function)
   C->>S: PutObject incoming/UUID (OAC)
   S->>S: Reject the upload if the contents do not match the SHA256
-  B->>C: POST /s3_uploads/complete (key, file name)
+  B->>C: POST /s3_uploads/complete (ticket)
   C->>R: Request
   R->>S: HeadObject (ChecksumMode=ENABLED)
   R->>S: CopyObject (files/year/month/name), DeleteObject (incoming)
   R-->>B: Token (same response as the standard flow)
 ```
 
-1. **Compute the SHA256 in the browser:** The browser reads the file in pieces and computes its SHA256 with a small SHA-256 implementation in WebAssembly or JavaScript. Web Crypto (`crypto.subtle.digest`) is not used, because it needs the whole file in memory. The page shows the progress of the hashing as part of the upload.
-2. **Get the signed URL:** Add `POST /s3_uploads/presign`, which receives the file name, the size and the SHA256 (base64). It is same-origin, so rails-ujs adds the CSRF token. The same permission as the standard upload (`authorize_global`) is checked. The extension is checked with `Attachment.valid_extension?`, and the size against Redmine's attachment limit (`attachment_max_size`). Redmine keeps the declared size and SHA256 with the key and returns a CloudFront signed URL with a custom policy for exactly `https://<domain>/incoming/<UUID>`, which expires in 15 minutes.
+1. **Compute the SHA256 in the browser:** The browser reads the file 4 MB at a time and computes its SHA256 with the plugin's own SHA-256 in JavaScript (`assets/javascripts/s3_upload.js`, no external library). Web Crypto (`crypto.subtle.digest`) is not used, because it needs the whole file in memory. Redmine's progress bar shows the hashing as its first half and the PUT as its second half.
+2. **Get the signed URL:** Add `POST /s3_uploads/presign`, which receives the file name, the size and the SHA256 (base64). It is same-origin, so rails-ujs adds the CSRF token. The same permission as the standard upload (`authorize_global`) is checked. The extension is checked with `Attachment.valid_extension?`, and the size against Redmine's attachment limit (`attachment_max_size`). Redmine returns a CloudFront signed URL with a canned policy for exactly `https://<domain>/incoming/<UUID>`, which expires in 15 minutes, and a ticket: the key, the declared file name, size, SHA256 and content type, and the user, signed with Rails' message verifier (`secret_key_base`) and expiring with the URL. Redmine keeps no state between the two requests, so they can reach different environments.
 3. **PUT through CloudFront:** The browser PUTs the file to the signed URL with the header `x-amz-checksum-sha256: <base64>`. The cache behavior `/incoming/*` allows PUT, requires signed URLs, does not cache, and forwards the `x-amz-checksum-sha256` header to S3 through OAC. A CloudFront Function on viewer request rejects a request whose `Content-Length` is over the upload limit, because a signed URL cannot limit the size. S3 compares the contents with the checksum and rejects the PUT if they do not match (not checked yet through CloudFront).
-4. **Register:** Add `POST /s3_uploads/complete`. Redmine calls `HeadObject` with `ChecksumMode=ENABLED`. The `ChecksumSHA256` (with `ChecksumType` `FULL_OBJECT`) and the `ContentLength` must equal the SHA256 and size declared at step 2; otherwise Redmine deletes the object and registration fails. Redmine does not read the object. The SHA256 (base64, converted to hexadecimal) becomes the digest. If an attachment with the same digest and size already exists, it shares that file and deletes the uploaded object (the same idea as Redmine's `reuse_existing_file_if_possible`). Otherwise it copies the object to `files/<year>/<month>/<file name>` and deletes the object in `incoming/`. Then it creates the attachment record with `disk_directory`, `disk_filename`, `digest` and `filesize` set. The file contents are not passed to Redmine, so `files_to_final_location` does nothing.
+4. **Register:** Add `POST /s3_uploads/complete`, which receives the ticket. The ticket must be valid, unexpired and the current user's. Redmine calls `HeadObject` with `ChecksumMode=ENABLED`. The `ChecksumSHA256` (with `ChecksumType` `FULL_OBJECT`) and the `ContentLength` must equal the SHA256 and size declared at step 2; otherwise Redmine deletes the object and registration fails. Redmine does not read the object. The SHA256 (base64, converted to hexadecimal) becomes the digest. If an attachment with the same digest and size already exists, it shares that file and deletes the uploaded object (the same idea as Redmine's `reuse_existing_file_if_possible`). Otherwise it copies the object to `files/<year>/<month>/<file name>` and deletes the object in `incoming/`. The file name is made as Redmine makes it (`yymmddHHMMSS_` and the name, or its hash for names that are not ASCII), and is unique in S3 and in the database. Then it creates the attachment record with `disk_directory`, `disk_filename`, `digest` and `filesize` set. The file contents are not passed to Redmine, so `files_to_final_location` does nothing.
 5. **Return the token:** The response uses the same template as the standard `POST /uploads.js` (`attachments/upload.js.erb`). On the browser side, the token goes into the form as in the standard flow.
 
 - **Why PUT and not POST:** Origin access control signs the requests CloudFront sends to S3, and it supports PUT. It cannot sign the policy of an S3 POST form, so POST through CloudFront is not used (AWS blog "Implementing secure file uploads to Amazon S3 at the edge: Choosing the right pattern", 2026-02-24, and the CloudFront documentation on S3 origins).
-- **Browser side:** Add JavaScript that replaces `uploadBlob` in `attachments.js`, with the hashing before the upload. The queue, progress display and token handling stay standard. The JavaScript is in the plugin's assets and is loaded through a Redmine view hook (`view_layouts_base_html_head`).
+- **Browser side:** The plugin's JavaScript replaces `uploadBlob` in `attachments.js`, with the hashing before the upload. The queue, progress display and token handling stay standard, and errors appear where Redmine shows them. It is loaded through a Redmine view hook (`view_layouts_base_html_head`) only when the plugin is on, with the two URLs in `<meta>` tags. Because `attachments.js` can be loaded again with forms that come through Ajax, the replacement is put back before each file selection, drop or paste.
+- **REST API:** `POST /s3_uploads/presign.json` and `POST /s3_uploads/complete.json` accept the API key like Redmine's `POST /uploads.json`. The client PUTs the file to the returned URL with the returned headers, and `complete.json` returns the same `upload` (`id`, `token`) as `/uploads.json`.
 - **The browser's value is not trusted on its own:** The digest is the value S3 has compared with the uploaded bytes, and it must equal what was declared at step 2. Reporting another file's SHA256 to share its content fails at S3, because the contents do not match.
 - **File size limit:** Redmine does not read the file at registration, so the Lambda timeout no longer limits the size. The limits are Redmine's `attachment_max_size`, enforced by the CloudFront Function, and what CloudFront accepts for one PUT (not found in the documentation; to verify). Hashing a large file takes time in the browser.
 - **WAF:** The same WAF covers uploads. Bodies larger than what WAF inspects need the oversize handling of the rules applied to `/incoming/*`, or a scope-down, and the rule `SizeRestrictions_BODY` must not block uploads (to verify).
@@ -146,7 +147,7 @@ sequenceDiagram
 - **Same origin as Redmine:** As in standard Redmine, attachments are served from Redmine's origin. What isolates them is the sandbox CSP: a sandboxed document gets an opaque origin and cannot run scripts, so an HTML or SVG attachment cannot read Redmine's cookies or call Redmine. The header must therefore always be there; a check after deployment confirms that a response under `/files/` has the sandbox CSP and `nosniff` ([testing.md](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment)).
 - **Why CloudFront:** A presigned S3 GET can override only `response-content-type`, `-language`, `-expires`, `-cache-control`, `-disposition` and `-encoding`. It cannot add other headers, so the CSP cannot come from S3.
 - **One distribution:** No second distribution, certificate or DNS record is needed, and the WAF of Redmine's distribution also covers the attachments.
-- **Checking that the file exists:** Before a download, Redmine checks that the local file exists (`file_readable`, `Attachment#readable?`). This check is replaced with an S3 HeadObject.
+- **Checking that the file exists:** Before a download, Redmine checks that the local file exists (`file_readable`, `Attachment#readable?`). This check is replaced: the file in the local cache, or else an S3 HeadObject.
 - **Showing images:** Images in wiki pages and issue descriptions (`/attachments/download/<id>/<name>`) are shown through the same redirect. `<img>` shows the image even with `attachment`, and the sandbox CSP does not stop an image from being shown. Lambda is invoked once per image, so a page with many images starts as many environments as there are concurrent requests (estimate; to be measured after it is built).
 - **Signature:** The signed URL is made with the private key of the trusted key group, which Redmine reads from SSM Parameter Store ([setup.md](setup.md#configuration)). It is valid for 5 minutes, independent of the credentials of the process.
 
@@ -179,22 +180,22 @@ sequenceDiagram
   R->>R: Check permissions and total size (standard Redmine)
   R->>S: GetObject (attachments one by one)
   R->>R: Write the zip to /tmp
-  R->>S: PutObject (tmp/bulk/UUID.zip)
+  R->>S: PutObject (tmp/bulk/SHA256.zip)
   R-->>B: 302 (CloudFront signed URL)
-  B->>C: GET /tmp/bulk/UUID.zip
+  B->>C: GET /tmp/bulk/SHA256.zip
   C->>S: GetObject (OAC)
 ```
 
 1. **Check:** Redmine's standard checks (whether the attachments are visible, whether the total exceeds `bulk_download_max_size`) are applied as is.
 2. **Create:** Write the zip to `/tmp` while reading the attachments from S3 one at a time. Unlike standard Redmine, not all files are read into memory.
-3. **Store:** Put the zip at `tmp/bulk/<UUID>.zip` (multipart upload if it is large). Delete the zip in `/tmp`.
+3. **Store:** Put the zip at `tmp/bulk/<SHA256>.zip` with one PutObject (`bulk_download_max_size` keeps it far below the 5 GB limit of one PUT). Delete the zip in `/tmp`.
 4. **Return:** A 302 redirect to a CloudFront signed URL (expires in 5 minutes). The file name is the same as Redmine's (`<type>-<ID>-attachments.zip`), set to `attachment` with `response-content-disposition`.
 
 - **Limit:** `bulk_download_max_size` stays at Redmine's default (100 MB). Measure whether creating the zip fits within the `redmine-web` timeout (60 seconds), and lower the limit if it does not.
 - **Deleting temporary files:** Objects under `tmp/` are deleted by lifecycle after 1 day.
 - **Other exports:** Exports such as issue list CSV and PDF and wiki HTML are returned directly from Redmine. Issue exports are limited to 500 by default (`issues_export_limit`), and other exports are mostly text and compressed, so they are not expected to reach 6 MB ([lambda.md](https://redmine-kit.github.io/serverless/lambda.html#the-6-mb-limit)).
 - **No rebuilding:** If a zip for the same set of attachments (a key made from the attachment IDs and digests) is still in `tmp/bulk/`, redirect to it without rebuilding.
-- **Checking that files exist:** Redmine checks each attachment with `readable?`. In this design `readable?` is an S3 HeadObject, so one HeadObject is sent per attachment (estimate: slow with many attachments; to be measured when built).
+- **Checking that files exist:** Redmine checks each attachment with `readable?`. `readable?` uses the local cache when the file is there, and otherwise sends one S3 HeadObject per attachment (not measured yet with many attachments).
 
 ## The /tmp cache
 
@@ -225,17 +226,19 @@ Redmine's own files are not modified; the plugin replaces code with `prepend`. T
 | --- | --- | --- |
 | `Attachment#files_to_final_location` | After the standard processing, PutObject to S3 | Uploads through Lambda |
 | `Attachment#readable?` | S3 HeadObject | Check before download |
+| `Attachment#thumbnailable?` | No thumbnail for files larger than the local cache | `/tmp` limit |
 | Code that uses `Attachment#diskfile` | Fetch into the `/tmp` cache before use | Thumbnails, previews, PDF, zip |
 | `Attachment#delete_from_disk!` | Delete from S3 | Deletion |
 | `Attachment#reuse_existing_file_if_possible` | Compare by digest and size | Sharing identical content |
 | `Attachment#thumbnail` | Use the one in S3 if it exists; otherwise create and store it | Thumbnails |
 | `AttachmentsController#download`, `#thumbnail` | Redirect to a CloudFront signed URL (with `Cache-Control` for thumbnails) | Download, thumbnails |
 | `AttachmentsController#download_all` | Write the zip to `/tmp`, store it as a temporary file in S3, and redirect to a CloudFront signed URL | Downloading all attachments |
-| `Import#file=` and reading | Store in S3; fetch from S3 if not local | CSV import |
+| `Import#file=`, `#file_exists?`, `#remove_file` | Store in S3; fetch from S3 if not local; delete from S3 | CSV import |
+| `SettingsController#plugin` (only for this plugin, only GET) | Redirect to the "Attachments in S3" tab | "Configure" in the plugin list ([admin.md](admin.md)) |
 | `uploadBlob` in `attachments.js` | Compute the SHA256, then PUT the file to a CloudFront signed URL with it | Upload |
 
-- **Enabling condition:** The replacements are enabled only when the S3 bucket is configured (environment variable). Without it, Redmine behaves as standard. This lets Redmine's own tests pass as is ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
-- **Redmine upgrades:** When upgrading Redmine, check that the original code of the replaced methods has not changed. This table is the authoritative list of replacements. If the original code changes, a test must fail ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
+- **Enabling condition:** The replacements are enabled only when the S3 bucket is configured (`REDMINE_S3_BUCKET`). Without it, Redmine behaves as standard. This lets Redmine's own tests pass as is ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
+- **Redmine upgrades:** When upgrading Redmine, check that the original code of the replaced methods has not changed. This table is the authoritative list of replacements. If the original code changes, a test must fail: `test/unit/replaced_code_test.rb` compares the SHA256 of each method in this table, and of the Redmine code the plugin copies (`Attachment.create_diskfile`, `Attachment.archive_attachments`, the thumbnail size of `Attachment#thumbnail`), with Redmine 7.0.3 ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
 - **Tests:** Each piece of replaced code gets tests written with Redmine's test framework ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3-redmine_serverless_s3)).
 
 ## Permissions
@@ -248,7 +251,7 @@ Every process that runs Redmine with the plugin gets read and write permissions 
 - CloudFront's limit on the request body of a PUT to an S3 origin (not found in the documentation), and how the origin response timeout (30 seconds by default) applies to large uploads
 - WAF with large upload bodies (oversize handling, scope-down, `SizeRestrictions_BODY`)
 - How the CloudFront flat-rate plan counts upload traffic
-- How long hashing takes in the browser for large files (such as 1 GB), and which SHA-256 implementation to use
+- How long hashing takes in browsers for large files (such as 1 GB). The plugin's SHA-256 hashed about 100 MB per second in Node.js 26 in its test (2026-11-09)
 - Whether S3 accepts `response-content-disposition` and `response-content-type` on requests from CloudFront through OAC, and whether Japanese file names are saved correctly (how to write `response-content-disposition`)
 - How CloudFront caches signed URLs when the two query strings are part of the cache key
 - Whether pasted images and drag and drop work as in standard Redmine after replacing `uploadBlob`

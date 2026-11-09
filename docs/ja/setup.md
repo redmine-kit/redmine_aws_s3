@@ -1,6 +1,6 @@
 # 準備
 
-Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは設計段階なので、下の内容は設計で、コードを書くときに確認します。
+Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。本物の CloudFront のディストリビューションが要る部分は、[確認すること](#to-verify)にあります。
 
 <a id="requirements"></a>
 
@@ -14,7 +14,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ## インストール
 
-**プラグインの取り方:** バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。まだどのバージョンも公開していません。GitHub Packages から入れるには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem はプラグインの動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、入れた gem をそこにリンクします。
+**プラグインの取り方:** バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。最初のバージョンは 0.1.0 です。GitHub Packages から入れるには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem はプラグインの動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、入れた gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -31,9 +31,10 @@ ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s
 
 gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` に clone します(`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`)。
 
-1. プラグインを `plugins/redmine_serverless_s3` に置き、`bundle install` を実行します(プラグインの `Gemfile` が `aws-sdk-s3` を足し、Redmine の `Gemfile` がそれを読み込みます)。
+1. プラグインを `plugins/redmine_serverless_s3` に置き、`bundle install` を実行します(プラグインの `Gemfile` と gem が `aws-sdk-s3` と `aws-sdk-cloudfront` を足し、Redmine の `Gemfile` がプラグインの `Gemfile` を読み込みます)。
 2. migration は要りません。
-3. バケットを設定します(下記)。設定がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
+3. プラグインの JavaScript `s3_upload.js` を配るために、`bin/rails assets:precompile`(か、Redmine のいつもの assets の手順)を実行します。
+4. 環境変数を設定します(下記)。`REDMINE_S3_BUCKET` がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
 
 <a id="configuration"></a>
 
@@ -41,15 +42,18 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 
 | 設定 | 置き場所 | 中身 |
 | --- | --- | --- |
-| バケットの名前とリージョン | 環境変数 | プラグインを有効にする |
-| CloudFront のドメインとキーペアの ID | 環境変数 | Redmine のディストリビューションのドメイン(`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う)と、その信頼されたキーグループの公開鍵の ID |
-| CloudFront の秘密鍵 | 秘密の値(Serverless では、`/<instance>/env/` の下の SecureString のパラメーターで、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が環境変数に読み込む) | CloudFront の URL に署名する。ファイルやログには書かない |
-| 署名付き URL の有効期限 | プラグインの設定 | [管理画面](admin.md#attachments-in-s3)に出す。ダウンロードは 5 分、アップロードは 15 分([attachments.md](attachments.md#upload)) |
-| `/tmp` のキャッシュの大きさ | プラグインの設定 | [attachments.md](attachments.md#the-tmp-cache) |
+| `REDMINE_S3_BUCKET` | 環境変数 | 添付ファイルのバケット。プラグインを有効にする。なければ、Redmine は標準のとおりに動く |
+| `REDMINE_S3_REGION` | 環境変数 | バケットのリージョン。省略できる。なければ `AWS_REGION`、次に `AWS_DEFAULT_REGION` を使う |
+| `REDMINE_CLOUDFRONT_DOMAIN` | 環境変数 | Redmine のディストリビューションのドメイン(例: `redmine.example.com`)。`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う |
+| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | 環境変数 | ディストリビューションの信頼されたキーグループの公開鍵の ID |
+| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | 秘密の値から読む環境変数(Serverless では、`/<instance>/env/` の下の SecureString のパラメーターで、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が環境変数に読み込む) | PEM の秘密鍵。CloudFront の URL に署名する。ファイルやログには書かず、管理画面にも出さない |
+| 署名付き URL の有効期限 | プラグインの設定。[管理画面](admin.md#attachments-in-s3)で変える | ダウンロードとサムネイルは 300 秒、アップロードは 900 秒([attachments.md](attachments.md#upload)) |
+| 手元のキャッシュの大きさ | プラグインの設定。管理画面で変える | 256 MB([attachments.md](attachments.md#the-tmp-cache)) |
 | `attachments_storage_path` | `config/configuration.yml` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) |
 | 添付ファイルの最大の大きさ | Redmine の設定 | これまでどおり変えられる。`/incoming/*` の CloudFront Functions は、同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) |
 
-- **変数の名前:** 環境変数の名前は、コードを書くときに決めます(未定)。
+- **AWS の認証情報:** S3 のクライアントは、SDK の標準の認証情報の探し方を使います(Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロール)。プラグインが自分でアクセスキーを読むことはありません。
+- **ジョブ:** 管理画面の突き合わせは、Active Job の `ServerlessS3ReconcileJob` として動きます。許可するジョブのクラスの一覧を持つキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、一覧に足します。
 
 <a id="aws-resources"></a>
 
@@ -110,10 +114,25 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 
 ## テスト
 
-Redmine の標準のプラグインのテスト(`bin/rake redmine:plugins:test NAME=redmine_serverless_s3`)です。S3 は、ユニットと機能のテストでは SDK の `stub_responses`、統合とシステムのテストでは moto で再現します。Redmine 本体の添付ファイルのテストも、プラグインを有効にして実行します([Serverless の testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3-redmine_serverless_s3))。
+Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3、PostgreSQL 16、moto を使います。
+
+```sh
+bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
+bin/test core            # プラグインを入れた(無効の)状態で、Redmine 本体のテスト
+bin/test <ファイル...>    # プラグインのテストの一部
+bin/services --down      # PostgreSQL と moto を止める
+bin/lint                 # RuboCop
+node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の SHA-256
+```
+
+- **S3:** ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストでは moto を使います。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで、統合のテストは、その `HeadObject` の結果を保存されたバイト列から計算し、合わないチェックサムは `stub_responses` でテストします。
+- **署名付き URL:** テストで鍵のペアを作り、署名付き URL を公開鍵で検証します。
+- **置き換えるコード:** 置き換えたり写したりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。
+- **カバレッジ:** `bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。
+- **CI:** GitHub Actions が、push と pull request ごとに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。
 
 <a id="to-verify"></a>
 
 ## 確認すること
 
-設計で決まっていないことは、[attachments.md](attachments.md#to-verify) にあります。
+まだ確認していないことは、[attachments.md](attachments.md#to-verify) にあります。

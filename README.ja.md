@@ -1,10 +1,12 @@
 # Redmine Serverless S3
 
+[![codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3/graph/badge.svg)](https://codecov.io/gh/redmine-kit/redmine_serverless_s3)
+
 添付ファイルを Amazon S3 に置く Redmine のプラグインです。Redmine の CloudFront のディストリビューションを通した、署名付き URL でのアップロードとダウンロード(アップロードは S3 が SHA256 を確認し、ダウンロードには Redmine の sandbox の CSP を付ける)、`/tmp` のキャッシュ、バケットの管理画面を持ちます。AWS Lambda でも、Lambda 以外でも動きます。[Serverless](https://github.com/redmine-kit/serverless) は、[Redmine Serverless](https://github.com/redmine-kit/redmine_serverless) といっしょに使います。
 
 [English](README.md)
 
-> **状態:** 設計段階です。リポジトリには設計の資料だけがあり、まだ何も実装していません。
+> **状態:** 開発の初期の段階です。バージョン 0.1.0 を作り、Redmine 7.0.3 と moto でテストしています。本物の CloudFront のディストリビューションが要ることは、まだ確認していません([確認すること](docs/ja/attachments.md#to-verify))。
 
 <a id="documentation"></a>
 
