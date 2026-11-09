@@ -75,9 +75,9 @@ bundle install
 | `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルの最大の大きさ | これまでどおり変えられる。`/incoming/*` の CloudFront Functions は、同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
-- **秘密の値:** Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。
-- **AWS の認証情報:** S3 のクライアントは、SDK の標準の認証情報の探し方を使います(Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロール)。プラグインが自分でアクセスキーを読むことはありません。
-- **ジョブ:** 管理画面の突き合わせは、Active Job の `ServerlessS3ReconcileJob` として動きます。許可するジョブのクラスの一覧を持つキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、一覧に足します。
+Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロールです。プラグインが自分でアクセスキーを読むことはありません。
+
+管理画面の突き合わせは、Active Job の `ServerlessS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、このクラスを一覧に足します。
 
 <a id="aws-resources"></a>
 
@@ -99,7 +99,7 @@ bundle install
 | バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`thumbnails/`、`tmp/bulk/` の読み取りと、`incoming/` への書き込みを許す。マルウェアのスキャンを使うときは、問題がないとわかる前の `incoming/` と `imports/` の読み取りを拒む |
 | マルウェアのスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
 
-- **バケットに届くもの:** OAC を通した CloudFront と、Redmine を動かすプロセスのロールです。ブラウザーに S3 の署名付き URL は渡しません。
+バケットに届くのは、OAC を通した CloudFront と、Redmine を動かすプロセスのロールだけです。ブラウザーに S3 の署名付き URL は渡しません。
 
 <a id="the-cloudfront-distribution"></a>
 
@@ -115,9 +115,11 @@ bundle install
 | 信頼されたキーグループ | Redmine が URL の署名に使う秘密鍵の、公開鍵 |
 | ほかのビヘイビア | 今までどおり Redmine。本文のハッシュを入れる関数は、これらだけに付ける |
 
-- **Redmine のパス:** Redmine には、`/files`、`/thumbnails`、`/tmp` で始まるルートがないので(2026-11-09 に Redmine 7.0.3 で確認)、これらのビヘイビアが Redmine の画面を隠すことはありません([attachments.md](attachments.md#download))。
-- **sandbox の CSP を外さない:** 添付ファイルは Redmine のオリジンから返り、そこでスクリプトを動かさないようにしているのは sandbox の CSP です。ディストリビューションを変えるたびに、`/files/` の下の応答にそれが付いていることを確認します。
-- **キーペアを作る:** 秘密鍵は一度だけ作って秘密の値として持ち、CloudFront には公開鍵だけを入れます。Serverless は、デプロイで作ります。
+これらのビヘイビアが Redmine の画面を隠すことはありません。Redmine には、`/files`、`/thumbnails`、`/tmp` で始まるルートがないためです(2026-11-09 に Redmine 7.0.3 で確認。[attachments.md](attachments.md#download))。
+
+sandbox の CSP は外さないでください。添付ファイルは Redmine のオリジンから返るので、そこでスクリプトを動かさないようにしているのは、このポリシーです。ディストリビューションを変えるたびに、`/files/` の下の応答にこのポリシーが付いていることを確認します。
+
+キーペアの秘密鍵は一度だけ作り、秘密の値として保存します。CloudFront には公開鍵だけを入れます。Serverless は、デプロイのときにキーペアを作ります。
 
 <a id="iam-permissions"></a>
 
@@ -152,15 +154,21 @@ bin/lint                 # RuboCop
 node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の SHA-256
 ```
 
-- **S3:** ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは、同じテストを LocalStack(CI で、組織のトークンがあるとき)か moto(フォークからの pull request や、トークンのない手元の実行)で動かします。どちらを使ったかは `bin/test` が出します。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、この 2 つの S3 の確認のテストは飛ばします。
-- **署名付き URL:** テストで鍵のペアを作り、署名付き URL を公開鍵で検証します。
-- **置き換えるコード:** 置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。
-- **カバレッジ:** `bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。
-- **CI:** GitHub Actions が、push と pull request ごとに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。
+<a id="how-aws-is-tested"></a>
+
+### AWS とのテストの方法
+
+ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの pull request やトークンのない手元の実行では moto に対して動かします。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、この 2 つの S3 の確認のテストは飛ばします。署名付き URL は、テストで作った鍵のペアの公開鍵で検証します。
+
+<a id="replaced-code-coverage-and-ci"></a>
+
+### 置き換えたコード、カバレッジ、CI
+
+置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。
 
 <a id="what-the-tests-check"></a>
 
-### テストで確認すること
+### テストで確認する内容
 
 置き換えるコードにはすべてテストがあり、AWS への呼び出しはすべてこのリポジトリでテストします。S3 が返しうる答えごとに `stub_responses` で、実際の要求は LocalStack か moto に対して確認します(PutObject、`ChecksumMode` 付きの HeadObject、CopyObject、DeleteObjects、ListObjectsV2、GuardDuty が付けるはずのタグでの GetObjectTagging、テストが付ける PutObjectTagging)。
 
@@ -179,9 +187,19 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 | ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアのスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
 | ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める | Node.js |
 
-- **AWS では確認していないこと:** LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto では飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
-- **Redmine 本体のテスト:** `bin/test core` は、プラグインを入れて無効にした状態で Redmine のテストを実行します。2026-11-10 にすべて(5,832 件)を実行したとき、7 件の失敗は Serverless に一覧がある gem によるもの(rails-dom-testing の `:match`)で、8 件のエラーは Redmine 自身のテストの順番によるものでした。`Redmine::PluginTest` がプラグインのディレクトリを戻さないので、`RoutingPluginsTest` のあとは、入れたプラグインのルートが消え、メニューの項目だけが残ります。この 8 件は、単独で実行すると通ります(2026-11-10)。
-- **プラグインを有効にした Redmine の添付ファイルのテスト:** `bin/test core-s3` は、Redmine の添付ファイルのテスト(`test/unit/attachment_test.rb`、`test/unit/attachment_transaction_test.rb`、`test/functional/attachments_controller_test.rb`、`test/functional/attachments_visibility_test.rb`、`test/integration/attachments_test.rb`、`test/integration/api_test/attachments_test.rb`)を、プラグインを有効にして、LocalStack か moto で実行します。140 件が通ります(2026-11-10)。除いた 15 件は、Redmine がファイルそのものを返すこと(ダウンロード、サムネイル、一括のダウンロード、`X-Sendfile`)を前提にしていて、プラグインはそれをリダイレクトに置き換えます。または、前のテストが S3 に置いたサムネイルが使われるものです。[`test/core/s3_exclusions.txt`](../../test/core/s3_exclusions.txt) に、それぞれの理由があります。
+<a id="not-checked-against-aws"></a>
+
+### AWS では確認していないこと
+
+LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto ではこの 2 つを飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
+
+<a id="redmines-own-tests"></a>
+
+### Redmine 本体のテスト
+
+`bin/test core` は、プラグインを入れて無効にした状態で、Redmine のテストを実行します。2026-11-10 にすべて(5,832 件)を実行したとき、7 件の失敗は、Serverless に一覧がある gem によるもの(rails-dom-testing の `:match`)でした。8 件のエラーは、Redmine 自身のテストの順番によるものです。`Redmine::PluginTest` がプラグインのディレクトリを戻さないので、`RoutingPluginsTest` のあとは、入れたプラグインのルートが消え、メニューの項目だけが残ります。この 8 件は、単独で実行すると通ります(2026-11-10)。
+
+`bin/test core-s3` は、Redmine の添付ファイルのテスト(`test/unit/attachment_test.rb`、`test/unit/attachment_transaction_test.rb`、`test/functional/attachments_controller_test.rb`、`test/functional/attachments_visibility_test.rb`、`test/integration/attachments_test.rb`、`test/integration/api_test/attachments_test.rb`)を、プラグインを有効にして、LocalStack か moto で実行します。140 件が通ります(2026-11-10)。除いた 15 件は、Redmine がファイルそのものを返すこと(ダウンロード、サムネイル、一括のダウンロード、`X-Sendfile`)を前提にしたものか、前のテストが S3 に置いたサムネイルが使われるものです。プラグインは、ファイルを返す部分をリダイレクトに置き換えます。[`test/core/s3_exclusions.txt`](../../test/core/s3_exclusions.txt) に、それぞれの理由があります。
 
 <a id="to-verify"></a>
 

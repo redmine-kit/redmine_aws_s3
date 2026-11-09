@@ -65,9 +65,9 @@ bundle install
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
 | Maximum attachment size | Can still be changed; the CloudFront Function on `/incoming/*` must use the same limit ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 
-- **Secrets:** On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment.
-- **AWS credentials:** The S3 client uses the SDK's standard credential chain (the execution role on Lambda, an instance profile or a task role elsewhere). The plugin reads no access keys of its own.
-- **Jobs:** The reconciliation on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. Where jobs go through a queue with a list of allowed job classes (such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/)), add it to the list.
+On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
+
+The reconciliation on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/), add this class to the list.
 
 ## AWS resources
 
@@ -85,7 +85,7 @@ One bucket, with the keys in [attachments.md](attachments.md#bucket-layout).
 | Bucket policy | Deny requests without TLS. Allow Redmine's CloudFront distribution, through its origin access control (OAC), to read `files/`, `thumbnails/` and `tmp/bulk/` and to write `incoming/`. With the malware scan, deny reading `incoming/` and `imports/` before the scan finds the object clean |
 | Malware scan (optional) | A GuardDuty Malware Protection plan for S3 on the bucket, for the prefixes `incoming/` and `imports/`, with tagging of the scanned objects on, and `REDMINE_S3_MALWARE_SCAN=true` ([attachments.md](attachments.md#malware-scan)) |
 
-- **Who reaches the bucket:** CloudFront through OAC, and the roles of the processes that run Redmine. Browsers never get S3 presigned URLs.
+Only CloudFront through OAC and the roles of the processes that run Redmine reach the bucket. Browsers never get S3 presigned URLs.
 
 ### The CloudFront distribution
 
@@ -99,9 +99,11 @@ The plugin uses Redmine's own distribution; no second distribution is needed. Ad
 | Trusted key group | A public key whose private key Redmine uses to sign URLs |
 | Other behaviors | Redmine, as before. The function that adds the body hash stays on them only |
 
-- **Redmine's paths:** Redmine has no routes that start with `/files`, `/thumbnails` or `/tmp` (checked in Redmine 7.0.3 on 2026-11-09), so these behaviors do not hide Redmine's pages ([attachments.md](attachments.md#download)).
-- **The sandbox CSP must stay:** Attachments are served from Redmine's origin, and the sandbox CSP is what keeps them from running scripts there. Check after every change of the distribution that a response under `/files/` has it.
-- **Creating the key pair:** The private key is created once and kept as a secret; only its public key goes into CloudFront. Serverless creates it with the deployment.
+These behaviors hide none of Redmine's pages: Redmine has no routes that start with `/files`, `/thumbnails` or `/tmp` (checked in Redmine 7.0.3 on 2026-11-09; [attachments.md](attachments.md#download)).
+
+Keep the sandbox CSP. Attachments are served from Redmine's origin, and this policy is what keeps them from running scripts there. After every change to the distribution, check that a response under `/files/` still has it.
+
+The private key of the key pair is created once and kept as a secret; only its public key goes into CloudFront. Serverless creates the pair with the deployment.
 
 ## IAM permissions
 
@@ -130,11 +132,13 @@ bin/lint                 # RuboCop
 node test/javascripts/sha256_test.mjs   # the SHA-256 of the upload script
 ```
 
-- **S3:** Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration tests run the same suite on LocalStack (in CI, with the organization's token) or on moto (pull requests from forks, local runs without the token). moto 5.2.5 neither checks `x-amz-checksum-sha256` nor returns `ChecksumSHA256` from `HeadObject` (checked on 2026-11-09), so on moto the tests compute that `HeadObject` result from the stored bytes and skip the two tests of these S3 checks.
-- **Signed URLs:** The tests make a key pair and verify each signed URL with the public key.
-- **Replaced code:** A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)).
-- **Coverage:** `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report.
-- **CI:** GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test` on every push and pull request, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) with OIDC.
+### How AWS is tested
+
+Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration tests run the same suite on LocalStack in CI, with the organization's token, and on moto for pull requests from forks and local runs without the token. moto 5.2.5 neither checks `x-amz-checksum-sha256` nor returns `ChecksumSHA256` from `HeadObject` (checked on 2026-11-09), so on moto the tests compute that `HeadObject` result from the stored bytes and skip the two tests of these S3 checks. For signed URLs, the tests make a key pair and verify each URL with the public key.
+
+### Replaced code, coverage and CI
+
+A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) with OIDC.
 
 ### What the tests check
 
@@ -155,9 +159,15 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
 | Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry | Node.js |
 
-- **Not checked against AWS:** On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the response headers policy) and GuardDuty are not reproduced locally. These are in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
-- **Redmine's own tests:** `bin/test core` runs Redmine's tests with the plugin installed and off. In the full run on 2026-11-10 (5,832 tests), the 7 failures were the gem-related ones listed in Serverless (`:match` in rails-dom-testing), and 8 errors came from the order of Redmine's own tests: `Redmine::PluginTest` does not restore the plugin directory, so after `RoutingPluginsTest` the installed plugins' routes are gone while their menu items stay. The 8 tests pass when run on their own (2026-11-10).
-- **Redmine's attachment tests with the plugin on:** `bin/test core-s3` runs Redmine's attachment tests (`test/unit/attachment_test.rb`, `test/unit/attachment_transaction_test.rb`, `test/functional/attachments_controller_test.rb`, `test/functional/attachments_visibility_test.rb`, `test/integration/attachments_test.rb`, `test/integration/api_test/attachments_test.rb`) with the plugin on, against LocalStack or moto. 140 tests pass (2026-11-10). The 15 left out expect Redmine to send the file itself (downloads, thumbnails, "download all", `X-Sendfile`), which the plugin replaces with redirects, or a thumbnail that an earlier test already stored in S3; [`test/core/s3_exclusions.txt`](../test/core/s3_exclusions.txt) lists each with the reason.
+### Not checked against AWS
+
+On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the response headers policy) and GuardDuty are not reproduced locally. They are listed in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
+
+### Redmine's own tests
+
+`bin/test core` runs Redmine's tests with the plugin installed and off. In the full run on 2026-11-10 (5,832 tests), the 7 failures were the gem-related ones listed in Serverless (`:match` in rails-dom-testing). The 8 errors came from the order of Redmine's own tests: `Redmine::PluginTest` does not restore the plugin directory, so after `RoutingPluginsTest` the installed plugins' routes are gone while their menu items stay. These 8 tests pass when run on their own (2026-11-10).
+
+`bin/test core-s3` runs Redmine's attachment tests (`test/unit/attachment_test.rb`, `test/unit/attachment_transaction_test.rb`, `test/functional/attachments_controller_test.rb`, `test/functional/attachments_visibility_test.rb`, `test/integration/attachments_test.rb`, `test/integration/api_test/attachments_test.rb`) with the plugin on, against LocalStack or moto. 140 tests pass (2026-11-10). The 15 left out expect Redmine to send the file itself (downloads, thumbnails, "download all", `X-Sendfile`), which the plugin replaces with redirects, or a thumbnail that an earlier test already stored in S3. [`test/core/s3_exclusions.txt`](../test/core/s3_exclusions.txt) gives the reason for each.
 
 ## To verify
 
