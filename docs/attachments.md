@@ -249,9 +249,9 @@ Redmine's own files are not modified; the plugin replaces code with `prepend`. T
 | `Attachment#delete_from_disk!` | Delete from S3 | Deletion |
 | `Attachment#reuse_existing_file_if_possible` | Compare by digest and size | Sharing identical content |
 | `Attachment#thumbnail` | Use the one in S3 if it exists; otherwise create and store it | Thumbnails |
-| `AttachmentsController#download`, `#thumbnail` | Redirect to a CloudFront signed URL (with `Cache-Control` for thumbnails) | Download, thumbnails |
+| `AttachmentsController#download`<br>`#thumbnail` | Redirect to a CloudFront signed URL (with `Cache-Control` for thumbnails) | Download, thumbnails |
 | `AttachmentsController#download_all` | Write the zip to `/tmp`, store it as a temporary file in S3, and redirect to a CloudFront signed URL | Downloading all attachments |
-| `Import#file=`, `#file_exists?`, `#remove_file` | Store in S3; fetch from S3 if not local; delete from S3 | CSV import |
+| `Import#file=`<br>`#file_exists?`<br>`#remove_file` | Store in S3; fetch from S3 if not local; delete from S3 | CSV import |
 | `MailHandler#receive` | No malware scan wait for attachments of received mail | [Malware scan](#malware-scan) |
 | `SettingsController#plugin` (only for this plugin, only GET) | Redirect to the "Attachments in S3" tab | "Configure" in the plugin list ([admin.md](admin.md)) |
 | `uploadBlob` in `attachments.js` | Compute the SHA256, then PUT the file to a CloudFront signed URL with it | Upload |

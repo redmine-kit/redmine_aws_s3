@@ -6,8 +6,8 @@ Every process that runs Redmine with the plugin (web requests, jobs, rake) gets 
 
 | Action | Resource | Why |
 | --- | --- | --- |
-| `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `files/*`, `thumbnails/*`, `imports/*`, `incoming/*`, `tmp/*` in the bucket | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
-| `s3:GetObjectTagging` | `incoming/*`, `imports/*` in the bucket | Reading GuardDuty's scan result, when the malware scan is on ([attachments.md](attachments.md#malware-scan)) |
+| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | In the bucket:<br>`files/*`<br>`thumbnails/*`<br>`imports/*`<br>`incoming/*`<br>`tmp/*` | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | In the bucket:<br>`incoming/*`<br>`imports/*` | Reading GuardDuty's scan result, when the malware scan is on ([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | The bucket | `HeadObject` on a missing object returns 404 instead of 403. Deleting thumbnails by prefix, reconciliation, `HeadBucket` in the connection check |
 | Reading the CloudFront private key | The secret that holds it (on Serverless, `ssm:GetParametersByPath` on `/<instance>/env/`, through [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/)) | Signing CloudFront URLs |
 
