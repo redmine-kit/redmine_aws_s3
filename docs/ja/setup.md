@@ -87,7 +87,7 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 | 項目 | 設定 |
 | --- | --- |
 | オリジン | 添付ファイルのバケット。要求に署名するオリジンアクセスコントロール(OAC)を付ける |
-| ビヘイビア `/files/*`、`/thumbnails/*`、`/tmp/bulk/*` | GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。キャッシュのキーとオリジンへの要求に、クエリーの `response-content-disposition` と `response-content-type` を入れ、Cookie と `Authorization` のヘッダーは入れない。レスポンスヘッダーポリシーで `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付ける |
+| ビヘイビア<br>`/files/*`<br>`/thumbnails/*`<br>`/tmp/bulk/*` | GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。キャッシュのキーとオリジンへの要求に、クエリーの `response-content-disposition` と `response-content-type` を入れ、Cookie と `Authorization` のヘッダーは入れない。レスポンスヘッダーポリシーで `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付ける |
 | ビヘイビア `/incoming/*` | すべてのメソッド(PUT が要る)。署名付き URL を必須にする。キャッシュしない。オリジンへの要求で `x-amz-checksum-sha256` のヘッダーを渡す。ビューワーリクエストの CloudFront Functions で、アップロードの上限を超える `Content-Length` を断る |
 | 信頼されたキーグループ | Redmine が URL の署名に使う秘密鍵の、公開鍵 |
 | ほかのビヘイビア | 今までどおり Redmine。本文のハッシュを入れる関数は、これらだけに付ける |
@@ -144,12 +144,12 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 | 対象 | 確認すること | 使うもの |
 | --- | --- | --- |
 | `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアのスキャンを使うときは `incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
-| `readable?`、`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
-| `delete_from_disk!`、`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
-| `thumbnail`、`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
+| `readable?`<br>`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
+| `delete_from_disk!`<br>`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
+| `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
 | `/s3_uploads/presign` | 権限、拡張子、サイズ、SHA256 の形を確認する。URL はちょうど `/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
 | `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。`ChecksumSHA256`(`FULL_OBJECT`)と `ContentLength` が申告と等しく、そうでなければオブジェクトを消す。同じ内容は共有する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
-| `download`、`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
+| `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
 | CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアのスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
 | 管理画面のタブ | 設定、読み書きの確認、配信の確認(CSP と `nosniff` のヘッダー、署名のない URL が断られること)、突き合わせのジョブ、マルウェアの記録。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
 | 置き換える Redmine のコード | 置き換えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい | — |

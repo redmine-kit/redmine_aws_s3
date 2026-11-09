@@ -279,9 +279,9 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `Attachment#delete_from_disk!` | S3 から消す | 削除 |
 | `Attachment#reuse_existing_file_if_possible` | digest とサイズで比べる | 同じ内容の共有 |
 | `Attachment#thumbnail` | S3 にあればそれを使い、なければ作って置く | サムネイル |
-| `AttachmentsController#download`、`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
+| `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
-| `Import#file=`、`#file_exists?`、`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
+| `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
 | `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアのスキャンを待たない | [マルウェアのスキャン](#malware-scan) |
 | `SettingsController#plugin`(このプラグインの GET だけ) | 「添付ファイルの S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
 | `attachments.js` の `uploadBlob` | SHA256 を計算し、その値を付けて CloudFront の署名付き URL に PUT する | アップロード |
