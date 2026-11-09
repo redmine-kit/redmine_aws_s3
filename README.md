@@ -9,7 +9,7 @@ A Redmine plugin that stores attachments in Amazon S3: uploads and downloads thr
 ## Documentation
 
 - Website: https://redmine-kit.github.io/redmine_serverless_s3/ (日本語: https://redmine-kit.github.io/redmine_serverless_s3/ja/)
-- Markdown: [docs/README.md](docs/README.md) (日本語: [docs/ja/README.md](docs/ja/README.md)), with [setup](docs/setup.md), [attachments and S3](docs/attachments.md) and the [administration page](docs/admin.md)
+- Markdown: [docs/README.md](docs/README.md) (日本語: [docs/ja/README.md](docs/ja/README.md)), with [setup](docs/setup.md), [IAM permissions](docs/iam.md), [attachments and S3](docs/attachments.md) and the [administration page](docs/admin.md)
 
 ## License
 

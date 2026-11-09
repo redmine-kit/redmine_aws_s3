@@ -270,7 +270,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 ## 権限
 
-プラグインを入れた Redmine を動かすプロセスには、どれも、添付ファイルのバケットのプレフィックスごとの読み書きを付け、CloudFront の署名付き URL のための秘密鍵を読ませます。一覧とポリシーの例は [setup.md](setup.md#iam-permissions)、Serverless のロールは [iam.md](https://redmine-kit.github.io/serverless/ja/iam.html) にあります。Serverless では、Lambda は VPC の中で動き、S3 のゲートウェイエンドポイント(無料)を通って S3 に届きます。Lambda の外では、バケットに同じ操作を許す認証情報が、プロセスに要ります。
+プラグインを入れた Redmine を動かすプロセスには、どれも、添付ファイルのバケットのプレフィックスごとの読み書きを付け、CloudFront の署名付き URL のための秘密鍵を読ませます。一覧とポリシーの例は [iam.md](iam.md)、Serverless のロールは [iam.md](https://redmine-kit.github.io/serverless/ja/iam.html) にあります。Serverless では、Lambda は VPC の中で動き、S3 のゲートウェイエンドポイント(無料)を通って S3 に届きます。Lambda の外では、バケットに同じ操作を許す認証情報が、プロセスに要ります。
 
 <a id="to-verify"></a>
 

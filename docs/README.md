@@ -2,7 +2,8 @@
 
 Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores attachments in Amazon S3. Uploads are PUT from the browser through Redmine's CloudFront distribution to S3, and downloads redirect to CloudFront signed URLs on Redmine's domain, so file contents do not pass through Redmine. It does not modify Redmine's own files and uses only Redmine's standard extension mechanisms. The plugin is in the design stage, and only the documentation exists.
 
-- [Setup](setup.md): requirements, installation, configuration, AWS resources (the bucket, the CloudFront distribution), IAM permissions, network, tests
+- [Setup](setup.md): requirements, installation, configuration, AWS resources (the bucket, the CloudFront distribution), network, tests
+- [IAM permissions](iam.md): permissions, example policy, resource-based policies
 - [Attachments and S3](attachments.md): storage, uploads, downloads, cache, replaced code
 - [Administration page](admin.md): settings, read/write check, reconciliation
 

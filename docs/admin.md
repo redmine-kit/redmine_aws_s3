@@ -21,7 +21,7 @@ Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › S
 
 ## Permissions
 
-For the reconciliation job, the role that runs jobs gets permission to list the bucket. The delivery check uses the same permissions as attachments. The list is in [setup.md](setup.md#iam-permissions).
+For the reconciliation job, the role that runs jobs gets permission to list the bucket. The delivery check uses the same permissions as attachments. The list is in [iam.md](iam.md).
 
 ## Tests
 
