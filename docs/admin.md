@@ -21,7 +21,7 @@ Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › S
 
 ## Permissions
 
-For this page, the role that runs Redmine's web requests gets permission to read the bucket CORS. For the reconciliation job, the role that runs jobs gets permission to list the bucket. Details are in [iam.md](https://redmine-kit.github.io/serverless/iam.html).
+For this page, the role that runs Redmine's web requests gets permission to read the bucket CORS. For the reconciliation job, the role that runs jobs gets permission to list the bucket. The list is in [setup.md](setup.md#iam-permissions).
 
 ## Tests
 

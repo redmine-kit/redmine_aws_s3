@@ -27,7 +27,7 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 
 ## 権限
 
-この画面のために、Redmine の Web の要求を動かすロールに、バケットの CORS を読む権限を足します。突き合わせのジョブのために、ジョブを動かすロールに、バケットの一覧の権限を付けます。詳しくは [iam.md](https://redmine-kit.github.io/serverless/ja/iam.html) にあります。
+この画面のために、Redmine の Web の要求を動かすロールに、バケットの CORS を読む権限を足します。突き合わせのジョブのために、ジョブを動かすロールに、バケットの一覧の権限を付けます。一覧は [setup.md](setup.md#iam-permissions) にあります。
 
 <a id="tests"></a>
 
