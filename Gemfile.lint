@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+# Static checks only (bin/lint). Redmine loads Gemfile, not this file.
+source 'https://rubygems.org'
+
+gem 'rubocop', require: false

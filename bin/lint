@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Static checks: the newest RuboCop published at least 3 days ago, in Docker.
+# No lock is committed; bundle update resolves the gems again on every run.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+RUBY=ruby:4.0@sha256:a69f361db050bb2c65ec66ef75411bfc4ce2e1d993ba1179fac4e4ba6ecfe91f
+docker run --rm -v "$PWD:/work" -w /work -v redmine-serverless-s3-bundle:/usr/local/bundle \
+  -e BUNDLE_GEMFILE=Gemfile.lint "$RUBY" \
+  sh -c 'bundle update --quiet --cooldown=3 && bundle exec rubocop "$@"' rubocop "$@"

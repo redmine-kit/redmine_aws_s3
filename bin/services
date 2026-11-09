@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Starts PostgreSQL 16 and moto for the tests, on their own Compose project.
+#   bin/services          # start and wait until they answer
+#   bin/services --down   # stop them
+set -euo pipefail
+cd "$(dirname "$0")/.."
+compose=(docker compose -f test/compose.yml -p redmine-serverless-s3-test)
+if [[ "${1:-}" == "--down" ]]; then
+  "${compose[@]}" down -v
+  exit 0
+fi
+if ! "${compose[@]}" up -d --wait; then
+  "${compose[@]}" logs --tail 80
+  exit 1
+fi

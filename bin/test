@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Tests (docs/setup.md#tests), in Docker: Redmine 7.0.3 with this plugin, on
+# PostgreSQL 16, with moto for S3.
+#   bin/test                  # the plugin's tests, with coverage in coverage/
+#   bin/test core             # Redmine's own tests with the plugin installed (off)
+#   bin/test <files...>       # some of the plugin's tests
+#   PARALLEL_WORKERS=1 bin/test
+# Commands that run inside containers are in single quotes on purpose.
+# shellcheck disable=SC2016
+set -euo pipefail
+cd "$(dirname "$0")/.."
+image=redmine-serverless-s3-test
+network=redmine-serverless-s3-test_default
+
+bin/services >/dev/null
+docker buildx build --load -q -t "$image" -f test/Dockerfile . >/dev/null
+workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
+run() {
+  docker run --rm --network "$network" -e PARALLEL_WORKERS="$workers" "${extra[@]}" \
+    -e S3_TEST_ENDPOINT=http://moto:5000 -e AWS_REGION=us-east-1 \
+    -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test "$image" \
+    sh -c 'bin/rails db:drop db:create db:migrate db:schema:dump >/dev/null && "$@"' run "$@"
+}
+
+extra=()
+if [[ "${1:-}" == "core" ]]; then
+  shift
+  run bin/rails test "$@"
+elif (($#)); then
+  run bin/rails test "$@"
+else
+  # One process, so that SimpleCov sees every test (Redmine's helper starts
+  # it when COVERAGE is set).
+  rm -rf coverage && mkdir coverage
+  workers=1
+  extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_serverless_s3/coverage")
+  run bin/rails test plugins/redmine_serverless_s3/test
+fi

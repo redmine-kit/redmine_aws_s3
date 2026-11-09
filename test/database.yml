@@ -1,0 +1,7 @@
+# Database of the tests (bin/test): the PostgreSQL of test/compose.yml.
+test:
+  adapter: postgresql
+  host: postgres
+  database: redmine_test
+  username: postgres
+  encoding: unicode

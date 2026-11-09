@@ -1,0 +1,31 @@
+AllCops:
+  TargetRubyVersion: 4.0
+  NewCops: enable
+  SuggestExtensions: false
+  Include:
+    - '**/*.rb'
+    - '**/*.rake'
+    - '**/Gemfile'
+    - 'Gemfile.lint'
+    - '*.gemspec'
+
+Style/Documentation:
+  Enabled: false
+
+# Tests read better as one scenario per method.
+Metrics/MethodLength:
+  Max: 25
+  Exclude:
+    - 'test/**/*'
+
+Metrics/AbcSize:
+  Max: 30
+  Exclude:
+    - 'test/**/*'
+
+Metrics/ClassLength:
+  Exclude:
+    - 'test/**/*'
+
+Layout/LineLength:
+  Max: 120
