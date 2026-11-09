@@ -14,5 +14,5 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 
 - **With or without Lambda:** The plugin works in any Redmine that can reach S3. On AWS Lambda, there is no writable disk and requests are limited to 6 MB, so [Serverless](https://redmine-kit.github.io/serverless/) installs it together with [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/).
 - **Gems:** Gems the plugin uses (such as `aws-sdk-s3`) go in the plugin's `Gemfile`. Redmine's `Gemfile` also loads `plugins/*/Gemfile`.
-- **Tests:** Tests are written for each piece of replaced code, using Redmine's standard mechanism (`rake redmine:plugins:test`) ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3)).
+- **Tests:** Tests are written for each piece of replaced code, using Redmine's standard mechanism (`rake redmine:plugins:test`) ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3-redmine_serverless_s3)).
 - **Migrations:** None planned.

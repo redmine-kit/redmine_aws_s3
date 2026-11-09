@@ -228,7 +228,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 - **有効にする条件:** S3 のバケットの設定(環境変数)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
 - **Redmine の更新:** Redmine のバージョンを上げるときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗するようにします([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3))。
+- **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3-redmine_serverless_s3))。
 
 <a id="permissions"></a>
 

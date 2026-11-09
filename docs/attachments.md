@@ -200,7 +200,7 @@ Redmine's own files are not modified; the plugin replaces code with `prepend`. T
 
 - **Enabling condition:** The replacements are enabled only when the S3 bucket is configured (environment variable). Without it, Redmine behaves as standard. This lets Redmine's own tests pass as is ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
 - **Redmine upgrades:** When upgrading Redmine, check that the original code of the replaced methods has not changed. This table is the authoritative list of replacements. If the original code changes, a test must fail ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
-- **Tests:** Each piece of replaced code gets tests written with Redmine's test framework ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3)).
+- **Tests:** Each piece of replaced code gets tests written with Redmine's test framework ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3-redmine_serverless_s3)).
 
 ## Permissions
 
