@@ -14,7 +14,22 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ## インストール
 
-**プラグインの取り方:** バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.1 です。GitHub Packages から入れるには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem はプラグインの動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、入れた gem をそこにリンクします。
+1. プラグインを `plugins/redmine_serverless_s3` に置きます。gem をインストールするか([gem](#gem))、リポジトリをクローンします([gem を使わないとき](#without-the-gem))。
+2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を足します。
+3. migration は要りません。
+4. プラグインの JavaScript `s3_upload.js` を配るために、アセットを作ります(Redmine のいつものアセットの手順でもかまいません)。
+
+   ```sh
+   bin/rails assets:precompile
+   ```
+
+5. 環境変数を設定します(下記)。`REDMINE_S3_BUCKET` がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
+
+<a id="gem"></a>
+
+### gem
+
+バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.1 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -29,12 +44,16 @@ bundle install
 ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s3
 ```
 
-gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` に clone します(`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`)。
+<a id="without-the-gem"></a>
 
-1. プラグインを `plugins/redmine_serverless_s3` に置き、`bundle install` を実行します(プラグインの `Gemfile` と gem が、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を足し、Redmine の `Gemfile` がプラグインの `Gemfile` を読み込みます)。
-2. migration は要りません。
-3. プラグインの JavaScript `s3_upload.js` を配るために、`bin/rails assets:precompile`(か、Redmine のいつもの assets の手順)を実行します。
-4. 環境変数を設定します(下記)。`REDMINE_S3_BUCKET` がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
+### gem を使わないとき
+
+リポジトリを `plugins/redmine_serverless_s3` にクローンし、gem をインストールします。
+
+```sh
+git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3
+bundle install
+```
 
 <a id="configuration"></a>
 

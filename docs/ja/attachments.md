@@ -246,7 +246,7 @@ sequenceDiagram
 Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここを S3 のキャッシュとして使います。
 
 - **パスの形:** `/tmp/redmine/files/<年>/<月>/<ファイル名>` で、S3 のキー(`files/<年>/<月>/<ファイル名>`)と同じ形です。`Attachment#diskfile` は、Redmine の標準のまま使えます。
-- **取り方:** `Attachment#diskfile` を差し替え、パスを返す前に次のように判断します。
+- **S3 からの取得:** `Attachment#diskfile` を差し替え、パスを返す前に次のように判断します。
   - ローカルにファイルがあれば、そのパスを返します。保存の途中(`files_to_final_location` がファイルを作ったあと)もこれに当たり、S3 には取りに行きません。
   - ローカルになく、レコードが保存済みなら、S3 から取ってからパスを返します。別の名前で書いてから名前を変えるので、途中のファイルを読むことはありません。
   - 削除(`delete_from_disk!`)と、ファイルがあるかの確認(`readable?`)は、`diskfile` を通さないように差し替えます。消すだけのファイルや、確認するだけのファイルを取りに行かないためです。

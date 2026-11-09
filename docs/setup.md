@@ -10,7 +10,20 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ## Installation
 
-**Getting the plugin:** Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.1. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files; Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+1. Put the plugin in `plugins/redmine_serverless_s3`: install the gem ([Gem](#gem)) or clone the repository ([Without the gem](#without-the-gem)).
+2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.178 or later (which has the full-object checksums, `ChecksumType`) and `aws-sdk-cloudfront` 1.x.
+3. No migrations are needed.
+4. Build the assets, so that the plugin's JavaScript `s3_upload.js` is served (or use Redmine's usual asset step):
+
+   ```sh
+   bin/rails assets:precompile
+   ```
+
+5. Set the environment variables (below). Without `REDMINE_S3_BUCKET`, the plugin stays off and Redmine stores attachments on disk as standard.
+
+### Gem
+
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.1. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
 ```ruby
 # Redmine's Gemfile.local
@@ -25,12 +38,14 @@ bundle install
 ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s3
 ```
 
-Without the gem, clone the repository into `plugins/redmine_serverless_s3` (`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`).
+### Without the gem
 
-1. Put the plugin in `plugins/redmine_serverless_s3` and run `bundle install` (the plugin's `Gemfile` and the gem add `aws-sdk-s3` 1.178 or later, which has the full-object checksums (`ChecksumType`), and `aws-sdk-cloudfront` 1.x; Redmine's `Gemfile` loads the plugin's).
-2. No migrations are needed.
-3. Run `bin/rails assets:precompile` (or Redmine's usual asset step) so that the plugin's JavaScript `s3_upload.js` is served.
-4. Set the environment variables (below). Without `REDMINE_S3_BUCKET`, the plugin stays off and Redmine stores attachments on disk as standard.
+Clone the repository into `plugins/redmine_serverless_s3` and install its gems:
+
+```sh
+git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3
+bundle install
+```
 
 ## Configuration
 
