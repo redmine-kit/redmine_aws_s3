@@ -8,7 +8,7 @@
 
 | 操作 | 対象 | 理由 |
 | --- | --- | --- |
-| `s3:GetObject`、`s3:PutObject`、`s3:DeleteObject` | バケットの `files/*`、`thumbnails/*`、`imports/*`、`incoming/*`、`tmp/*` | 添付ファイルとサムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `incoming/` からの写し、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
+| `s3:GetObject`、`s3:PutObject`、`s3:DeleteObject` | バケットの `files/*`、`thumbnails/*`、`imports/*`、`incoming/*`、`tmp/*` | 添付ファイルとサムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `incoming/` からのコピー、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
 | `s3:GetObjectTagging` | バケットの `incoming/*`、`imports/*` | マルウェアのスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、突き合わせ、接続の確認の `HeadBucket` |
 | CloudFront の秘密鍵を読む | それを入れた秘密の値(Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |

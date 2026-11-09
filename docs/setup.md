@@ -10,7 +10,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ## Installation
 
-**Getting the plugin:** Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The first version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files; Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+**Getting the plugin:** Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.1. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files; Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
 ```ruby
 # Redmine's Gemfile.local
@@ -27,7 +27,7 @@ ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s
 
 Without the gem, clone the repository into `plugins/redmine_serverless_s3` (`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`).
 
-1. Put the plugin in `plugins/redmine_serverless_s3` and run `bundle install` (the plugin's `Gemfile` and the gem add `aws-sdk-s3` and `aws-sdk-cloudfront`; Redmine's `Gemfile` loads the plugin's).
+1. Put the plugin in `plugins/redmine_serverless_s3` and run `bundle install` (the plugin's `Gemfile` and the gem add `aws-sdk-s3` 1.178 or later, which has the full-object checksums (`ChecksumType`), and `aws-sdk-cloudfront` 1.x; Redmine's `Gemfile` loads the plugin's).
 2. No migrations are needed.
 3. Run `bin/rails assets:precompile` (or Redmine's usual asset step) so that the plugin's JavaScript `s3_upload.js` is served.
 4. Set the environment variables (below). Without `REDMINE_S3_BUCKET`, the plugin stays off and Redmine stores attachments on disk as standard.
@@ -103,8 +103,10 @@ Redmine's standard plugin tests, in Docker with Redmine 7.0.3, PostgreSQL 16, an
 ```sh
 bin/test                 # the plugin's tests, with coverage in coverage/
 bin/test core            # Redmine's own tests with the plugin installed (off)
+bin/test core-s3         # Redmine's attachment tests with the plugin on
+bin/test system          # the system tests, in headless Chromium
 bin/test <files...>      # some of the plugin's tests
-bin/services --down      # stop PostgreSQL, moto and LocalStack
+bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
 node test/javascripts/sha256_test.mjs   # the SHA-256 of the upload script
 ```
@@ -131,10 +133,12 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
 | Administration tab | Settings, read/write check, delivery check (the CSP and `nosniff` headers, the unsigned URL refused), reconciliation job, malware findings; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
 | Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's | — |
+| Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
 | Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry | Node.js |
 
 - **Not checked against AWS:** On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the response headers policy) and GuardDuty are not reproduced locally. These are in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
-- **Redmine's own tests:** `bin/test core` runs Redmine's tests with the plugin installed and off. In the full run on 2026-11-10 (5,832 tests), the 7 failures were the gem-related ones listed in Serverless (`:match` in rails-dom-testing), and 8 errors came from the order of Redmine's own tests: `Redmine::PluginTest` does not restore the plugin directory, so after `RoutingPluginsTest` the installed plugins' routes are gone while their menu items stay. The 8 tests pass when run on their own (2026-11-10). Running Redmine's attachment tests with the plugin on is not done yet.
+- **Redmine's own tests:** `bin/test core` runs Redmine's tests with the plugin installed and off. In the full run on 2026-11-10 (5,832 tests), the 7 failures were the gem-related ones listed in Serverless (`:match` in rails-dom-testing), and 8 errors came from the order of Redmine's own tests: `Redmine::PluginTest` does not restore the plugin directory, so after `RoutingPluginsTest` the installed plugins' routes are gone while their menu items stay. The 8 tests pass when run on their own (2026-11-10).
+- **Redmine's attachment tests with the plugin on:** `bin/test core-s3` runs Redmine's attachment tests (`test/unit/attachment_test.rb`, `test/unit/attachment_transaction_test.rb`, `test/functional/attachments_controller_test.rb`, `test/functional/attachments_visibility_test.rb`, `test/integration/attachments_test.rb`, `test/integration/api_test/attachments_test.rb`) with the plugin on, against LocalStack or moto. 140 tests pass (2026-11-10). The 15 left out expect Redmine to send the file itself (downloads, thumbnails, "download all", `X-Sendfile`), which the plugin replaces with redirects, or a thumbnail that an earlier test already stored in S3; [`test/core/s3_exclusions.txt`](../test/core/s3_exclusions.txt) lists each with the reason.
 
 ## To verify
 

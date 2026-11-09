@@ -8,7 +8,7 @@
 
 [English](README.md)
 
-> **状態:** 開発の初期の段階です。バージョン 0.1.0 を作り、Redmine 7.0.3 と、LocalStack と moto でテストしています。本物の CloudFront のディストリビューションが要ることは、まだ確認していません([確認すること](docs/ja/attachments.md#to-verify))。
+> **状態:** 開発の初期の段階です。バージョン 0.1.1 を作り、Redmine 7.0.3 と、LocalStack と moto でテストしています。本物の CloudFront のディストリビューションが要ることは、まだ確認していません([確認すること](docs/ja/attachments.md#to-verify))。
 
 <a id="documentation"></a>
 

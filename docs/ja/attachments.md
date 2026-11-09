@@ -133,7 +133,7 @@ sequenceDiagram
 
 CloudFront を通る要求の本文は、本文のハッシュを入れる Lambda@Edge が読める 1 MB までです([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。大きなファイルを API で送るときは、CloudFront を通したアップロード(上の流れ。API キーと OAuth でも使える)を使います。
 
-これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外にしてレコードを保存しません。マルウェアのスキャンを使うときは、代わりに `incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません(下記)。
+これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外を発生させ、レコードを保存しません。マルウェアのスキャンを使うときは、代わりに `incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません(下記)。
 
 <a id="malware-scan"></a>
 
@@ -287,7 +287,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `attachments.js` の `uploadBlob` | SHA256 を計算し、その値を付けて CloudFront の署名付き URL に PUT する | アップロード |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **Redmine の更新:** Redmine のバージョンを上げるときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインが写した Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
+- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
 - **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([setup.md](setup.md#what-the-tests-check))。
 
 <a id="permissions"></a>

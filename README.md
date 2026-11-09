@@ -8,7 +8,7 @@ A Redmine plugin that stores attachments in Amazon S3: uploads and downloads thr
 
 [日本語](README.ja.md)
 
-> **Status:** early development. Version 0.1.0 is built and tested with Redmine 7.0.3 against LocalStack and moto; what needs a real CloudFront distribution is not checked yet ([to verify](docs/attachments.md#to-verify)).
+> **Status:** early development. Version 0.1.1 is built and tested with Redmine 7.0.3 against LocalStack and moto; what needs a real CloudFront distribution is not checked yet ([to verify](docs/attachments.md#to-verify)).
 
 ## Documentation
 
