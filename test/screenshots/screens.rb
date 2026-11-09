@@ -43,7 +43,7 @@ class RedmineServerlessS3Screens < ScreenshotCase
   def test_screens
     each_language do |language|
       visit '/admin/serverless/s3'
-      click_button I18n.t(:button_redmine_serverless_s3_read_write, locale: language)
+      click_link I18n.t(:button_redmine_serverless_s3_read_write, locale: language)
       assert_selector '#serverless-s3-checks'
       shoot 's3-admin', language
     end

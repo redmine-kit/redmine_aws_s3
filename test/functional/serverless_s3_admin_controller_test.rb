@@ -22,7 +22,7 @@ class ServerlessS3AdminControllerTest < Redmine::ControllerTest
     assert_select '.tabs a', text: 'Attachments in S3'
     assert_select 'p.warning', text: /REDMINE_S3_BUCKET/
     assert_select 'input[name=?][value=?]', 'settings[download_url_expiry]', '300'
-    assert_select 'form[action=?]', '/admin/serverless/s3/read_write', count: 0
+    assert_select 'a[href=?]', '/admin/serverless/s3/read_write', count: 0
   end
 
   def test_show_with_the_bucket_never_shows_the_private_key
@@ -30,11 +30,11 @@ class ServerlessS3AdminControllerTest < Redmine::ControllerTest
       get :show
 
       assert_response :success
-      assert_select 'td', text: 'redmine-files'
-      assert_select 'td', text: DOMAIN
-      assert_select 'td', text: 'Set'
+      assert_select 'div.box.tabular p', text: /redmine-files/
+      assert_select 'div.box.tabular p', text: /#{Regexp.escape(DOMAIN)}/
+      assert_select 'div.box.tabular p', text: /Set\s*REDMINE_CLOUDFRONT_PRIVATE_KEY/
       assert_not_includes response.body, 'PRIVATE KEY'
-      assert_select 'form[action=?]', '/admin/serverless/s3/read_write'
+      assert_select 'p a.icon.icon-checked[data-method=post][href=?]', '/admin/serverless/s3/read_write'
       assert_empty client.api_requests
     end
   end
@@ -111,7 +111,7 @@ class ServerlessS3AdminControllerTest < Redmine::ControllerTest
     with_s3(stub_client) do
       get :show
 
-      assert_select '#serverless-s3-reconciliation td', text: 'f'
+      assert_select '#serverless-s3-reconciliation p', text: /f\z/
       assert_select 'li code', text: 'files/2026/11/a'
     end
   end
@@ -144,7 +144,7 @@ class RedmineServerlessS3SettingsControllerTest < Redmine::ControllerTest
 
     assert_response :success
     assert_include 'settings_attachment_max_size', response.body
-    assert_include 'CloudFront Function on /incoming/*', response.body
+    assert_include 'CloudFront Function on /tmp/* (uploads under /tmp/incoming/)', response.body
     assert_select 'meta[name=?]', 'redmine-s3-presign-url'
   ensure
     ENV.delete(RedmineServerlessS3::ENV_BUCKET)

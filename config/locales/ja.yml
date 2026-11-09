@@ -22,7 +22,7 @@ ja:
   field_redmine_serverless_s3_domain: CloudFront のドメイン
   field_redmine_serverless_s3_key_pair_id: CloudFront のキーペア ID
   field_redmine_serverless_s3_private_key: CloudFront の秘密鍵
-  field_redmine_serverless_s3_storage_path: ローカルのキャッシュ(attachments_storage_path)
+  field_redmine_serverless_s3_storage_path: ローカルのキャッシュ
   field_redmine_serverless_s3_download_url_expiry: ダウンロードの URL の有効期限(秒)
   field_redmine_serverless_s3_upload_url_expiry: アップロードの URL の有効期限(秒)
   field_redmine_serverless_s3_cache_size_mb: ローカルのキャッシュの大きさ(MB)
@@ -36,5 +36,5 @@ ja:
   text_redmine_serverless_s3_off: "%{name} がないので、添付ファイルは標準どおりローカルのディスクに保存します。"
   text_redmine_serverless_s3_reconciliation_running: "%{time} から実行中です。"
   text_redmine_serverless_s3_max_size: >-
-    添付ファイルを S3 に置く場合、ブラウザーからのアップロードは /incoming/* の CloudFront Function でも制限され、
+    添付ファイルを S3 に置く場合、ブラウザーからのアップロードは /tmp/* の CloudFront Function(/tmp/incoming/ へのアップロード)でも制限され、
     同じ値にする必要があります。Lambda では、REST API の POST /uploads.json は 1 MB までです。

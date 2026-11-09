@@ -22,7 +22,7 @@ en:
   field_redmine_serverless_s3_domain: CloudFront domain
   field_redmine_serverless_s3_key_pair_id: CloudFront key pair ID
   field_redmine_serverless_s3_private_key: CloudFront private key
-  field_redmine_serverless_s3_storage_path: Local cache (attachments_storage_path)
+  field_redmine_serverless_s3_storage_path: Local cache
   field_redmine_serverless_s3_download_url_expiry: Download URL expiry (seconds)
   field_redmine_serverless_s3_upload_url_expiry: Upload URL expiry (seconds)
   field_redmine_serverless_s3_cache_size_mb: Local cache size (MB)
@@ -36,5 +36,5 @@ en:
   text_redmine_serverless_s3_off: "%{name} is not set, so attachments are stored on the local disk as standard."
   text_redmine_serverless_s3_reconciliation_running: "Running since %{time}."
   text_redmine_serverless_s3_max_size: >-
-    With attachments in S3, uploads from browsers are also limited by the CloudFront Function on /incoming/*,
+    With attachments in S3, uploads from browsers are also limited by the CloudFront Function on /tmp/* (uploads under /tmp/incoming/),
     which must use the same value. On Lambda, POST /uploads.json of the REST API is limited to 1 MB.

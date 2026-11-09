@@ -1,89 +1,123 @@
 <%= render partial: 'serverless_admin/tabs', locals: { selected: 's3' } %>
 
 <% unless RedmineServerlessS3.enabled? %>
-  <p class="warning"><%= l(:text_redmine_serverless_s3_off, name: RedmineServerlessS3::ENV_BUCKET) %></p>
+<p class="warning"><%= l(:text_redmine_serverless_s3_off, name: RedmineServerlessS3::ENV_BUCKET) %></p>
 <% end %>
 
 <h3><%= l(:label_redmine_serverless_s3_environment) %></h3>
-<table class="list">
-  <tbody>
-    <tr><th><%= l(:field_redmine_serverless_s3_bucket) %> (<code><%= RedmineServerlessS3::ENV_BUCKET %></code>)</th><td><%= RedmineServerlessS3.bucket || '-' %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_region) %> (<code><%= RedmineServerlessS3::ENV_REGION %></code>)</th><td><%= RedmineServerlessS3.region || '-' %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_domain) %> (<code><%= RedmineServerlessS3::ENV_DOMAIN %></code>)</th><td><%= RedmineServerlessS3.cloudfront_domain || '-' %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_key_pair_id) %> (<code><%= RedmineServerlessS3::ENV_KEY_PAIR_ID %></code>)</th><td><%= RedmineServerlessS3.key_pair_id || '-' %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_private_key) %> (<code><%= RedmineServerlessS3::ENV_PRIVATE_KEY %></code>)</th><td><%= l(RedmineServerlessS3.private_key? ? :label_redmine_serverless_s3_set : :label_redmine_serverless_s3_not_set) %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_malware_scan) %> (<code><%= RedmineServerlessS3::ENV_MALWARE_SCAN %></code>)</th><td><%= l(RedmineServerlessS3.malware_scan? ? :general_text_Yes : :general_text_No) %></td></tr>
-    <tr><th><%= l(:field_redmine_serverless_s3_storage_path) %></th><td><code><%= Attachment.storage_path %></code></td></tr>
-  </tbody>
-</table>
 
-<h3><%= l(:label_settings) %></h3>
-<%= form_tag(serverless_s3_admin_path, method: :patch) do %>
 <div class="box tabular settings">
-  <% @settings.each do |name, value| %>
-    <p>
-      <%= label_tag "settings_#{name}", l(:"field_redmine_serverless_s3_#{name}") %>
-      <%= text_field_tag "settings[#{name}]", value, size: 6 %>
-    </p>
+  <% [[:bucket, RedmineServerlessS3::ENV_BUCKET, RedmineServerlessS3.bucket],
+      [:region, RedmineServerlessS3::ENV_REGION, RedmineServerlessS3.region],
+      [:domain, RedmineServerlessS3::ENV_DOMAIN, RedmineServerlessS3.cloudfront_domain],
+      [:key_pair_id, RedmineServerlessS3::ENV_KEY_PAIR_ID, RedmineServerlessS3.key_pair_id],
+      [:private_key, RedmineServerlessS3::ENV_PRIVATE_KEY,
+       l(RedmineServerlessS3.private_key? ? :label_redmine_serverless_s3_set : :label_redmine_serverless_s3_not_set)],
+      [:malware_scan, RedmineServerlessS3::ENV_MALWARE_SCAN,
+       l(RedmineServerlessS3.malware_scan? ? :general_text_Yes : :general_text_No)]].each do |name, env, value| %>
+  <p><label><%= l(:"field_redmine_serverless_s3_#{name}") %></label><%= value || '-' %> <em class="info"><%= env %></em></p>
   <% end %>
+  <p><label><%= l(:field_redmine_serverless_s3_storage_path) %></label><%= Attachment.storage_path %> <em class="info">attachments_storage_path</em></p>
 </div>
-<%= submit_tag l(:button_save) %>
-<% end %>
 
 <% if RedmineServerlessS3.enabled? %>
 <h3><%= l(:label_redmine_serverless_s3_checks) %></h3>
+
 <p>
-  <%= button_to l(:button_redmine_serverless_s3_read_write), serverless_s3_admin_read_write_path, form: { style: 'display:inline' } %>
-  <%= button_to l(:button_redmine_serverless_s3_delivery), serverless_s3_admin_delivery_path, form: { style: 'display:inline' } %>
+  <%= link_to sprite_icon('checked', l(:button_redmine_serverless_s3_read_write)), serverless_s3_admin_read_write_path, method: :post, class: 'icon icon-checked' %>
+  <%= link_to sprite_icon('checked', l(:button_redmine_serverless_s3_delivery)), serverless_s3_admin_delivery_path, method: :post, class: 'icon icon-checked' %>
 </p>
+
 <% if (results = flash[:serverless_s3_checks]).present? %>
-<table class="list" id="serverless-s3-checks">
-  <thead><tr><th><%= l(:field_name) %></th><th><%= l(:field_status) %></th><th><%= l(:label_redmine_serverless_s3_detail) %></th></tr></thead>
-  <tbody>
-  <% results.each do |name, ok, detail| %>
-    <tr><td><%= name %></td><td><%= l(ok ? :label_redmine_serverless_s3_ok : :label_redmine_serverless_s3_failed) %></td><td><%= detail %></td></tr>
-  <% end %>
-  </tbody>
+<div class="autoscroll">
+<table class="list checks" id="serverless-s3-checks"><thead>
+<tr>
+    <th><%= l(:field_name) %></th>
+    <th><%= l(:field_status) %></th>
+    <th><%= l(:label_redmine_serverless_s3_detail) %></th>
+</tr></thead>
+<tbody>
+<% results.each do |name, ok, detail| %>
+<tr class="<%= ok ? 'ok' : 'failed' %>">
+    <td class="name"><%= name %></td>
+    <td class="tick">
+      <span class="icon-only icon-<%= ok ? 'ok' : 'error' %>">
+        <%= ok ? sprite_icon('checked', l(:label_redmine_serverless_s3_ok)) : sprite_icon('warning', l(:label_redmine_serverless_s3_failed)) %>
+      </span>
+    </td>
+    <td class="description"><%= detail %></td>
+</tr>
+<% end %>
+</tbody>
 </table>
+</div>
 <% end %>
 
 <% if RedmineServerlessS3.malware_scan? || RedmineServerlessS3::MalwareScan.findings.any? %>
 <h3><%= l(:label_redmine_serverless_s3_malware_findings) %></h3>
-<% if (findings = RedmineServerlessS3::MalwareScan.findings).empty? %>
-  <p class="nodata"><%= l(:label_no_data) %></p>
-<% else %>
-<table class="list" id="serverless-s3-malware">
-  <thead><tr><th><%= l(:field_created_on) %></th><th><%= l(:field_status) %></th><th><%= l(:field_filename) %></th><th><%= l(:field_login) %></th></tr></thead>
-  <tbody>
-  <% findings.each do |finding| %>
-    <tr><td><%= finding['time'] %></td><td><%= finding['status'] %></td><td><%= finding['filename'] %></td><td><%= finding['user'] %></td></tr>
-  <% end %>
-  </tbody>
+
+<% if (findings = RedmineServerlessS3::MalwareScan.findings).any? %>
+<div class="autoscroll">
+<table class="list findings" id="serverless-s3-malware"><thead>
+<tr>
+    <th><%= l(:field_created_on) %></th>
+    <th><%= l(:field_status) %></th>
+    <th><%= l(:field_filename) %></th>
+    <th><%= l(:field_login) %></th>
+</tr></thead>
+<tbody>
+<% findings.each do |finding| %>
+<tr>
+    <td><%= finding['time'] %></td>
+    <td><%= finding['status'] %></td>
+    <td class="name"><%= finding['filename'] %></td>
+    <td class="name"><%= finding['user'] %></td>
+</tr>
+<% end %>
+</tbody>
 </table>
+</div>
+<% else %>
+<p class="nodata"><%= l(:label_no_data) %></p>
 <% end %>
 <% end %>
 
 <h3><%= l(:label_redmine_serverless_s3_reconciliation) %></h3>
-<p><%= button_to l(:button_redmine_serverless_s3_reconcile), serverless_s3_admin_reconcile_path, form: { style: 'display:inline' } %></p>
+
+<p><%= link_to sprite_icon('reload', l(:button_redmine_serverless_s3_reconcile)), serverless_s3_admin_reconcile_path, method: :post, class: 'icon icon-reload' %></p>
+
 <% if @reconciliation.blank? %>
-  <p class="nodata"><%= l(:label_no_data) %></p>
+<p class="nodata"><%= l(:label_no_data) %></p>
 <% elsif @reconciliation['finished_at'].blank? %>
-  <p><%= l(:text_redmine_serverless_s3_reconciliation_running, time: @reconciliation['started_at']) %></p>
+<p><%= l(:text_redmine_serverless_s3_reconciliation_running, time: @reconciliation['started_at']) %></p>
 <% else %>
-  <table class="list" id="serverless-s3-reconciliation">
-    <tbody>
-      <tr><th><%= l(:field_redmine_serverless_s3_finished_at) %></th><td><%= @reconciliation['finished_at'] %></td></tr>
-      <tr><th><%= l(:field_redmine_serverless_s3_attachments) %></th><td><%= @reconciliation['attachments'] %></td></tr>
-      <tr><th><%= l(:field_redmine_serverless_s3_objects) %></th><td><%= @reconciliation['objects'] %></td></tr>
-      <tr><th><%= l(:field_redmine_serverless_s3_missing) %></th><td><%= @reconciliation['missing_count'] %></td></tr>
-      <tr><th><%= l(:field_redmine_serverless_s3_unused) %></th><td><%= @reconciliation['unused_count'] %></td></tr>
-    </tbody>
-  </table>
-  <% %w[missing unused].each do |kind| %>
-    <% if Array(@reconciliation[kind]).any? %>
-      <p><strong><%= l(:"field_redmine_serverless_s3_#{kind}") %></strong></p>
-      <ul><% Array(@reconciliation[kind]).each do |key| %><li><code><%= key %></code></li><% end %></ul>
-    <% end %>
+<div class="box tabular settings" id="serverless-s3-reconciliation">
+  <% %w[finished_at attachments objects].each do |name| %>
+  <p><label><%= l(:"field_redmine_serverless_s3_#{name}") %></label><%= @reconciliation[name] %></p>
   <% end %>
+  <p><label><%= l(:field_redmine_serverless_s3_missing) %></label><%= @reconciliation['missing_count'] %></p>
+  <p><label><%= l(:field_redmine_serverless_s3_unused) %></label><%= @reconciliation['unused_count'] %></p>
+</div>
+<% %w[missing unused].each do |kind| %>
+<% if Array(@reconciliation[kind]).any? %>
+<h4><%= l(:"field_redmine_serverless_s3_#{kind}") %></h4>
+<ul><% Array(@reconciliation[kind]).each do |key| %><li><code><%= key %></code></li><% end %></ul>
 <% end %>
+<% end %>
+<% end %>
+<% end %>
+
+<h3><%= l(:label_settings) %></h3>
+
+<%= form_tag(serverless_s3_admin_path, method: :patch) do %>
+<div class="box tabular settings">
+  <% @settings.each do |name, value| %>
+  <p>
+    <%= label_tag "settings_#{name}", l(:"field_redmine_serverless_s3_#{name}") %>
+    <%= text_field_tag "settings[#{name}]", value, size: 6 %>
+  </p>
+  <% end %>
+</div>
+
+<%= submit_tag l(:button_save) %>
 <% end %>
