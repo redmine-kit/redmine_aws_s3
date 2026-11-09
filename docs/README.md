@@ -22,3 +22,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 ## Sponsors
 
 <Sponsors><a href="https://localstack.cloud">LocalStack</a></Sponsors>
+
+## License
+
+Redmine Serverless S3 is released under the GNU General Public License, version 2 or (at your option) any later version. See [LICENSE](../LICENSE). Not affiliated with the Redmine project.

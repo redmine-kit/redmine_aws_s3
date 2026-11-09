@@ -21,6 +21,14 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 - **テスト:** Redmine の標準の仕組み(`rake redmine:plugins:test`)で、差し替えた処理ごとにテストを書きます([setup.md](setup.md#what-the-tests-check))。
 - **migration:** ありません。
 
+<a id="sponsors"></a>
+
 ## スポンサー
 
 <Sponsors><a href="https://localstack.cloud">LocalStack</a></Sponsors>
+
+<a id="license"></a>
+
+## ライセンス
+
+Redmine Serverless S3 は、GNU General Public License バージョン 2 またはそれ以降のバージョンで公開しています。[LICENSE](../../LICENSE) を参照してください。Redmine projectとは関係ありません。

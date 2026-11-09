@@ -18,7 +18,7 @@
 - Web サイト: https://redmine-kit.github.io/redmine_serverless_s3/ja/ (English: https://redmine-kit.github.io/redmine_serverless_s3/)
 - Markdown: [docs/ja/README.md](docs/ja/README.md) (English: [docs/README.md](docs/README.md))。[準備](docs/ja/setup.md)、[IAM の権限](docs/ja/iam.md)、[添付ファイルと S3](docs/ja/attachments.md)、[管理画面](docs/ja/admin.md)があります。
 
-<a id="license"></a>
+<a id="sponsors"></a>
 
 ## スポンサー
 
@@ -28,6 +28,8 @@
     <img alt="LocalStack" src=".github/assets/localstack-logo.svg" width="120" height="28">
   </picture>
 </a>
+
+<a id="license"></a>
 
 ## ライセンス
 
