@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - run: bin/lint
-      - run: node test/javascripts/sha256_test.mjs
+      - run: for test in test/javascripts/*_test.mjs; do node "$test"; done
 
   test:
     needs: static
@@ -33,7 +33,11 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+      # LocalStack when the organization's token is available, moto otherwise
+      # (pull requests from forks); bin/test prints which one ran.
       - run: bin/test
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
       # Not failing the run while the Codecov GitHub App is not installed.
       - uses: codecov/codecov-action@v7.1.1
         with:
@@ -42,3 +46,5 @@ jobs:
           fail_ci_if_error: false
       - if: always()
         run: bin/services --down
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}

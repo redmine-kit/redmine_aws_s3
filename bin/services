@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Starts PostgreSQL 16 and moto for the tests, on their own Compose project.
+# Starts PostgreSQL 16 and moto for the tests, on their own Compose project,
+# and LocalStack when LOCALSTACK_AUTH_TOKEN is set.
 #   bin/services          # start and wait until they answer
 #   bin/services --down   # stop them
 set -euo pipefail
 cd "$(dirname "$0")/.."
 compose=(docker compose -f test/compose.yml -p redmine-serverless-s3-test)
+if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
+  compose+=(--profile localstack)
+fi
 if [[ "${1:-}" == "--down" ]]; then
   "${compose[@]}" down -v
   exit 0

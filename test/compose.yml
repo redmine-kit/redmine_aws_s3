@@ -1,5 +1,6 @@
-# Services for the tests (bin/test): PostgreSQL 16 and moto, which reproduces
-# the S3 API. No ports are published; the tests reach them on the network.
+# Services for the tests (bin/test): PostgreSQL 16, and moto or LocalStack,
+# which reproduce the S3 API. No ports are published; the tests reach them on
+# the network.
 services:
   postgres:
     image: postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
@@ -16,3 +17,14 @@ services:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/moto-api/')"]
       interval: 2s
       retries: 30
+
+  # LocalStack (Hobby) needs an auth token, so it starts only with the
+  # "localstack" profile, which bin/services turns on when
+  # LOCALSTACK_AUTH_TOKEN is set. The token is never written to the repository.
+  localstack:
+    image: localstack/localstack:2026.10.6@sha256:f94401988db4c01a5b2634d37d698a9b11c93f74c1ad0f7a8849f5ebd73dcbdc
+    profiles: ["localstack"]
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+      SERVICES: s3
+    # The image has its own health check.

@@ -2,11 +2,11 @@
 
 require_relative '../test_helper'
 
-# Attachments in S3 reproduced by moto (S3_TEST_ENDPOINT). moto 5.2.5 neither
-# checks x-amz-checksum-sha256 nor returns ChecksumSHA256 from HeadObject, so
-# the upload tests compute that HeadObject result from the stored bytes, as S3
-# does; a checksum that does not match is tested with stub_responses
-# (test/unit/upload_test.rb).
+# Attachments in S3 reproduced by LocalStack or moto (S3_TEST_ENDPOINT, chosen
+# by bin/test). moto 5.2.5 neither checks x-amz-checksum-sha256 nor returns
+# ChecksumSHA256 from HeadObject, so on moto the upload tests compute that
+# HeadObject result from the stored bytes, as S3 does; S3 refusing a checksum
+# that does not match is tested on LocalStack only.
 class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   include RedmineServerlessS3::TestHelper
 
@@ -29,13 +29,14 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
     RedmineServerlessS3.storage.keys(prefix)
   end
 
-  # HeadObject as S3 answers it for an object uploaded with a SHA256 checksum.
+  # HeadObject as S3 answers it for an object uploaded with a SHA256
+  # checksum, where the backend does not return the checksum (moto).
   def emulate_s3_checksums
     RedmineServerlessS3::Storage.class_eval do
       alias_method :head_without_checksum, :head
       define_method(:head) do |key, checksum: false|
-        result = head_without_checksum(key)
-        return result unless result && checksum
+        result = head_without_checksum(key, checksum: checksum)
+        return result unless result && checksum && result.checksum_sha256.nil?
 
         data = client.get_object(bucket: bucket, key: key).body.read
         Struct.new(:content_length, :checksum_sha256, :checksum_type)
@@ -70,7 +71,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_the_upload_flow_through_cloudfront
-    with_moto do
+    with_test_s3 do
       log_user('jsmith', 'jsmith')
       data = "contents uploaded by the browser\n"
       incoming, token = emulate_s3_checksums { upload_through_cloudfront(data, 'browser.txt') }
@@ -100,8 +101,89 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
     end
   end
 
+  # GuardDuty is not reproduced locally; the test puts the tag GuardDuty would.
+  def test_the_upload_waits_for_the_malware_scan
+    with_test_s3 do
+      with_malware_scan do
+        log_user('jsmith', 'jsmith')
+        data = 'scanned by GuardDuty'
+        post '/s3_uploads/presign',
+             params: { filename: 'scanned.txt', size: data.bytesize, sha256: sha256_base64(data) }
+        presigned = response.parsed_body
+        key = put_upload(presigned['url'], presigned['headers'], data)
+        emulate_s3_checksums do
+          post '/s3_uploads/complete.js', params: { ticket: presigned['ticket'], attachment_id: 1 }, xhr: true
+          assert_response :accepted
+
+          RedmineServerlessS3.client.put_object_tagging(
+            bucket: RedmineServerlessS3.bucket, key: key,
+            tagging: { tag_set: [{ key: RedmineServerlessS3::MalwareScan::TAG, value: 'NO_THREATS_FOUND' }] }
+          )
+          post '/s3_uploads/complete.js', params: { ticket: presigned['ticket'], attachment_id: 1 }, xhr: true
+          assert_response :success
+        end
+        attachment = Attachment.last
+
+        assert_equal 'scanned.txt', attachment.filename
+        assert_equal data, object(attachment.s3_key)
+        assert_nil object(key)
+      end
+    end
+  end
+
+  def test_a_threat_found_by_the_malware_scan_is_refused
+    with_test_s3 do
+      with_malware_scan do
+        log_user('jsmith', 'jsmith')
+        data = 'not a real threat'
+        post '/s3_uploads/presign', params: { filename: 'bad.txt', size: data.bytesize, sha256: sha256_base64(data) }
+        presigned = response.parsed_body
+        key = put_upload(presigned['url'], presigned['headers'], data)
+        RedmineServerlessS3.client.put_object_tagging(
+          bucket: RedmineServerlessS3.bucket, key: key,
+          tagging: { tag_set: [{ key: RedmineServerlessS3::MalwareScan::TAG, value: 'THREATS_FOUND' }] }
+        )
+        assert_no_difference 'Attachment.count' do
+          post '/s3_uploads/complete.js', params: { ticket: presigned['ticket'], attachment_id: 1 }, xhr: true
+        end
+
+        assert_response :unprocessable_content
+        assert_includes response.parsed_body['errors'].first, 'threat'
+        assert_nil object(key)
+        assert_equal 'bad.txt', RedmineServerlessS3::MalwareScan.findings.first['filename']
+      end
+    ensure
+      Setting.plugin_redmine_serverless_s3 = {}
+    end
+  end
+
+  def test_s3_refuses_a_put_whose_contents_do_not_match_the_checksum
+    skip "#{s3_test_backend} does not check the checksum (LocalStack does)" unless s3_test_backend == 'localstack'
+
+    with_test_s3 do
+      assert_raises(Aws::S3::Errors::ServiceError) do
+        RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'incoming/mismatch', body: 'abc',
+                                              checksum_sha256: sha256_base64('other'))
+      end
+      assert_nil object('incoming/mismatch')
+    end
+  end
+
+  def test_head_object_returns_the_full_object_checksum
+    skip "#{s3_test_backend} does not return ChecksumSHA256 (LocalStack does)" unless s3_test_backend == 'localstack'
+
+    with_test_s3 do
+      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'incoming/ok', body: 'abc',
+                                            checksum_sha256: sha256_base64('abc'))
+      head = RedmineServerlessS3.storage.head('incoming/ok', checksum: true)
+
+      assert_equal sha256_base64('abc'), head.checksum_sha256
+      assert_equal 'FULL_OBJECT', head.checksum_type
+    end
+  end
+
   def test_identical_uploads_share_one_object
-    with_moto do
+    with_test_s3 do
       log_user('jsmith', 'jsmith')
       data = 'same bytes'
       _, first = emulate_s3_checksums { upload_through_cloudfront(data, 'one.txt') }
@@ -115,7 +197,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_uploads_through_lambda_and_deletion
-    with_moto do
+    with_test_s3 do
       with_settings rest_api_enabled: '1' do
         post '/uploads.json?filename=api.txt', params: 'through the REST API',
                                                headers: { 'CONTENT_TYPE' => 'application/octet-stream' }
@@ -138,7 +220,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   def test_thumbnails_are_stored_and_deleted_with_the_image
     skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
 
-    with_moto do
+    with_test_s3 do
       attachment = Attachment.create!(container: Issue.find(1), author: User.find(1),
                                       file: uploaded_test_file('2010/11/101123161450_testfile_1.png', 'image/png'))
       FileUtils.rm_f(attachment.local_diskfile)
@@ -156,7 +238,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_download_all_stores_a_zip
-    with_moto do
+    with_test_s3 do
       issue = Issue.find(1)
       a1 = Attachment.create!(container: issue, author: User.find(1), file: mock_file(filename: 'a.txt', content: 'A'))
       Attachment.create!(container: issue, author: User.find(1), file: mock_file(filename: 'a.txt', content: 'B'))
@@ -182,7 +264,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_csv_import_continues_in_another_environment
-    with_moto do
+    with_test_s3 do
       log_user('jsmith', 'jsmith')
       post '/imports', params: { type: 'IssueImport', file: uploaded_test_file('import_issues.csv', 'text/csv') }
       import = Import.last
@@ -199,7 +281,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_reconciliation
-    with_moto do
+    with_test_s3 do
       kept = Attachment.create!(container: Issue.find(1), author: User.find(1),
                                 file: mock_file(filename: 'kept.txt', content: 'kept'))
       RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'files/2020/01/orphan', body: 'x')
@@ -216,7 +298,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   def test_read_write_check
-    with_moto do
+    with_test_s3 do
       assert(RedmineServerlessS3::Checks.read_write.all? { |_, ok, _| ok })
       assert_empty keys('tmp/')
       assert_equal RedmineServerlessS3.bucket, RedmineServerlessS3::Checks.head_bucket

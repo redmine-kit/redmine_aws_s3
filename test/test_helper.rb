@@ -18,7 +18,7 @@ end
 
 module RedmineServerlessS3
   # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
-  # or reproduced by moto (S3_TEST_ENDPOINT, set by bin/test), and a
+  # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
   # CloudFront key pair made for the test.
   module TestHelper
     DOMAIN = 'redmine.example.test'
@@ -45,20 +45,40 @@ module RedmineServerlessS3
       RedmineServerlessS3.client = saved_client
     end
 
+    # Runs the block with REDMINE_S3_MALWARE_SCAN=true, without waiting
+    # between the requests for the scan tag.
+    def with_malware_scan
+      saved = ENV.fetch(ENV_MALWARE_SCAN, nil)
+      ENV[ENV_MALWARE_SCAN] = 'true'
+      MalwareScan.stubs(:wait_seconds).returns(0)
+      yield
+    ensure
+      saved.nil? ? ENV.delete(ENV_MALWARE_SCAN) : ENV[ENV_MALWARE_SCAN] = saved
+    end
+
+    def scan_tag(status)
+      { tag_set: status ? [{ key: MalwareScan::TAG, value: status }] : [] }
+    end
+
     def stub_client(**stubs)
       Aws::S3::Client.new(stub_responses: stubs.presence || true, region: 'us-east-1',
                           credentials: Aws::Credentials.new('test', 'test'))
     end
 
-    # A client of moto, with a new bucket; skips the test without moto.
-    def moto_client
+    # LocalStack or moto (S3_TEST_BACKEND, chosen by bin/test).
+    def s3_test_backend
+      ENV.fetch('S3_TEST_BACKEND', 'moto')
+    end
+
+    # A client of the S3 of the tests; skips the test without it.
+    def test_s3_client
       skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
       Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true, region: 'us-east-1',
                           credentials: Aws::Credentials.new('test', 'test'))
     end
 
-    def with_moto(&)
-      client = moto_client
+    def with_test_s3(&)
+      client = test_s3_client
       bucket = "redmine-test-#{SecureRandom.hex(6)}"
       client.create_bucket(bucket: bucket)
       with_s3(client, bucket: bucket, &)
