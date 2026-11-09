@@ -8,6 +8,7 @@ This is the administration page of Redmine Serverless S3. Only Redmine administr
 | --- | --- | --- |
 | Environment variables | Bucket name, Region, CloudFront domain and key pair ID, whether the private key is set, the local cache directory | Environment variables ([setup.md](setup.md#configuration)), display only. The private key itself is not shown |
 | Settings | Expiry of download and upload URLs (seconds), size of the local cache (MB) | Plugin settings, changed on the page. Positive whole numbers only |
+| Malware scan | Whether `REDMINE_S3_MALWARE_SCAN` is on, and the files the scan refused (the last 20: time, status, file name, user) | The environment variable; the findings are kept in the plugin settings |
 | Read/write check | Put a check object (`tmp/healthcheck/<UUID>`), read it, and delete it | A button runs `PutObject`, `GetObject`, `DeleteObject` |
 | Reconciliation | The numbers of attachment files in the database and of objects under `files/`; the files that are not in S3 and the objects that no attachment uses (the first 100 of each) | A button starts the job `ServerlessS3ReconcileJob`, which lists `files/`. The result is kept in the plugin settings, so every environment shows the latest one |
 | Delivery check | Put a check object, make a signed URL for it under `/tmp/bulk/`, and request it through CloudFront: it must return the object with the sandbox CSP and `nosniff`, and the same URL without the signature must be refused | A button runs it; the check object is deleted afterwards |

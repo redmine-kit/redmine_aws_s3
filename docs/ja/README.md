@@ -13,10 +13,10 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 
 | 機能 | 中身 | 有効にする条件 | 資料 |
 | --- | --- | --- | --- |
-| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード(S3 が確認するチェックサム付きの PUT)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
+| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード(S3 が確認するチェックサム付きの PUT)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアのスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
 | 管理画面 | 共有の「Serverless」のメニューの「添付ファイルの S3」のタブ。バケットと設定、S3 への読み書きの確認、CloudFront からの配信の確認、データベースと S3 の突き合わせ | 管理者 | [admin.md](admin.md) |
 
 - **Lambda でも、Lambda 以外でも:** S3 に届き、CloudFront で配る Redmine なら、どこでも動きます。AWS Lambda には書き込めるディスクがなく、要求は 6 MB までなので、[Serverless](https://redmine-kit.github.io/serverless/ja/) は [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/ja/) といっしょに入れます。
 - **gem:** `aws-sdk-s3` と `aws-sdk-cloudfront` を、プラグインの `Gemfile` と gem の依存に書きます。Redmine の `Gemfile` は、`plugins/*/Gemfile` も読み込みます。
-- **テスト:** Redmine の標準の仕組み(`rake redmine:plugins:test`)で、差し替えた処理ごとにテストを書きます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3-redmine_serverless_s3))。
+- **テスト:** Redmine の標準の仕組み(`rake redmine:plugins:test`)で、差し替えた処理ごとにテストを書きます([setup.md](setup.md#what-the-tests-check))。
 - **migration:** ありません。

@@ -9,6 +9,7 @@
 | 操作 | 対象 | 理由 |
 | --- | --- | --- |
 | `s3:GetObject`、`s3:PutObject`、`s3:DeleteObject` | バケットの `files/*`、`thumbnails/*`、`imports/*`、`incoming/*`、`tmp/*` | 添付ファイルとサムネイルの保存と削除、登録のときのチェックサム付きの `HeadObject` と `incoming/` からの写し、合わないアップロードの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | バケットの `incoming/*`、`imports/*` | マルウェアのスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、突き合わせ、接続の確認の `HeadBucket` |
 | CloudFront の秘密鍵を読む | それを入れた秘密の値(Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
 
@@ -33,6 +34,12 @@
         "arn:aws:s3:::<bucket>/incoming/*",
         "arn:aws:s3:::<bucket>/tmp/*"
       ]
+    },
+    {
+      "Sid": "ScanResults",
+      "Effect": "Allow",
+      "Action": "s3:GetObjectTagging",
+      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
     },
     {
       "Sid": "Bucket",
@@ -73,6 +80,29 @@ OAC を通した CloudFront を許すバケットポリシーです。
       "Action": "s3:PutObject",
       "Resource": "arn:aws:s3:::<bucket>/incoming/*",
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
+    }
+  ]
+}
+```
+
+マルウェアのスキャンを使うときに、問題がないとわかる前のアップロードとインポートのファイルの読み取りを拒むバケットポリシーです。2 つの条件がどちらも成り立つときだけ拒むので、GuardDuty のロールはスキャンのためにオブジェクトを読めます。
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ScannedOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
+      "Condition": {
+        "StringNotEquals": {
+          "s3:ExistingObjectTag/GuardDutyMalwareScanStatus": "NO_THREATS_FOUND",
+          "aws:PrincipalArn": "arn:aws:iam::<account>:role/<GuardDuty Malware Protection role>"
+        }
+      }
     }
   ]
 }

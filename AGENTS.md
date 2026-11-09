@@ -11,7 +11,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 - **Redmine's extension points only:** do not edit Redmine's own files. Keep Redmine's standard behaviour wherever possible.
 - **Off without its settings:** without the S3 bucket settings, Redmine behaves as standard.
 - **Replaced code:** when Redmine code is replaced, update the table of [replaced code](docs/attachments.md#replaced-code). When Redmine is upgraded, check that the original code in that table has not changed.
-- **Tests:** replaced and added code has tests, run with Redmine's own mechanism (`rake redmine:plugins:test`). The test plan is in Serverless ([testing.md](https://github.com/redmine-kit/serverless/blob/main/docs/testing.md#attachments-in-s3)).
+- **Tests:** replaced and added code has tests, run with Redmine's own mechanism (`rake redmine:plugins:test`). The test plan is in Serverless ([setup.md](docs/setup.md#what-the-tests-check)).
 - **Keep digests SHA256:** attachment tokens, ETags, thumbnails and the sharing of identical content rely on them.
 - **No secrets in the repository.**
 

@@ -7,6 +7,7 @@ Every process that runs Redmine with the plugin (web requests, jobs, rake) gets 
 | Action | Resource | Why |
 | --- | --- | --- |
 | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `files/*`, `thumbnails/*`, `imports/*`, `incoming/*`, `tmp/*` in the bucket | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | `incoming/*`, `imports/*` in the bucket | Reading GuardDuty's scan result, when the malware scan is on ([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | The bucket | `HeadObject` on a missing object returns 404 instead of 403. Deleting thumbnails by prefix, reconciliation, `HeadBucket` in the connection check |
 | Reading the CloudFront private key | The secret that holds it (on Serverless, `ssm:GetParametersByPath` on `/<instance>/env/`, through [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/)) | Signing CloudFront URLs |
 
@@ -29,6 +30,12 @@ For every process that runs Redmine with the plugin:
         "arn:aws:s3:::<bucket>/incoming/*",
         "arn:aws:s3:::<bucket>/tmp/*"
       ]
+    },
+    {
+      "Sid": "ScanResults",
+      "Effect": "Allow",
+      "Action": "s3:GetObjectTagging",
+      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"]
     },
     {
       "Sid": "Bucket",
@@ -67,6 +74,29 @@ Bucket policy that allows CloudFront through OAC:
       "Action": "s3:PutObject",
       "Resource": "arn:aws:s3:::<bucket>/incoming/*",
       "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
+    }
+  ]
+}
+```
+
+Bucket policy that denies reading uploads and import files before the malware scan finds them clean, when the scan is used. Both conditions must hold for the denial, so GuardDuty's own role can still read the object to scan it:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ScannedOnly",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": ["arn:aws:s3:::<bucket>/incoming/*", "arn:aws:s3:::<bucket>/imports/*"],
+      "Condition": {
+        "StringNotEquals": {
+          "s3:ExistingObjectTag/GuardDutyMalwareScanStatus": "NO_THREATS_FOUND",
+          "aws:PrincipalArn": "arn:aws:iam::<account>:role/<GuardDuty Malware Protection role>"
+        }
+      }
     }
   ]
 }

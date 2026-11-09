@@ -47,6 +47,7 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 | `REDMINE_CLOUDFRONT_DOMAIN` | 環境変数 | Redmine のディストリビューションのドメイン(例: `redmine.example.com`)。`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う |
 | `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | 環境変数 | ディストリビューションの信頼されたキーグループの公開鍵の ID |
 | `REDMINE_CLOUDFRONT_PRIVATE_KEY` | 秘密の値から読む環境変数(Serverless では、`/<instance>/env/` の下の SecureString のパラメーターで、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が環境変数に読み込む) | PEM の秘密鍵。CloudFront の URL に署名する。ファイルやログには書かず、管理画面にも出さない |
+| `REDMINE_S3_MALWARE_SCAN` | 環境変数 | `true` で、アップロードとインポートのファイルを使う前に、GuardDuty Malware Protection for S3 の結果を待つ([attachments.md](attachments.md#malware-scan))。ほかの値やないときは使わない |
 | 署名付き URL の有効期限 | プラグインの設定。[管理画面](admin.md#attachments-in-s3)で変える | ダウンロードとサムネイルは 300 秒、アップロードは 900 秒([attachments.md](attachments.md#upload)) |
 | 手元のキャッシュの大きさ | プラグインの設定。管理画面で変える | 256 MB([attachments.md](attachments.md#the-tmp-cache)) |
 | `attachments_storage_path` | `config/configuration.yml` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) |
@@ -72,7 +73,8 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 | 暗号化 | SSE-S3(S3 の既定) |
 | 公開 | S3 のパブリックアクセスのブロックを有効にする。TLS でない要求は、バケットポリシーで拒む(`aws:SecureTransport` が `false`) |
 | CORS | なし。ブラウザーは Redmine のドメインだけを使う |
-| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`thumbnails/`、`tmp/bulk/` の読み取りと、`incoming/` への書き込みを許す |
+| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`thumbnails/`、`tmp/bulk/` の読み取りと、`incoming/` への書き込みを許す。マルウェアのスキャンを使うときは、問題がないとわかる前の `incoming/` と `imports/` の読み取りを拒む |
+| マルウェアのスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
 
 - **バケットに届くもの:** OAC を通した CloudFront と、Redmine を動かすプロセスのロールです。ブラウザーに S3 の署名付き URL は渡しません。
 
@@ -114,22 +116,45 @@ gem を使わないなら、リポジトリを `plugins/redmine_serverless_s3` �
 
 ## テスト
 
-Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3、PostgreSQL 16、moto を使います。
+Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。
 
 ```sh
 bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
 bin/test core            # プラグインを入れた(無効の)状態で、Redmine 本体のテスト
 bin/test <ファイル...>    # プラグインのテストの一部
-bin/services --down      # PostgreSQL と moto を止める
+bin/services --down      # PostgreSQL、moto、LocalStack を止める
 bin/lint                 # RuboCop
 node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の SHA-256
 ```
 
-- **S3:** ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストでは moto を使います。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで、統合のテストは、その `HeadObject` の結果を保存されたバイト列から計算し、合わないチェックサムは `stub_responses` でテストします。
+- **S3:** ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは、同じテストを LocalStack(CI で、組織のトークンがあるとき)か moto(フォークからの pull request や、トークンのない手元の実行)で動かします。どちらを使ったかは `bin/test` が出します。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、この 2 つの S3 の確認のテストは飛ばします。
 - **署名付き URL:** テストで鍵のペアを作り、署名付き URL を公開鍵で検証します。
 - **置き換えるコード:** 置き換えたり写したりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。
 - **カバレッジ:** `bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。
 - **CI:** GitHub Actions が、push と pull request ごとに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。
+
+<a id="what-the-tests-check"></a>
+
+### テストで確認すること
+
+置き換えるコードにはすべてテストがあり、AWS への呼び出しはすべてこのリポジトリでテストします。S3 が返しうる答えごとに `stub_responses` で、実際の要求は LocalStack か moto に対して確認します(PutObject、`ChecksumMode` 付きの HeadObject、CopyObject、DeleteObjects、ListObjectsV2、GuardDuty が付けるはずのタグでの GetObjectTagging、テストが付ける PutObjectTagging)。
+
+| 対象 | 確認すること | 使うもの |
+| --- | --- | --- |
+| `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアのスキャンを使うときは `incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
+| `readable?`、`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
+| `delete_from_disk!`、`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
+| `thumbnail`、`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
+| `/s3_uploads/presign` | 権限、拡張子、サイズ、SHA256 の形を確認する。URL はちょうど `/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
+| `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。`ChecksumSHA256`(`FULL_OBJECT`)と `ContentLength` が申告と等しく、そうでなければオブジェクトを消す。同じ内容は共有する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
+| `download`、`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
+| CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアのスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
+| 管理画面のタブ | 設定、読み書きの確認、配信の確認(CSP と `nosniff` のヘッダー、署名のない URL が断られること)、突き合わせのジョブ、マルウェアの記録。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
+| 置き換える Redmine のコード | 置き換えたり写したりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい | — |
+| ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める | Node.js |
+
+- **AWS では確認していないこと:** LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto では飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは[確認すること](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
+- **Redmine 本体のテスト:** `bin/test core` は、プラグインを入れて無効にした状態で Redmine のテストを実行します。2026-11-10 にすべて(5,832 件)を実行したとき、7 件の失敗は Serverless に一覧がある gem によるもの(rails-dom-testing の `:match`)で、8 件のエラーは Redmine 自身のテストの順番によるものでした。`Redmine::PluginTest` がプラグインのディレクトリを戻さないので、`RoutingPluginsTest` のあとは、入れたプラグインのルートが消え、メニューの項目だけが残ります。この 8 件は、単独で実行すると通ります(2026-11-10)。プラグインを有効にして Redmine の添付ファイルのテストを実行することは、まだしていません。
 
 <a id="to-verify"></a>
 

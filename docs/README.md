@@ -11,10 +11,10 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 
 | Feature | Contents | Enabled when | Page |
 | --- | --- | --- | --- |
-| S3 attachments | Storing and deleting, uploads through CloudFront to S3 (PUT with a checksum that S3 checks), redirects to CloudFront signed URLs with the sandbox CSP (downloads and thumbnails), the `/tmp` cache, CSV import files, zip files for downloading all attachments | `REDMINE_S3_BUCKET` is set, with the CloudFront settings ([setup.md](setup.md#configuration)). Without it, Redmine behaves as standard | [attachments.md](attachments.md) |
+| S3 attachments | Storing and deleting, uploads through CloudFront to S3 (PUT with a checksum that S3 checks), redirects to CloudFront signed URLs with the sandbox CSP (downloads and thumbnails), the `/tmp` cache, CSV import files, zip files for downloading all attachments, an optional wait for GuardDuty's malware scan | `REDMINE_S3_BUCKET` is set, with the CloudFront settings ([setup.md](setup.md#configuration)). Without it, Redmine behaves as standard | [attachments.md](attachments.md) |
 | Administration page | The "Attachments in S3" tab under the shared "Serverless" menu: bucket and settings, S3 read/write check, delivery check through CloudFront, reconciliation between the database and S3 | Administrators | [admin.md](admin.md) |
 
 - **With or without Lambda:** The plugin works in any Redmine that can reach S3 and is served through CloudFront. On AWS Lambda, there is no writable disk and requests are limited to 6 MB, so [Serverless](https://redmine-kit.github.io/serverless/) installs it together with [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/).
 - **Gems:** `aws-sdk-s3` and `aws-sdk-cloudfront`, in the plugin's `Gemfile` and the gem's dependencies. Redmine's `Gemfile` also loads `plugins/*/Gemfile`.
-- **Tests:** Tests are written for each piece of replaced code, using Redmine's standard mechanism (`rake redmine:plugins:test`) ([testing.md](https://redmine-kit.github.io/serverless/testing.html#attachments-in-s3-redmine_serverless_s3)).
+- **Tests:** Tests are written for each piece of replaced code, using Redmine's standard mechanism (`rake redmine:plugins:test`) ([setup.md](setup.md#what-the-tests-check)).
 - **Migrations:** None.

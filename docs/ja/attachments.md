@@ -87,6 +87,7 @@ sequenceDiagram
   participant C as CloudFront(Redmine のドメイン)
   participant R as Redmine(Lambda)
   participant S as S3
+  participant G as GuardDuty
   B->>B: ファイルの SHA256 を計算する
   B->>C: POST /s3_uploads/presign(ファイル名、サイズ、SHA256)
   C->>R: 要求(Redmine のビヘイビア)
@@ -96,8 +97,11 @@ sequenceDiagram
   C->>C: 上限を超える本文を断る(CloudFront Functions)
   C->>S: PutObject incoming/UUID(OAC)
   S->>S: 中身が SHA256 と合わなければ断る
+  G->>S: incoming/UUID をスキャンし、結果をタグに付ける(スキャンを使うとき)
   B->>C: POST /s3_uploads/complete(チケット)
   C->>R: 要求
+  R->>S: GetObjectTagging を最大 20 秒(スキャンを使うとき)
+  R-->>B: 結果がなければ 202。ブラウザーが complete をもう一度送る
   R->>S: HeadObject(ChecksumMode=ENABLED)
   R->>S: CopyObject(files/年/月/名前)、DeleteObject(incoming)
   R-->>B: トークン(標準の流れと同じ応答)
@@ -106,7 +110,7 @@ sequenceDiagram
 1. **ブラウザーで SHA256 を計算する:** ブラウザーが、ファイルを 4 MB ずつ読みながら、プラグインが持つ JavaScript の SHA-256(`assets/javascripts/s3_upload.js`、外部のライブラリなし)で SHA256 を計算します。Web Crypto(`crypto.subtle.digest`)は、ファイル全体をメモリに読む必要があるので使いません。Redmine の進み具合のバーは、前半で計算を、後半で PUT を表します。
 2. **署名付き URL を受け取る:** `POST /s3_uploads/presign` を足します。ファイル名、サイズ、SHA256(base64)を受け取ります。同一オリジンなので、rails-ujs が CSRF のトークンを付けます。権限は、標準のアップロードと同じもの(`authorize_global`)を確認します。拡張子は `Attachment.valid_extension?` で、サイズは Redmine の添付の上限(`attachment_max_size`)で確認します。Redmine は、ちょうど `https://<ドメイン>/incoming/<UUID>` だけに効く既定ポリシー(canned policy)の CloudFront の署名付き URL と、チケットを返します。URL の期限は 15 分です。チケットは、キー、申告されたファイル名、サイズ、SHA256、コンテンツタイプと、ユーザーを、Rails の message verifier(`secret_key_base`)で署名したもので、URL と同じときに期限が切れます。2 つの要求のあいだで Redmine は状態を持たないので、2 つが別の実行環境に届いてもかまいません。
 3. **CloudFront を通して PUT する:** ブラウザーが、`x-amz-checksum-sha256: <base64>` のヘッダーを付けて、署名付き URL にファイルを PUT します。キャッシュビヘイビアの `/incoming/*` は、PUT を許し、署名付き URL を必須にし、キャッシュせず、`x-amz-checksum-sha256` のヘッダーを、OAC で S3 に渡します。署名付き URL では大きさを限れないので、ビューワーリクエストの CloudFront Functions が、`Content-Length` がアップロードの上限を超える要求を断ります。S3 は中身をチェックサムと照らし、合わなければ PUT を断ります(CloudFront を通したときのことは、まだ確認していない)。
-4. **登録する:** チケットを受け取る `POST /s3_uploads/complete` を足します。チケットは、正しく、期限内で、いまのユーザーのものである必要があります。Redmine は `ChecksumMode=ENABLED` で `HeadObject` を呼びます。`ChecksumSHA256`(`ChecksumType` が `FULL_OBJECT`)と `ContentLength` が、手順 2 で申告された SHA256 とサイズに等しくなければ、オブジェクトを消して登録を失敗させます。オブジェクトは読みません。SHA256(base64 を 16 進に直したもの)を digest にします。同じ digest とサイズの添付がすでにあれば、そのファイルを共有し、送られたオブジェクトは消します(Redmine の `reuse_existing_file_if_possible` と同じ考え方)。なければ `files/<年>/<月>/<ファイル名>` にコピーし、`incoming/` のオブジェクトを消します。ファイル名は Redmine と同じ作り方(`yymmddHHMMSS_` と名前。ASCII でない名前はそのハッシュ)で、S3 とデータベースで重ならないものにします。そのうえで、添付のレコードを `disk_directory`、`disk_filename`、`digest`、`filesize` を指定して作ります。ファイルの本体を Redmine に渡さないので、`files_to_final_location` は何もしません。
+4. **登録する:** チケットを受け取る `POST /s3_uploads/complete` を足します。チケットは、正しく、期限内で、いまのユーザーのものである必要があります。マルウェアのスキャンを使うときは、まずその結果を待ちます([下記](#malware-scan))。Redmine は `ChecksumMode=ENABLED` で `HeadObject` を呼びます。`ChecksumSHA256`(`ChecksumType` が `FULL_OBJECT`)と `ContentLength` が、手順 2 で申告された SHA256 とサイズに等しくなければ、オブジェクトを消して登録を失敗させます。オブジェクトは読みません。SHA256(base64 を 16 進に直したもの)を digest にします。同じ digest とサイズの添付がすでにあれば、そのファイルを共有し、送られたオブジェクトは消します(Redmine の `reuse_existing_file_if_possible` と同じ考え方)。なければ `files/<年>/<月>/<ファイル名>` にコピーし、`incoming/` のオブジェクトを消します。ファイル名は Redmine と同じ作り方(`yymmddHHMMSS_` と名前。ASCII でない名前はそのハッシュ)で、S3 とデータベースで重ならないものにします。そのうえで、添付のレコードを `disk_directory`、`disk_filename`、`digest`、`filesize` を指定して作ります。ファイルの本体を Redmine に渡さないので、`files_to_final_location` は何もしません。
 5. **トークンを返す:** 応答は、標準の `POST /uploads.js` と同じテンプレート(`attachments/upload.js.erb`)で返します。ブラウザーの側は、標準の流れと同じくトークンをフォームに入れます。
 
 - **POST でなく PUT にする理由:** オリジンアクセスコントロールは、CloudFront が S3 に送る要求に署名し、PUT に対応しています。S3 の POST のフォームのポリシーには署名できないので、CloudFront を通した POST は使いません(AWS のブログ「Implementing secure file uploads to Amazon S3 at the edge: Choosing the right pattern」、2026-02-24、と CloudFront の S3 のオリジンの資料)。
@@ -129,7 +133,23 @@ sequenceDiagram
 
 CloudFront を通る要求の本文は、本文のハッシュを入れる Lambda@Edge が読める 1 MB までです([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。大きなファイルを API で送るときは、CloudFront を通したアップロード(上の流れ。API キーと OAuth でも使える)を使います。
 
-これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外にしてレコードを保存しません。
+これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外にしてレコードを保存しません。マルウェアのスキャンを使うときは、代わりに `incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません(下記)。
+
+<a id="malware-scan"></a>
+
+## マルウェアのスキャン
+
+Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファイルを、Redmine が使う前にスキャンできます。既定では使わないので、GuardDuty がなくてもプラグインは動きます。`REDMINE_S3_MALWARE_SCAN=true` で、結果を待つようにします([setup.md](setup.md#configuration))。
+
+- **スキャンするもの:** 添付ファイルのバケットの Malware Protection のプランが、`incoming/`(アップロード)と `imports/`(CSV のインポートのファイル)の下の新しいオブジェクトをスキャンし、`GuardDutyMalwareScanStatus` のタグを付けます。値は `NO_THREATS_FOUND`、`THREATS_FOUND`、`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` のどれかです。
+- **待ち方:** Redmine は、1 回の要求のなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
+- **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202`(`{"status":"scanning"}`、`Retry-After: 2`)を返します。ブラウザーは、1、2、4、8、15、30 秒後に同じ要求を送り直し、それでも終わらなければ、まだスキャン中だと出します。REST API のクライアントにも `202` を返すので、`complete.json` を送り直します。
+- **断るファイル:** `THREATS_FOUND` なら、オブジェクトを消し、「マルウェアのスキャンで脅威が見つかった」としてファイルを断ります。`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` も、状態を添えて同じように断ります。断ったファイルは、ログに書き、[管理画面](admin.md#attachments-in-s3)に出します(最新の 20 件)。
+- **Lambda を通るアップロード:** 先に `incoming/` に置きます([上記](#uploads-through-lambda))。20 秒たっても結果がなければ、「まだスキャン中」としてアップロードを失敗させるので、送り直します。
+- **受信したメール:** 受信したメールの添付ファイルは、SES が独自にウイルスを判定するので([mail.md](https://redmine-kit.github.io/serverless/ja/mail.html#receiving))、待たずに `files/` に置きます。
+- **CSV のインポート:** インポートのファイルは、タグが `NO_THREATS_FOUND` になってから読みます。断ったファイルは消し、Redmine はファイルを読めないと出します。
+- **バケットポリシー:** オブジェクトのタグが `NO_THREATS_FOUND` でなければ、`incoming/*` と `imports/*` の `GetObject`(つまり `HeadObject` と `CopyObject` のコピー元)を拒みます。GuardDuty のロールは除きます([iam.md](iam.md#resource-based-policies))。待たないコードがあっても、問題がないとわかる前にファイルが読まれることはありません。
+- **費用:** 東京(ap-northeast-1)で、スキャンした量 1 GB あたり 0.1185 USD(毎月最初の 1 GB は無料)と、オブジェクト 1 つあたり 0.000282 USD(毎月最初の 1,000 は無料)です(2026-10-30 の AWS の価格表)。スキャンするのは `incoming/` と `imports/` だけなので、サムネイル、zip、`files/` にコピーしたオブジェクトは、もう一度スキャンしません。
 
 <a id="download"></a>
 
@@ -262,12 +282,13 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `AttachmentsController#download`、`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
 | `Import#file=`、`#file_exists?`、`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
+| `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアのスキャンを待たない | [マルウェアのスキャン](#malware-scan) |
 | `SettingsController#plugin`(このプラグインの GET だけ) | 「添付ファイルの S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
 | `attachments.js` の `uploadBlob` | SHA256 を計算し、その値を付けて CloudFront の署名付き URL に PUT する | アップロード |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
 - **Redmine の更新:** Redmine のバージョンを上げるときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインが写した Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#attachments-in-s3-redmine_serverless_s3))。
+- **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([setup.md](setup.md#what-the-tests-check))。
 
 <a id="permissions"></a>
 
