@@ -13,6 +13,8 @@ Gem::Specification.new do |spec|
   spec.homepage = 'https://github.com/redmine-kit/redmine_serverless_s3'
   spec.required_ruby_version = '>= 4.0'
   spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib}/**/*']
+  spec.add_dependency 'aws-sdk-cloudfront', '~> 1.164'
+  spec.add_dependency 'aws-sdk-s3', '~> 1.239'
   spec.metadata['github_repo'] = 'ssh://github.com/redmine-kit/redmine_serverless_s3'
   spec.metadata['rubygems_mfa_required'] = 'true'
 end
