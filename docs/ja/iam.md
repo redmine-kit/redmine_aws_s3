@@ -15,7 +15,7 @@
 
 <a id="example-policy"></a>
 
-## 例のポリシー
+## ポリシーの例
 
 プラグインを入れた Redmine を動かす、すべてのプロセスのポリシーです。
 
@@ -128,6 +128,6 @@ TLS でない要求を拒むバケットポリシーです。
 
 <a id="not-checked-yet"></a>
 
-## 未確認のこと
+## 未確認の事項
 
 - OAC を使う CloudFront が、チェックサムのヘッダーを付けた `incoming/` への PUT を通すか。ほかは [attachments.md](attachments.md#to-verify) の項目です。

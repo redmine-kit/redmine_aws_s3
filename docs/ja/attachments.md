@@ -1,6 +1,6 @@
 # 添付ファイルと S3
 
-Redmine Serverless S3 が Redmine の添付ファイルを S3 に置く仕組みです。プラグインは開発の初期の段階で、本物の CloudFront のディストリビューションでまだ確認していないことは[確認すること](#to-verify)にあります。ブラウザーは、Redmine 自身の CloudFront のディストリビューションだけを通してファイルに触れ、S3 のドメインには触れません。アップロードは、CloudFront を通して S3 に PUT し、ブラウザーが計算した SHA256 を S3 が確認します。ダウンロードは、Redmine が権限を確認してから、`/files/` の下の署名付き URL にリダイレクトします。CloudFront が S3 からオブジェクトを読み、Redmine と同じ sandbox の CSP を付けます。ファイルの本体は Lambda を通りません。
+Redmine Serverless S3 が Redmine の添付ファイルを S3 に置く仕組みです。プラグインは開発の初期の段階で、本物の CloudFront のディストリビューションでまだ確認していないことは[未確認の事項](#to-verify)にあります。ブラウザーは、Redmine 自身の CloudFront のディストリビューションだけを通してファイルに触れ、S3 のドメインには触れません。アップロードは、CloudFront を通して S3 に PUT し、ブラウザーが計算した SHA256 を S3 が確認します。ダウンロードは、Redmine が権限を確認してから、`/files/` の下の署名付き URL にリダイレクトします。CloudFront が S3 からオブジェクトを読み、Redmine と同じ sandbox の CSP を付けます。ファイルの本体は Lambda を通りません。
 
 Redmine の S3 のプラグイン(下記)のやり方を参考に、プラグイン Redmine Serverless S3(`redmine_serverless_s3`)として作ります。外部のプラグインは入れません。[Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/ja/) なしで、Lambda の外でも動きます。Lambda では、[Serverless](https://redmine-kit.github.io/serverless/ja/) が両方を入れます。
 
@@ -298,7 +298,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 <a id="to-verify"></a>
 
-## 確認すること
+## 未確認の事項
 
 - CloudFront(OAC)を通した PUT の中身が `x-amz-checksum-sha256` と合わないときに S3 が断ること、合うときに `HeadObject` が `ChecksumSHA256` と `ChecksumType` の `FULL_OBJECT` を返すこと
 - S3 のオリジンへの PUT で、CloudFront が受け付ける要求の本文の大きさ(資料に見つからない)、オリジンの応答のタイムアウト(既定 30 秒)が大きなアップロードにどう効くか

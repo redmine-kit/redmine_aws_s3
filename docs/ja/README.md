@@ -2,8 +2,8 @@
 
 Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon S3 に置く Redmine のプラグインです。アップロードはブラウザーから Redmine の CloudFront のディストリビューションを通して S3 に PUT し、ダウンロードは Redmine のドメインの CloudFront の署名付き URL にリダイレクトするので、ファイルの本体は Redmine を通りません。Redmine 本体のファイルは書き換えず、Redmine の標準の拡張の仕組みだけで作ります。今は開発の初期の段階です(バージョン 0.1.1)。
 
-- [準備](setup.md): 前提、インストール、設定、AWS のリソース(バケット、CloudFront のディストリビューション)、ネットワーク、テスト
-- [IAM の権限](iam.md): 権限、例のポリシー、リソースベースのポリシー
+- [導入](setup.md): 動作環境、インストール、設定、AWS のリソース(バケット、CloudFront のディストリビューション)、ネットワーク、テスト
+- [IAM の権限](iam.md): 権限、ポリシーの例、リソースベースのポリシー
 - [添付ファイルと S3](attachments.md): 保存、アップロード、ダウンロード、キャッシュ、差し替える処理
 - [管理画面](admin.md): 設定、読み書きの確認、突き合わせ
 

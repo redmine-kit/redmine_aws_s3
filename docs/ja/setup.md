@@ -1,10 +1,10 @@
-# 準備
+# 導入
 
-Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。本物の CloudFront のディストリビューションが要る部分は、[確認すること](#to-verify)にあります。
+Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。本物の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
 
 <a id="requirements"></a>
 
-## 前提
+## 動作環境
 
 - Redmine 7.0 以降。
 - AWS の認証情報で S3 に届くプロセス(Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロール)。Redmine にアクセスキーは置きません。
@@ -179,12 +179,12 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 | ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアのスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
 | ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める | Node.js |
 
-- **AWS では確認していないこと:** LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto では飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは[確認すること](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
+- **AWS では確認していないこと:** LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto では飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
 - **Redmine 本体のテスト:** `bin/test core` は、プラグインを入れて無効にした状態で Redmine のテストを実行します。2026-11-10 にすべて(5,832 件)を実行したとき、7 件の失敗は Serverless に一覧がある gem によるもの(rails-dom-testing の `:match`)で、8 件のエラーは Redmine 自身のテストの順番によるものでした。`Redmine::PluginTest` がプラグインのディレクトリを戻さないので、`RoutingPluginsTest` のあとは、入れたプラグインのルートが消え、メニューの項目だけが残ります。この 8 件は、単独で実行すると通ります(2026-11-10)。
 - **プラグインを有効にした Redmine の添付ファイルのテスト:** `bin/test core-s3` は、Redmine の添付ファイルのテスト(`test/unit/attachment_test.rb`、`test/unit/attachment_transaction_test.rb`、`test/functional/attachments_controller_test.rb`、`test/functional/attachments_visibility_test.rb`、`test/integration/attachments_test.rb`、`test/integration/api_test/attachments_test.rb`)を、プラグインを有効にして、LocalStack か moto で実行します。140 件が通ります(2026-11-10)。除いた 15 件は、Redmine がファイルそのものを返すこと(ダウンロード、サムネイル、一括のダウンロード、`X-Sendfile`)を前提にしていて、プラグインはそれをリダイレクトに置き換えます。または、前のテストが S3 に置いたサムネイルが使われるものです。[`test/core/s3_exclusions.txt`](../../test/core/s3_exclusions.txt) に、それぞれの理由があります。
 
 <a id="to-verify"></a>
 
-## 確認すること
+## 未確認の事項
 
 まだ確認していないことは、[attachments.md](attachments.md#to-verify) にあります。
