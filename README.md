@@ -1,8 +1,8 @@
 # Redmine Serverless S3
 
 [![CI](https://img.shields.io/github/actions/workflow/status/redmine-kit/redmine_serverless_s3/ci.yml?branch=main&label=CI)](https://github.com/redmine-kit/redmine_serverless_s3/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/redmine-kit/redmine_serverless_s3)](https://codecov.io/gh/redmine-kit/redmine_serverless_s3)
-[![License](https://img.shields.io/github/license/redmine-kit/redmine_serverless_s3)](LICENSE)
+[![Coverage](https://img.shields.io/codecov/c/github/redmine-kit/redmine_serverless_s3?label=Coverage)](https://codecov.io/gh/redmine-kit/redmine_serverless_s3)
+[![License](https://img.shields.io/github/license/redmine-kit/redmine_serverless_s3?label=License)](LICENSE)
 
 A Redmine plugin that stores attachments in Amazon S3: uploads and downloads through Redmine's CloudFront distribution with signed URLs (S3 checks the SHA256 of uploads, and downloads get Redmine's sandbox CSP), a `/tmp` cache, and an administration page for the bucket. It works with or without AWS Lambda; [Serverless](https://github.com/redmine-kit/serverless) uses it together with [Redmine Serverless](https://github.com/redmine-kit/redmine_serverless).
 
