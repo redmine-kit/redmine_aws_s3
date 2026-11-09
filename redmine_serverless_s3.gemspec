@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.license = 'GPL-2.0-or-later'
   spec.homepage = 'https://github.com/redmine-kit/redmine_serverless_s3'
   spec.required_ruby_version = '>= 4.0'
-  spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib}/**/*']
+  spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib,help}/**/*']
   # aws-sdk-s3 1.178.0 (2025-01-15) added ChecksumType (FULL_OBJECT), which
   # the registration of uploads checks; the CloudFront URL signer is in every 1.x.
   spec.add_dependency 'aws-sdk-cloudfront', '~> 1.0'
