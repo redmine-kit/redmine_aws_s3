@@ -38,6 +38,14 @@ module RedmineServerlessAdmin
       @checks.values
     end
 
+    # Whether the routes have the shared entry. Redmine draws plugin routes
+    # from its plugin directory; when routes are drawn without it (some of
+    # Redmine's own tests change the directory), the menu item is hidden
+    # instead of breaking every administration page.
+    def routed?
+      Rails.application.routes.routes.any? { |route| route.defaults[:controller] == 'serverless_admin' }
+    end
+
     def run_checks
       checks.map do |check|
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -59,7 +67,8 @@ module RedmineServerlessAdmin
 
         menu.push :serverless, { controller: 'serverless_admin', action: 'index' },
                   caption: :label_serverless_admin, icon: 'server-authentication',
-                  html: { class: 'icon icon-server-authentication' }
+                  html: { class: 'icon icon-server-authentication' },
+                  if: ->(_project) { RedmineServerlessAdmin.routed? }
       end
     end
   end
