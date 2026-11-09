@@ -18,10 +18,10 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 ## Documentation
 
 - **Two languages.** English is the source (`README.md`, `docs/`); the Japanese translation is `README.ja.md` and `docs/ja/`, with the same file names. Change both together.
-- **Layout.** The READMEs stay short. The details go in `docs/`, published at https://redmine-kit.github.io/redmine_serverless_s3/ with [redmine-kit/docs-skeleton](https://github.com/redmine-kit/docs-skeleton). Links to the documentation of Serverless and the other plugins are absolute URLs.
+- **Layout.** The READMEs stay short. The details go in `docs/`, published at https://redmine-kit.github.io/redmine_serverless_s3/ with [redmine-kit/docs-skeleton](https://github.com/redmine-kit/docs-skeleton). `docs/README.md` has the overview and the features, `docs/setup.md` the sections Requirements, Installation, Configuration, AWS resources, IAM permissions, Network, Tests and To verify, in this order (the same in every Redmine Serverless plugin). Links to the documentation of Serverless and the other plugins are absolute URLs.
 - **Anchors in Japanese.** Put `<a id="..."></a>` with the English heading's anchor before each Japanese heading.
 - **Facts.** State only what has been checked, with the date and the source. Mark what has not been checked yet.
-- **Japanese wording.** Plain, precise Japanese. Keep established technical terms. Do not use "版" for a version, write "通知" rather than "知らせ", and "確認" rather than "確かめ".
+- **Japanese wording.** Plain, precise Japanese. Keep established technical terms. Do not use "版" for a version, write "通知" rather than "知らせ", "確認" rather than "確かめ", and "インストール" rather than "入れ方".
 
 ## Commits
 
