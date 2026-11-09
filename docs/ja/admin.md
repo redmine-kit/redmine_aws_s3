@@ -1,6 +1,6 @@
 # 管理画面
 
-Redmine Serverless S3 の管理画面の設計です。Redmine の管理者だけが開けます(`require_admin`)。[Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/ja/admin.html) を入れているときは、その「サーバーレス」の管理画面のタブになります。入れていないときは、Redmine の管理のメニューの 1 つの項目になります。
+Redmine Serverless S3 の管理画面の設計です。Redmine の管理者だけが開けます(`require_admin`)。画面は、[Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/ja/admin.html#the-serverless-menu) をインストールしているかどうかにかかわらず、すべての Redmine Serverless のプラグインが共有する Redmine の管理のメニューの「Serverless」の下の、「添付ファイルの S3」のタブになります。
 
 <a id="attachments-in-s3"></a>
 

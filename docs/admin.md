@@ -1,6 +1,6 @@
 # Administration page
 
-This is the design of the administration page of Redmine Serverless S3. Only Redmine administrators can open it (`require_admin`). When [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html) is installed, the page is a tab of its "Serverless" administration page. Without it, the page is an item of its own in Redmine's administration menu.
+This is the design of the administration page of Redmine Serverless S3. Only Redmine administrators can open it (`require_admin`). The page is the "Attachments in S3" tab under the "Serverless" item of Redmine's administration menu, which all the Redmine Serverless plugins share, whether or not [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu) is installed.
 
 ## Attachments in S3
 

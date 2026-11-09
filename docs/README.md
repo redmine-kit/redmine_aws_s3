@@ -12,7 +12,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 | Feature | Contents | Enabled when | Page |
 | --- | --- | --- | --- |
 | S3 attachments | Storing and deleting, uploads through CloudFront to S3 (PUT with a checksum that S3 checks), redirects to CloudFront signed URLs with the sandbox CSP (downloads and thumbnails), the `/tmp` cache, CSV import files, zip files for downloading all attachments | S3 bucket and CloudFront settings (environment variables) exist. Without them, Redmine behaves as standard | [attachments.md](attachments.md) |
-| Administration page | Bucket and settings, S3 read/write check, reconciliation between the database and S3 | Administrators | [admin.md](admin.md) |
+| Administration page | The "Attachments in S3" tab under the shared "Serverless" menu: bucket and settings, S3 read/write check, reconciliation between the database and S3 | Administrators | [admin.md](admin.md) |
 
 - **With or without Lambda:** The plugin works in any Redmine that can reach S3 and is served through CloudFront. On AWS Lambda, there is no writable disk and requests are limited to 6 MB, so [Serverless](https://redmine-kit.github.io/serverless/) installs it together with [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/).
 - **Gems:** Gems the plugin uses (such as `aws-sdk-s3`) go in the plugin's `Gemfile`. Redmine's `Gemfile` also loads `plugins/*/Gemfile`.
