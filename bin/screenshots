@@ -10,10 +10,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 plugin=redmine_serverless_s3
 image=redmine-serverless-s3-test
-project=redmine-serverless-s3-test
+project=redmine-serverless-s3-screenshots
 compose=(docker compose -f test/compose.yml -p "$project" --profile system)
 "${compose[@]}" up -d --wait >/dev/null
-trap '"${compose[@]}" stop chrome >/dev/null' EXIT
+# Its own Compose project, apart from bin/test's, removed afterwards.
+trap '"${compose[@]}" down -v >/dev/null 2>&1' EXIT
 docker buildx build --load -q -t "$image" -f test/Dockerfile . >/dev/null
 mkdir -p docs/images docs/ja/images
 # The browser in the chrome container opens the test server of this container
