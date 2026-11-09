@@ -18,3 +18,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 - **Gems:** `aws-sdk-s3` and `aws-sdk-cloudfront`, in the plugin's `Gemfile` and the gem's dependencies. Redmine's `Gemfile` also loads `plugins/*/Gemfile`.
 - **Tests:** Tests are written for each piece of replaced code, using Redmine's standard mechanism (`rake redmine:plugins:test`) ([setup.md](setup.md#what-the-tests-check)).
 - **Migrations:** None.
+
+## Sponsors
+
+<Sponsors><a href="https://localstack.cloud">LocalStack</a></Sponsors>

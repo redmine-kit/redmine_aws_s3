@@ -20,3 +20,7 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 - **gem:** `aws-sdk-s3` と `aws-sdk-cloudfront` を、プラグインの `Gemfile` と gem の依存に書きます。Redmine の `Gemfile` は、`plugins/*/Gemfile` も読み込みます。
 - **テスト:** Redmine の標準の仕組み(`rake redmine:plugins:test`)で、差し替えた処理ごとにテストを書きます([setup.md](setup.md#what-the-tests-check))。
 - **migration:** ありません。
+
+## スポンサー
+
+<Sponsors><a href="https://localstack.cloud">LocalStack</a></Sponsors>
