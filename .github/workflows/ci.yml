@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: bin/lint
+      - run: node test/javascripts/sha256_test.mjs
+
+  test:
+    needs: static
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write # Codecov with OIDC, no token stored
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: bin/test
+      # Not failing the run while the Codecov GitHub App is not installed.
+      - uses: codecov/codecov-action@v7.1.1
+        with:
+          files: coverage/coverage.xml
+          use_oidc: true
+          fail_ci_if_error: false
+      - if: always()
+        run: bin/services --down
