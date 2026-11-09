@@ -13,8 +13,10 @@ Gem::Specification.new do |spec|
   spec.homepage = 'https://github.com/redmine-kit/redmine_serverless_s3'
   spec.required_ruby_version = '>= 4.0'
   spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib}/**/*']
-  spec.add_dependency 'aws-sdk-cloudfront', '~> 1.164'
-  spec.add_dependency 'aws-sdk-s3', '~> 1.239'
+  # aws-sdk-s3 1.178.0 (2025-01-15) added ChecksumType (FULL_OBJECT), which
+  # the registration of uploads checks; the CloudFront URL signer is in every 1.x.
+  spec.add_dependency 'aws-sdk-cloudfront', '~> 1.0'
+  spec.add_dependency 'aws-sdk-s3', '~> 1.178'
   spec.metadata['github_repo'] = 'ssh://github.com/redmine-kit/redmine_serverless_s3'
   spec.metadata['rubygems_mfa_required'] = 'true'
 end
