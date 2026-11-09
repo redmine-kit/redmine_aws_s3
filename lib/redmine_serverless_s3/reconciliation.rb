@@ -6,12 +6,15 @@ module RedmineServerlessS3
   # environment shows the latest one.
   module Reconciliation
     LIMIT = 100
+    # Redmine's derived cache (Markdown previews) under files/, not attachments.
+    DERIVED_PREFIX = 'files/derived_cache/'
 
     module_function
 
     def run
       started_at = result&.fetch('started_at', nil) || Time.now.utc.iso8601
-      in_s3 = RedmineServerlessS3.storage.keys('files/').to_set
+      in_s3 = RedmineServerlessS3.storage.keys('files/')
+                                 .reject { |key| key.start_with?(DERIVED_PREFIX) }.to_set
       in_db = attachment_keys
       save({ 'started_at' => started_at, 'finished_at' => Time.now.utc.iso8601,
              'attachments' => in_db.size, 'objects' => in_s3.size }

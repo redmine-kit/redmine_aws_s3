@@ -71,6 +71,13 @@ module RedmineServerlessS3
       target
     end
 
+    # Keeps the Markdown preview in S3 (MarkdownizedPreview).
+    def markdownized_preview_content
+      return super unless RedmineServerlessS3.enabled? && markdownized_previewable?
+
+      RedmineServerlessS3::MarkdownizedPreview.around(self) { super }
+    end
+
     # The S3 key of the thumbnail, made if it is not in S3 yet; nil if there
     # is none.
     def s3_thumbnail(options = {})
@@ -83,7 +90,7 @@ module RedmineServerlessS3
     end
 
     def s3_thumbnail_key(size)
-      "thumbnails/#{File.basename(thumbnail_path(size))}"
+      "#{RedmineServerlessS3::THUMBNAILS_PREFIX}#{File.basename(thumbnail_path(size))}"
     end
 
     # The size Redmine's Attachment#thumbnail computes.
@@ -130,12 +137,16 @@ module RedmineServerlessS3
       existing
     end
 
-    # Deletes the file and its thumbnails in S3, then the local copies.
+    # Deletes the file, its thumbnails and its Markdown preview in S3, then
+    # the local copies.
     def delete_from_disk!
       if RedmineServerlessS3.enabled? && disk_filename.present?
         storage = RedmineServerlessS3.storage
         storage.delete(s3_key)
-        storage.delete_prefix("thumbnails/#{digest}_#{filesize}_") if digest.present?
+        if digest.present?
+          storage.delete_prefix("#{RedmineServerlessS3::THUMBNAILS_PREFIX}#{digest}_#{filesize}_")
+          storage.delete(RedmineServerlessS3::MarkdownizedPreview.key(self))
+        end
       end
       super
     end

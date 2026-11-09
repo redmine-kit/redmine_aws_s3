@@ -15,7 +15,7 @@ AttachmentsTest#test_download_should_set_sendfile_header  # no X-Sendfile; Cloud
 AttachmentsTest#test_upload_as_js_and_preview_as_inline_attachment  # the preview is a redirect to the signed URL
 Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/download/:id/:filename_should_return_the_attachment_content  # redirect, no contents
 #
-# Thumbnails redirect to a signed URL under /thumbnails/.
+# Thumbnails redirect to a signed URL under /tmp/thumbnails/.
 AttachmentsControllerTest#test_thumbnail  # redirect, no image
 AttachmentsControllerTest#test_thumbnail_for_pdf_should_be_png  # redirect, no image
 Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/thumbnail/:id_should_return_the_thumbnail  # redirect, no image

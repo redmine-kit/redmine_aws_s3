@@ -34,7 +34,7 @@ module RedmineServerlessS3
     # signature is refused.
     def delivery
       storage = RedmineServerlessS3.storage
-      key = "tmp/bulk/healthcheck-#{SecureRandom.uuid}.txt"
+      key = "#{RedmineServerlessS3::BULK_PREFIX}healthcheck-#{SecureRandom.uuid}.txt"
       storage.client.put_object(bucket: storage.bucket, key: key, body: 'ok', content_type: 'text/plain')
       url = RedmineServerlessS3.url_signer.url_for(key, expires_in: 60)
       signed = get(url)

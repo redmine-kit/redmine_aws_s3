@@ -5,7 +5,7 @@ require 'securerandom'
 module RedmineServerlessS3
   # Uploads from the browser through CloudFront (docs/attachments.md#upload).
   # presign checks the request and returns a CloudFront signed URL for a PUT
-  # to incoming/<UUID>, with a ticket that keeps the declared name, size and
+  # to tmp/incoming/<UUID>, with a ticket that keeps the declared name, size and
   # SHA256 signed by Redmine. complete reads the checksum S3 has checked and
   # registers the attachment without reading the file.
   class Upload
@@ -36,7 +36,7 @@ module RedmineServerlessS3
       raise Error, 'sha256 is invalid' unless SHA256_BASE64.match?(sha256.to_s)
 
       check_attachment(filename, size)
-      key = "incoming/#{SecureRandom.uuid}"
+      key = "#{RedmineServerlessS3::INCOMING_PREFIX}#{SecureRandom.uuid}"
       expiry = RedmineServerlessS3.upload_url_expiry
       ticket = verifier.generate(
         { 'key' => key, 'filename' => filename, 'size' => size, 'sha256' => sha256,
@@ -54,7 +54,7 @@ module RedmineServerlessS3
       raise Error, 'the upload ticket is invalid or expired' unless data && data['user_id'] == user.id
 
       key = data['key']
-      raise Error, 'the key is not an upload' unless key.to_s.start_with?('incoming/')
+      raise Error, 'the key is not an upload' unless key.to_s.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
 
       scan!(key, data)
       head = storage.head(key, checksum: true)

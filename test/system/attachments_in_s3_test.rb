@@ -104,7 +104,7 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
     assert_equal 'testfile.txt', attachment.filename
     assert_equal File.binread(path), object(attachment.s3_key)
     assert_equal Digest::SHA256.file(path).hexdigest, attachment.digest
-    assert_empty @client.list_objects_v2(bucket: @bucket, prefix: 'incoming/').contents
+    assert_empty @client.list_objects_v2(bucket: @bucket, prefix: 'tmp/incoming/').contents
     progress = @progress
 
     assert(progress.any? { |value| value.to_f.between?(1, 99) }, "no progress in between: #{progress}")
@@ -146,7 +146,7 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
            'the thumbnail did not load'
     attachment = issue.attachments.first
 
-    prefix = "thumbnails/#{attachment.digest}_#{attachment.filesize}_"
+    prefix = "tmp/thumbnails/#{attachment.digest}_#{attachment.filesize}_"
     thumbnails = @client.list_objects_v2(bucket: @bucket, prefix: prefix)
 
     assert_not_empty thumbnails.contents, 'the thumbnail is not in S3'
@@ -162,7 +162,7 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
     scanner = Thread.new do
       key = nil
       240.times do
-        key = @client.list_objects_v2(bucket: @bucket, prefix: 'incoming/').contents.first&.key
+        key = @client.list_objects_v2(bucket: @bucket, prefix: 'tmp/incoming/').contents.first&.key
         break if key
 
         sleep 0.5

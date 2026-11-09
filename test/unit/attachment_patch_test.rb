@@ -60,7 +60,7 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
                                file: mock_file(filename: 'scanned.txt', content: 'scanned'))
         requests = client.api_requests.index_by { |request| request[:operation_name] }
 
-        assert_match %r{\Aincoming/}, requests[:put_object][:params][:key]
+        assert_match %r{\Atmp/incoming/}, requests[:put_object][:params][:key]
         assert_equal a.s3_key, requests[:copy_object][:params][:key]
       end
     end
@@ -140,7 +140,7 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
   end
 
   def test_delete_from_disk_deletes_the_object_and_its_thumbnails
-    with_s3(stub_client(list_objects_v2: { contents: [{ key: 'thumbnails/d_1_100.thumb' }] })) do |client|
+    with_s3(stub_client(list_objects_v2: { contents: [{ key: 'tmp/thumbnails/d_1_100.thumb' }] })) do |client|
       a = Attachment.create!(container: Issue.find(1), author: User.find(1),
                              file: mock_file(filename: 'gone.txt', content: 'gone'))
       key = a.s3_key
@@ -150,9 +150,36 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
       listed = client.api_requests.find { |request| request[:operation_name] == :list_objects_v2 }
 
       assert_includes deleted, key
-      assert_includes deleted, 'thumbnails/d_1_100.thumb'
-      assert_equal "thumbnails/#{a.digest}_#{a.filesize}_", listed[:params][:prefix]
+      assert_includes deleted, 'tmp/thumbnails/d_1_100.thumb'
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_", listed[:params][:prefix]
+      assert_includes deleted, "files/derived_cache/markdownized_previews/#{a.digest}_#{a.filesize}.md"
       assert_not File.exist?(a.local_diskfile)
+    end
+  end
+
+  # The Markdown preview is kept in S3 at Redmine's own path, and reused.
+  def test_markdownized_preview_is_stored_in_s3_and_reused
+    a = Attachment.create!(container: Issue.find(1), author: User.find(1),
+                           file: mock_file(filename: 'doc.docx', content: 'docx'))
+    key = "files/derived_cache/markdownized_previews/#{a.digest}_#{a.filesize}.md"
+    target = a.send(:markdownized_preview_cache_path)
+    Redmine::Markdownizer.stubs(:available?).returns(true)
+    Redmine::Markdownizer.stubs(:supports?).returns(true)
+    Redmine::Markdownizer.expects(:convert).once.with do |_source, path|
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, '# Preview')
+    end.returns(target)
+
+    with_s3(stub_client(head_object: 'NotFound')) do |client|
+      assert_equal '# Preview', a.markdownized_preview_content
+      assert(client.api_requests.any? { |r| r[:operation_name] == :put_object && r[:params][:key] == key })
+    end
+    FileUtils.rm_f(target)
+    Redmine::Markdownizer.stubs(:convert).returns(target)
+    with_s3(stub_client(head_object: {}, get_object: { body: '# Preview' })) do |client|
+      assert_equal '# Preview', a.markdownized_preview_content
+      assert_includes operations(client), :get_object
+      assert_not(client.api_requests.any? { |r| r[:operation_name] == :put_object && r[:params][:key] == key })
     end
   end
 

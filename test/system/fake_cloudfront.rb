@@ -2,12 +2,12 @@
 
 module RedmineServerlessS3
   # CloudFront for the system tests, in front of Redmine on the test server:
-  # the paths /files/, /thumbnails/, /tmp/bulk/ (GET) and /incoming/ (PUT) go
+  # the paths /files/, /tmp/thumbnails/, /tmp/bulk/ (GET) and /tmp/incoming/ (PUT) go
   # to the S3 of the tests, only with a valid signed URL (canned policy,
   # checked with the public key), and downloads get the response headers of
   # the distribution (docs/setup.md#the-cloudfront-distribution).
   class FakeCloudFront
-    PATHS = %r{\A/(?:files|thumbnails|tmp/bulk|incoming)/}
+    PATHS = %r{\A/(?:files|tmp)/}
     CLOUDFRONT_PARAMS = /[?&]Expires=.*\z/
 
     def initialize(app, public_key:)
@@ -27,7 +27,7 @@ module RedmineServerlessS3
     private
 
     def respond(request, key)
-      upload = key.start_with?('incoming/')
+      upload = key.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
       return upload(request, key) if request.put? && upload
       return download(request, key) if request.get? && !upload
 

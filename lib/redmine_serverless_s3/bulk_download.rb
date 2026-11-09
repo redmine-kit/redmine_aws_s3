@@ -15,7 +15,7 @@ module RedmineServerlessS3
     def store
       return nil if @attachments.empty?
 
-      key = "tmp/bulk/#{signature}.zip"
+      key = "#{RedmineServerlessS3::BULK_PREFIX}#{signature}.zip"
       storage = RedmineServerlessS3.storage
       return key if storage.exists?(key)
 

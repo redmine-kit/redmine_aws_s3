@@ -32,7 +32,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       result = presign
       unsigned, expires = verify_signed_url(result[:url])
 
-      assert_match %r{\Ahttps://#{DOMAIN}/incoming/[0-9a-f-]{36}\z}, unsigned
+      assert_match %r{\Ahttps://#{DOMAIN}/tmp/incoming/[0-9a-f-]{36}\z}, unsigned
       assert_in_delta Time.now.to_i + 900, expires, 5
       assert_equal({ 'x-amz-checksum-sha256' => sha256_base64(CONTENT) }, result[:headers])
       assert result[:ticket].present?
@@ -82,8 +82,8 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       assert_match %r{\A\d{4}/\d{2}\z}, attachment.disk_directory
       assert_match(/\A\d{12}_report\.txt\z/, attachment.disk_filename)
       assert_equal attachment.s3_key, requests[:copy_object][:params][:key]
-      assert_match %r{\Aredmine-files/incoming/}, requests[:copy_object][:params][:copy_source]
-      assert_match %r{\Aincoming/}, requests[:delete_objects][:params][:delete][:objects].first[:key]
+      assert_match %r{\Aredmine-files/tmp/incoming/}, requests[:copy_object][:params][:copy_source]
+      assert_match %r{\Atmp/incoming/}, requests[:delete_objects][:params][:delete][:objects].first[:key]
     end
   end
 
@@ -110,7 +110,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       end
       deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
 
-      assert_match %r{\Aincoming/}, deleted[:params][:delete][:objects].first[:key]
+      assert_match %r{\Atmp/incoming/}, deleted[:params][:delete][:objects].first[:key]
     end
   end
 

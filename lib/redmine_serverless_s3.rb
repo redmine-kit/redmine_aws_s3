@@ -24,6 +24,18 @@ module RedmineServerlessS3
   # The value Redmine's AttachmentsController sets on attachments.
   ATTACHMENT_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 
+  # Everything but the attachments' files is under tmp/, as on Redmine's own
+  # disk (tmp/thumbnails), so that one CloudFront cache behavior (/tmp/*)
+  # serves thumbnails and the zips of "download all" and takes uploads.
+  # Uploads and zips expire; thumbnails stay until their attachment is
+  # deleted (docs/setup.md#the-bucket).
+  THUMBNAILS_PREFIX = 'tmp/thumbnails/'
+  # Redmine's cache of Markdown previews, under attachments_storage_path
+  # (Attachment.markdownized_previews_storage_path), so under files/.
+  PREVIEWS_PREFIX = 'files/derived_cache/markdownized_previews/'
+  BULK_PREFIX = 'tmp/bulk/'
+  INCOMING_PREFIX = 'tmp/incoming/'
+
   class << self
     attr_writer :client
 

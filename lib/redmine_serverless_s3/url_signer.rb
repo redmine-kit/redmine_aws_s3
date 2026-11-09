@@ -2,7 +2,9 @@
 
 module RedmineServerlessS3
   # CloudFront signed URLs on Redmine's own domain, for the cache behaviors
-  # /files/*, /thumbnails/*, /tmp/bulk/* and /incoming/* (docs/attachments.md).
+  # /files/* (attachments) and /tmp/* (thumbnails under /tmp/thumbnails/, the
+  # zips under /tmp/bulk/ and the uploads under /tmp/incoming/;
+  # docs/attachments.md).
   # A canned policy covers exactly the URL, query string included.
   class UrlSigner
     class NotConfigured < StandardError; end

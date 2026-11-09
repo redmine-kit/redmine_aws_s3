@@ -55,7 +55,7 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
       incoming, token = emulate_s3_checksums { upload_through_cloudfront(data, 'browser.txt') }
 
       assert token.present?
-      assert_nil object(incoming), 'the upload is deleted from incoming/'
+      assert_nil object(incoming), 'the upload is deleted from tmp/incoming/'
       post '/projects/ecookbook/issues', params: {
         issue: { tracker_id: 1, subject: 'With an upload' },
         attachments: { '1' => { token: token } }
@@ -140,10 +140,10 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
 
     with_test_s3 do
       assert_raises(Aws::S3::Errors::ServiceError) do
-        RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'incoming/mismatch', body: 'abc',
-                                              checksum_sha256: sha256_base64('other'))
+        RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'tmp/incoming/mismatch',
+                                              body: 'abc', checksum_sha256: sha256_base64('other'))
       end
-      assert_nil object('incoming/mismatch')
+      assert_nil object('tmp/incoming/mismatch')
     end
   end
 
@@ -151,9 +151,9 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
     skip "#{s3_test_backend} does not return ChecksumSHA256 (LocalStack does)" unless s3_test_backend == 'localstack'
 
     with_test_s3 do
-      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'incoming/ok', body: 'abc',
+      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'tmp/incoming/ok', body: 'abc',
                                             checksum_sha256: sha256_base64('abc'))
-      head = RedmineServerlessS3.storage.head('incoming/ok', checksum: true)
+      head = RedmineServerlessS3.storage.head('tmp/incoming/ok', checksum: true)
 
       assert_equal sha256_base64('abc'), head.checksum_sha256
       assert_equal 'FULL_OBJECT', head.checksum_type
@@ -206,12 +206,12 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
       get "/attachments/thumbnail/#{attachment.id}/100"
 
       assert_response :redirect
-      key = "thumbnails/#{attachment.digest}_#{attachment.filesize}_100.thumb"
+      key = "tmp/thumbnails/#{attachment.digest}_#{attachment.filesize}_100.thumb"
       assert_equal "/#{key}", URI(verify_signed_url(response.location).first).path
       assert object(key).b.start_with?("\x89PNG".b)
 
       attachment.destroy
-      assert_empty keys('thumbnails/')
+      assert_empty keys('tmp/thumbnails/')
     end
   end
 
@@ -263,10 +263,13 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
       kept = Attachment.create!(container: Issue.find(1), author: User.find(1),
                                 file: mock_file(filename: 'kept.txt', content: 'kept'))
       RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'files/2020/01/orphan', body: 'x')
+      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket,
+                                            key: 'files/derived_cache/markdownized_previews/d_1.md', body: 'x')
       ServerlessS3ReconcileJob.perform_now
       result = RedmineServerlessS3::Reconciliation.result
 
       assert_includes result['unused'], 'files/2020/01/orphan'
+      assert_not_includes result['unused'], 'files/derived_cache/markdownized_previews/d_1.md'
       assert_not_includes result['missing'], kept.s3_key
       assert_includes result['missing'], Attachment.find(1).s3_key
       assert result['finished_at'].present?

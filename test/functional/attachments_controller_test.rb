@@ -119,7 +119,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
       path, query, = signed_query(response.location)
       a = Attachment.find(16)
 
-      assert_equal "/thumbnails/#{a.digest}_#{a.filesize}_100.thumb", path
+      assert_equal "/tmp/thumbnails/#{a.digest}_#{a.filesize}_100.thumb", path
       assert_equal 'image/png', query['response-content-type']
       assert query['response-content-disposition'].start_with?('attachment;')
       assert_not_includes client.api_requests.pluck(:operation_name), :put_object
@@ -138,7 +138,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
       put = client.api_requests.find { |request| request[:operation_name] == :put_object }
       a = Attachment.find(16)
 
-      assert_equal "thumbnails/#{a.digest}_#{a.filesize}_100.thumb", put[:params][:key]
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_100.thumb", put[:params][:key]
     end
   end
 

@@ -31,7 +31,7 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
       assert_response :success
       json = response.parsed_body
 
-      assert json['url'].start_with?("https://#{DOMAIN}/incoming/")
+      assert json['url'].start_with?("https://#{DOMAIN}/tmp/incoming/")
       assert_equal sha256_base64(CONTENT), json['headers']['x-amz-checksum-sha256']
       assert json['ticket'].present?
     end
