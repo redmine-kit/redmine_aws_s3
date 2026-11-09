@@ -11,7 +11,7 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 
 ## 機能
 
-| 機能 | 中身 | 有効にする条件 | 資料 |
+| 機能 | 内容 | 有効にする条件 | 資料 |
 | --- | --- | --- | --- |
 | S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード(S3 が確認するチェックサム付きの PUT)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアのスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
 | 管理画面 | 共有の「Serverless」のメニューの「添付ファイルの S3」のタブ。バケットと設定、S3 への読み書きの確認、CloudFront からの配信の確認、データベースと S3 の突き合わせ | 管理者 | [admin.md](admin.md) |

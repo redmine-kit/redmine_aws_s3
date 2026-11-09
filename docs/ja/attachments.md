@@ -61,7 +61,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 
 バケットは 1 つです(この資料では `redmine-files` と書きます。インスタンスの名前が `redmine` のときの例で、本当の名前は [deploy-config.md](https://redmine-kit.github.io/serverless/ja/deploy-config.html#names-derived-from-the-instance-name) の決まりで作ります)。
 
-| キー | 中身 | 消すとき |
+| キー | 内容 | 消すとき |
 | --- | --- | --- |
 | `files/<年>/<月>/<ファイル名>` | 添付ファイル。Redmine の `disk_directory` と `disk_filename` と同じ形 | Redmine が添付を消したとき |
 | `thumbnails/<digest>_<サイズ>_<幅>.thumb` | サムネイル。名前は Redmine と同じ規則 | 元の添付を消したとき |
