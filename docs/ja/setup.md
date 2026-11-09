@@ -1,6 +1,6 @@
 # 準備
 
-Redmine Serverless S3 を使う Redmine に要るもの(入れ方、設定、バケット、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは設計段階なので、下の内容は設計で、コードを書くときに確認します。
+Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは設計段階なので、下の内容は設計で、コードを書くときに確認します。
 
 <a id="requirements"></a>
 
@@ -12,7 +12,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(入れ方、設定、バ
 
 <a id="installation"></a>
 
-## 入れ方
+## インストール
 
 1. プラグインを `plugins/redmine_serverless_s3` に置き、`bundle install` を実行します(プラグインの `Gemfile` が `aws-sdk-s3` を足し、Redmine の `Gemfile` がそれを読み込みます)。
 2. migration は要りません。
