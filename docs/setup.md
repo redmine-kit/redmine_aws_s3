@@ -1,12 +1,12 @@
 # Setup
 
-What a Redmine needs to use Redmine Serverless S3: installation, configuration, the bucket, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in the design stage, so the details below are the design and are checked when the code is written.
+What a Redmine needs to use Redmine Serverless S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in the design stage, so the details below are the design and are checked when the code is written.
 
 ## Requirements
 
 - Redmine 7.0 or later.
 - A process that can reach S3 with AWS credentials (an execution role on Lambda, an instance profile or a task role elsewhere). No access keys are stored in Redmine.
-- Browsers can reach S3 over the internet, because uploads and downloads go directly between the browser and S3 ([attachments.md](attachments.md#upload)).
+- Redmine is served through a CloudFront distribution. Browsers upload and download files through it, never through the S3 domain ([attachments.md](attachments.md#upload)).
 
 ## Installation
 
@@ -18,11 +18,15 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 | Setting | Where | Contents |
 | --- | --- | --- |
-| Bucket name and Region | Environment variables | Turn the plugin on. The variable names are decided when the code is written (not decided yet) |
-| Presigned URL expiry | Plugin settings | Shown on the [administration page](admin.md#attachments-in-s3). Presigned POST for uploads expires in 15 minutes ([attachments.md](attachments.md#upload)) |
+| Bucket name and Region | Environment variables | Turn the plugin on |
+| CloudFront domain and key pair ID | Environment variables | The domain of Redmine's distribution (for signed URLs under `/files/`, `/thumbnails/`, `/tmp/bulk/` and `/incoming/`) and the ID of the public key in its trusted key group |
+| CloudFront private key | A secret (on Serverless, a SecureString parameter under `/<instance>/env/` that [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads into the environment) | Signs the CloudFront URLs. Never written to files or logs |
+| Signed URL expiry | Plugin settings | Shown on the [administration page](admin.md#attachments-in-s3). 5 minutes for downloads and 15 minutes for uploads ([attachments.md](attachments.md#upload)) |
 | Size of the `/tmp` cache | Plugin settings | [attachments.md](attachments.md#the-tmp-cache) |
 | `attachments_storage_path` | `config/configuration.yml` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) |
-| Maximum attachment size | Redmine's settings | Can still be changed; the plugin shows the practical limit ([admin.md](admin.md#maximum-attachment-size)) |
+| Maximum attachment size | Redmine's settings | Can still be changed; the CloudFront Function on `/incoming/*` must use the same limit ([admin.md](admin.md#maximum-attachment-size)) |
+
+- **Variable names:** The names of the environment variables are decided when the code is written (not decided yet).
 
 ## The bucket
 
@@ -34,19 +38,36 @@ One bucket, with the keys in [attachments.md](attachments.md#bucket-layout).
 | Lifecycle | `incoming/` and `tmp/` after 1 day, `imports/` after 7 days, noncurrent versions after 30 days |
 | Encryption | SSE-S3 (the S3 default) |
 | Public access | S3 Block Public Access on. A bucket policy denies requests without TLS (`aws:SecureTransport` is `false`) |
-| CORS | `POST` from Redmine's origin (for example `https://redmine.example.com`), for the presigned POST |
+| CORS | None. Browsers use only Redmine's domain |
+| Bucket policy | Deny requests without TLS. Allow Redmine's CloudFront distribution, through its origin access control (OAC), to read `files/`, `thumbnails/` and `tmp/bulk/` and to write `incoming/` |
 
-- **No route restriction:** Do not limit the bucket or the role to a VPC endpoint or to IP addresses (`aws:SourceVpce`, `aws:SourceIp`). Browsers use the presigned URLs from the internet, and such a condition would reject them too ([attachments.md](attachments.md#bucket-layout)).
+- **Who reaches the bucket:** CloudFront through OAC, and the roles of the processes that run Redmine. Browsers never get S3 presigned URLs.
+
+## The CloudFront distribution
+
+The plugin uses Redmine's own distribution; no second distribution is needed. Add these to it:
+
+| Item | Setting |
+| --- | --- |
+| Origin | The attachments bucket, with an origin access control (OAC) that signs requests |
+| Behaviors `/files/*`, `/thumbnails/*`, `/tmp/bulk/*` | GET and HEAD. Signed URLs required (the trusted key group below). The cache key and the origin request include the query strings `response-content-disposition` and `response-content-type`; no cookies, no `Authorization` header. A response headers policy with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff` |
+| Behavior `/incoming/*` | All methods (PUT is needed). Signed URLs required. No caching. The origin request forwards the `x-amz-checksum-sha256` header. A CloudFront Function on viewer request rejects a `Content-Length` over the upload limit |
+| Trusted key group | A public key whose private key Redmine uses to sign URLs |
+| Other behaviors | Redmine, as before. The function that adds the body hash stays on them only |
+
+- **Redmine's paths:** Redmine has no routes that start with `/files`, `/thumbnails` or `/tmp` (checked in Redmine 7.0.3 on 2026-11-09), so these behaviors do not hide Redmine's pages ([attachments.md](attachments.md#download)).
+- **The sandbox CSP must stay:** Attachments are served from Redmine's origin, and the sandbox CSP is what keeps them from running scripts there. Check after every change of the distribution that a response under `/files/` has it.
+- **Creating the key pair:** The private key is created once and kept as a secret; only its public key goes into CloudFront. Serverless creates it with the deployment.
 
 ## IAM permissions
 
-Every process that runs Redmine with the plugin (web requests, jobs, rake) gets the same permissions on the bucket. Presigned URLs are signed with these credentials, so what a browser can do is limited by both this policy and the conditions in the signature (key, size, expiry).
+Every process that runs Redmine with the plugin (web requests, jobs, rake) gets the same permissions on the bucket. Browsers do not use these credentials: uploads and downloads go through CloudFront with URLs signed by the CloudFront private key.
 
 | Permission | Resource | Use |
 | --- | --- | --- |
-| `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `files/*`, `thumbnails/*`, `imports/*`, `incoming/*`, `tmp/*` in the bucket | Storing and deleting attachments and thumbnails, presigned POST and GET, copying from `incoming/` at registration, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
+| `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `files/*`, `thumbnails/*`, `imports/*`, `incoming/*`, `tmp/*` in the bucket | Storing and deleting attachments and thumbnails, `HeadObject` with the checksum and copying from `incoming/` at registration, deleting uploads that do not match, CSV imports, zip files for downloading all attachments, the read/write check (`tmp/healthcheck/`) |
 | `s3:ListBucket` | The bucket | `HeadObject` on a missing object returns 404 instead of 403. Deleting thumbnails by prefix, reconciliation, `HeadBucket` in the connection check |
-| `s3:GetBucketCors` | The bucket | The direct upload check on the administration page (web requests only) |
+| Reading the CloudFront private key | The secret that holds it (on Serverless, `ssm:GetParametersByPath` on `/<instance>/env/`, through [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/)) | Signing CloudFront URLs |
 
 Example policy:
 
@@ -69,8 +90,38 @@ Example policy:
     {
       "Sid": "Bucket",
       "Effect": "Allow",
-      "Action": ["s3:ListBucket", "s3:GetBucketCors"],
+      "Action": "s3:ListBucket",
       "Resource": "arn:aws:s3:::<bucket>"
+    }
+  ]
+}
+```
+
+Bucket policy that allows CloudFront through OAC:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFrontRead",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::<bucket>/files/*",
+        "arn:aws:s3:::<bucket>/thumbnails/*",
+        "arn:aws:s3:::<bucket>/tmp/bulk/*"
+      ],
+      "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
+    },
+    {
+      "Sid": "CloudFrontUpload",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<bucket>/incoming/*",
+      "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<distribution ID>" } }
     }
   ]
 }
@@ -99,7 +150,8 @@ Bucket policy that denies requests without TLS:
 | From | To | In a VPC without internet access |
 | --- | --- | --- |
 | Redmine | The S3 API of the bucket's Region | The S3 gateway endpoint (`com.amazonaws.<region>.s3`, free) on the subnets' route table |
-| Browsers | S3 (presigned POST and GET) | Over the internet; not through the VPC |
+| Browsers | Redmine's CloudFront distribution (uploads and downloads) | Over the internet; not through the VPC. Browsers never reach S3 directly |
+| CloudFront | The bucket, through OAC | AWS's network; not through the VPC |
 
 ## Tests
 

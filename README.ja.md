@@ -1,6 +1,6 @@
 # Redmine Serverless S3
 
-添付ファイルを Amazon S3 に置く Redmine のプラグインです。ブラウザーからの直接のアップロード(署名付きの POST)、署名付き URL でのダウンロードとサムネイル、`/tmp` のキャッシュ、バケットの管理画面を持ちます。AWS Lambda でも、Lambda 以外でも動きます。[Serverless](https://github.com/redmine-kit/serverless) は、[Redmine Serverless](https://github.com/redmine-kit/redmine_serverless) といっしょに使います。
+添付ファイルを Amazon S3 に置く Redmine のプラグインです。Redmine の CloudFront のディストリビューションを通した、署名付き URL でのアップロードとダウンロード(アップロードは S3 が SHA256 を確認し、ダウンロードには Redmine の sandbox の CSP を付ける)、`/tmp` のキャッシュ、バケットの管理画面を持ちます。AWS Lambda でも、Lambda 以外でも動きます。[Serverless](https://github.com/redmine-kit/serverless) は、[Redmine Serverless](https://github.com/redmine-kit/redmine_serverless) といっしょに使います。
 
 [English](README.md)
 

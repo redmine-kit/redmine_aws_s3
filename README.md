@@ -1,6 +1,6 @@
 # Redmine Serverless S3
 
-A Redmine plugin that stores attachments in Amazon S3: direct uploads from the browser (presigned POST), downloads and thumbnails through presigned URLs, a `/tmp` cache, and an administration page for the bucket. It works with or without AWS Lambda; [Serverless](https://github.com/redmine-kit/serverless) uses it together with [Redmine Serverless](https://github.com/redmine-kit/redmine_serverless).
+A Redmine plugin that stores attachments in Amazon S3: uploads and downloads through Redmine's CloudFront distribution with signed URLs (S3 checks the SHA256 of uploads, and downloads get Redmine's sandbox CSP), a `/tmp` cache, and an administration page for the bucket. It works with or without AWS Lambda; [Serverless](https://github.com/redmine-kit/serverless) uses it together with [Redmine Serverless](https://github.com/redmine-kit/redmine_serverless).
 
 [日本語](README.ja.md)
 

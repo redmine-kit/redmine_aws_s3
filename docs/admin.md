@@ -6,10 +6,10 @@ This is the design of the administration page of Redmine Serverless S3. Only Red
 
 | Item | Contents | Source |
 | --- | --- | --- |
-| Settings | Bucket name, Region, presigned URL expiry, size of the `/tmp` cache | Environment variables (display only), plugin settings (expiry, etc.) |
+| Settings | Bucket name, Region, CloudFront domain and key pair ID, signed URL expiry, size of the `/tmp` cache | Environment variables (display only), plugin settings (expiry, etc.). The private key is not shown |
 | Read/write check | Put a check object (`tmp/healthcheck/<UUID>`), read it, and delete it | A button runs `PutObject`, `GetObject`, `DeleteObject` |
 | Reconciliation | Attachments in the database that are not in S3. Objects in S3 not used by any attachment | A button runs it as a job and shows the result on the page |
-| Direct upload check | Whether the bucket CORS allows `POST` from Redmine's domain | `GetBucketCors` |
+| Delivery check | Put a check object, make a signed URL for it under `/tmp/bulk/`, and request it through CloudFront: it must return the object with the sandbox CSP and `nosniff`, and the same URL without the signature must be refused | A button runs it; the check object is deleted afterwards |
 
 - **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), reconciliation lets you check that nothing is missing.
 - **Connection check:** When Redmine Serverless is installed, its connection check also calls `HeadBucket` on the attachment bucket.
@@ -17,11 +17,11 @@ This is the design of the administration page of Redmine Serverless S3. Only Red
 
 ## Maximum attachment size
 
-Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. The plugin adds a note on the practical limit to the settings page: uploads from the UI are limited to a size whose SHA256 can be computed within 60 seconds at registration, and on Lambda the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
+Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. The plugin adds a note on the practical limit to the settings page: uploads through CloudFront are limited by the CloudFront Function on `/incoming/*`, which must use the same value, and by what CloudFront accepts for one PUT; on Lambda, the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
 
 ## Permissions
 
-For this page, the role that runs Redmine's web requests gets permission to read the bucket CORS. For the reconciliation job, the role that runs jobs gets permission to list the bucket. The list is in [setup.md](setup.md#iam-permissions).
+For the reconciliation job, the role that runs jobs gets permission to list the bucket. The delivery check uses the same permissions as attachments. The list is in [setup.md](setup.md#iam-permissions).
 
 ## Tests
 
