@@ -49,19 +49,23 @@ bundle install
 
 ## Configuration
 
-| Setting | Where | Contents |
+| Key | Description | Parameter |
 | --- | --- | --- |
-| `REDMINE_S3_BUCKET` | Environment variable | The attachment bucket. Turns the plugin on; without it, Redmine behaves as standard |
-| `REDMINE_S3_REGION` | Environment variable | The bucket's Region. Optional: `AWS_REGION`, then `AWS_DEFAULT_REGION`, are used without it |
-| `REDMINE_CLOUDFRONT_DOMAIN` | Environment variable | The domain of Redmine's distribution, such as `redmine.example.com`, for signed URLs under `/files/`, `/thumbnails/`, `/tmp/bulk/` and `/incoming/` |
-| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | Environment variable | The ID of the public key in the distribution's trusted key group |
-| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | Environment variable, from a secret (on Serverless, a SecureString parameter under `/<instance>/env/` that [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads into the environment) | The private key in PEM. Signs the CloudFront URLs. Never written to files or logs, and not shown on the administration page |
-| `REDMINE_S3_MALWARE_SCAN` | Environment variable | `true` to wait for GuardDuty Malware Protection for S3 before using uploads and import files ([attachments.md](attachments.md#malware-scan)). Anything else, or not set: off |
-| Signed URL expiry | Plugin settings, on the [administration page](admin.md#attachments-in-s3) | 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) |
-| Size of the local cache | Plugin settings, on the administration page | 256 MB ([attachments.md](attachments.md#the-tmp-cache)) |
-| `attachments_storage_path` | `config/configuration.yml` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) |
-| Maximum attachment size | Redmine's settings | Can still be changed; the CloudFront Function on `/incoming/*` must use the same limit ([admin.md](admin.md#maximum-attachment-size)) |
+| `REDMINE_S3_BUCKET` | The attachment bucket. Turns the plugin on; without it, Redmine behaves as standard | Required |
+| `REDMINE_S3_REGION` | The bucket's Region | Optional. Default: `AWS_REGION`, then `AWS_DEFAULT_REGION` |
+| `REDMINE_CLOUDFRONT_DOMAIN` | The domain of Redmine's distribution, for signed URLs under `/files/`, `/thumbnails/`, `/tmp/bulk/` and `/incoming/` | Required. Example: `redmine.example.com` |
+| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | The ID of the public key in the distribution's trusted key group | Required |
+| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | The private key in PEM that signs the CloudFront URLs. Never written to files or logs, and not shown on the administration page | Required. A secret. On Serverless, the SSM SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
+| `REDMINE_S3_MALWARE_SCAN` | Waits for GuardDuty Malware Protection for S3 before using uploads and import files ([attachments.md](attachments.md#malware-scan)) | Optional. `true` turns it on; anything else, or not set: off |
 
+| Item | Description | Where to change |
+| --- | --- | --- |
+| Signed URL expiry | Default: 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) | Plugin settings ([administration page](admin.md#attachments-in-s3)) |
+| Size of the local cache | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
+| `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
+| Maximum attachment size | Can still be changed; the CloudFront Function on `/incoming/*` must use the same limit ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
+
+- **Secrets:** On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment.
 - **AWS credentials:** The S3 client uses the SDK's standard credential chain (the execution role on Lambda, an instance profile or a task role elsewhere). The plugin reads no access keys of its own.
 - **Jobs:** The reconciliation on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. Where jobs go through a queue with a list of allowed job classes (such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/)), add it to the list.
 

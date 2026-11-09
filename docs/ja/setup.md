@@ -59,19 +59,23 @@ bundle install
 
 ## 設定
 
-| 設定 | 置き場所 | 中身 |
+| キー | 説明 | パラメーター |
 | --- | --- | --- |
-| `REDMINE_S3_BUCKET` | 環境変数 | 添付ファイルのバケット。プラグインを有効にする。なければ、Redmine は標準のとおりに動く |
-| `REDMINE_S3_REGION` | 環境変数 | バケットのリージョン。省略できる。なければ `AWS_REGION`、次に `AWS_DEFAULT_REGION` を使う |
-| `REDMINE_CLOUDFRONT_DOMAIN` | 環境変数 | Redmine のディストリビューションのドメイン(例: `redmine.example.com`)。`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う |
-| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | 環境変数 | ディストリビューションの信頼されたキーグループの公開鍵の ID |
-| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | 秘密の値から読む環境変数(Serverless では、`/<instance>/env/` の下の SecureString のパラメーターで、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が環境変数に読み込む) | PEM の秘密鍵。CloudFront の URL に署名する。ファイルやログには書かず、管理画面にも出さない |
-| `REDMINE_S3_MALWARE_SCAN` | 環境変数 | `true` で、アップロードとインポートのファイルを使う前に、GuardDuty Malware Protection for S3 の結果を待つ([attachments.md](attachments.md#malware-scan))。ほかの値やないときは使わない |
-| 署名付き URL の有効期限 | プラグインの設定。[管理画面](admin.md#attachments-in-s3)で変える | ダウンロードとサムネイルは 300 秒、アップロードは 900 秒([attachments.md](attachments.md#upload)) |
-| 手元のキャッシュの大きさ | プラグインの設定。管理画面で変える | 256 MB([attachments.md](attachments.md#the-tmp-cache)) |
-| `attachments_storage_path` | `config/configuration.yml` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) |
-| 添付ファイルの最大の大きさ | Redmine の設定 | これまでどおり変えられる。`/incoming/*` の CloudFront Functions は、同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) |
+| `REDMINE_S3_BUCKET` | 添付ファイルのバケット。これでプラグインが有効になる。なければ、Redmine は標準のとおりに動く | 必須 |
+| `REDMINE_S3_REGION` | バケットのリージョン | 省略可。既定は `AWS_REGION`、次に `AWS_DEFAULT_REGION` |
+| `REDMINE_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/thumbnails/`、`/tmp/bulk/`、`/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
+| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | ディストリビューションの信頼されたキーグループの公開鍵の ID | 必須 |
+| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | CloudFront の URL に署名する PEM の秘密鍵。ファイルやログには書かず、管理画面にも出さない | 必須。秘密の値。Serverless では SSM の SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
+| `REDMINE_S3_MALWARE_SCAN` | アップロードとインポートのファイルを使う前に、GuardDuty Malware Protection for S3 の結果を待つ([attachments.md](attachments.md#malware-scan)) | 省略可。`true` で有効。ほかの値やないときは無効 |
 
+| 項目 | 説明 | 変える場所 |
+| --- | --- | --- |
+| 署名付き URL の有効期限 | 既定は、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
+| 手元のキャッシュの大きさ | 既定は 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
+| `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
+| 添付ファイルの最大の大きさ | これまでどおり変えられる。`/incoming/*` の CloudFront Functions は、同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
+
+- **秘密の値:** Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。
 - **AWS の認証情報:** S3 のクライアントは、SDK の標準の認証情報の探し方を使います(Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロール)。プラグインが自分でアクセスキーを読むことはありません。
 - **ジョブ:** 管理画面の突き合わせは、Active Job の `ServerlessS3ReconcileJob` として動きます。許可するジョブのクラスの一覧を持つキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、一覧に足します。
 
