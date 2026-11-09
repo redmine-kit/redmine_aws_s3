@@ -45,8 +45,14 @@ class ScreenshotCase < ApplicationSystemTestCase
   # captures what is in the window; the focused field loses its caret.
   def shoot(name, language, selector: '#content')
     element = page.find(selector)
-    bottom = page.evaluate_script("document.querySelector(#{selector.to_json}).getBoundingClientRect().bottom")
-    page.driver.browser.manage.window.resize_to(1280, [bottom.ceil + 200, 900].max)
+    # Grow the window to the whole page: Redmine's #content stretches to the
+    # window, so the page's own height is measured, until it stops growing.
+    3.times do
+      height = page.evaluate_script('document.documentElement.scrollHeight')
+      break if height <= page.evaluate_script('window.innerHeight')
+
+      page.driver.browser.manage.window.resize_to(1280, height + 200)
+    end
     page.execute_script('window.scrollTo(0, 0); document.activeElement?.blur()')
     path = File.join(DOCS, LANGUAGES.fetch(language), "#{name}.png")
     element.native.save_screenshot(path)
