@@ -10,6 +10,14 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ## Installation
 
+**Getting the plugin:** with Docker, copy it from the plugin's image on ghcr.io, pinned by digest (tags: `main` and `sha-<commit>` for every push to `main`, `v*` for releases):
+
+```dockerfile
+COPY --from=ghcr.io/redmine-kit/redmine_serverless_s3:main@sha256:<digest> /redmine_serverless_s3 plugins/redmine_serverless_s3/
+```
+
+Without Docker, clone the repository (`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`) or, once releases are published, extract a release archive into `plugins/redmine_serverless_s3`.
+
 1. Put the plugin in `plugins/redmine_serverless_s3` and run `bundle install` (the plugin's `Gemfile` adds `aws-sdk-s3`; Redmine's `Gemfile` loads it).
 2. No migrations are needed.
 3. Set the bucket (below). Without it, the plugin stays off and Redmine stores attachments on disk as standard.

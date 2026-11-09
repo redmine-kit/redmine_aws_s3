@@ -14,6 +14,14 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ## インストール
 
+**プラグインの取り方:** Docker なら、ghcr.io のプラグインのイメージから、digest で固定して写します(タグは、`main` への push のたびに `main` と `sha-<コミット>`、リリースは `v*`)。
+
+```dockerfile
+COPY --from=ghcr.io/redmine-kit/redmine_serverless_s3:main@sha256:<digest> /redmine_serverless_s3 plugins/redmine_serverless_s3/
+```
+
+Docker を使わないなら、リポジトリを clone するか(`git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3`)、リリースを公開したあとは、そのアーカイブを `plugins/redmine_serverless_s3` に展開します。
+
 1. プラグインを `plugins/redmine_serverless_s3` に置き、`bundle install` を実行します(プラグインの `Gemfile` が `aws-sdk-s3` を足し、Redmine の `Gemfile` がそれを読み込みます)。
 2. migration は要りません。
 3. バケットを設定します(下記)。設定がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
