@@ -5,9 +5,11 @@ require 'securerandom'
 module RedmineServerlessS3
   # Uploads from the browser through CloudFront (docs/attachments.md#upload).
   # presign checks the request and returns a CloudFront signed URL for a PUT
-  # to tmp/incoming/<UUID>, with a ticket that keeps the declared name, size and
-  # SHA256 signed by Redmine. complete reads the checksum S3 has checked and
-  # registers the attachment without reading the file.
+  # to tmp/incoming/<UUID>.<SHA256 in hex>, with a ticket that keeps the
+  # declared name, size and SHA256 signed by Redmine. CloudFront gives S3 the
+  # checksum from the key, so S3 refuses any other content. complete reads the
+  # checksum S3 has checked and registers the attachment without reading the
+  # file.
   class Upload
     class Error < StandardError; end
 
@@ -36,7 +38,7 @@ module RedmineServerlessS3
       raise Error, 'sha256 is invalid' unless SHA256_BASE64.match?(sha256.to_s)
 
       check_attachment(filename, size)
-      key = "#{RedmineServerlessS3::INCOMING_PREFIX}#{SecureRandom.uuid}"
+      key = "#{RedmineServerlessS3::INCOMING_PREFIX}#{SecureRandom.uuid}.#{hex(sha256)}"
       expiry = RedmineServerlessS3.upload_url_expiry
       ticket = verifier.generate(
         { 'key' => key, 'filename' => filename, 'size' => size, 'sha256' => sha256,
@@ -65,6 +67,10 @@ module RedmineServerlessS3
     end
 
     private
+
+    def hex(sha256)
+      Base64.strict_decode64(sha256).unpack1('H*')
+    end
 
     def check_attachment(filename, size)
       unless Attachment.valid_extension?(File.extname(filename))
@@ -97,7 +103,7 @@ module RedmineServerlessS3
     end
 
     def register(key, data)
-      digest = Base64.strict_decode64(data['sha256']).unpack1('H*')
+      digest = hex(data['sha256'])
       attachment = Attachment.new(author: user, filesize: data['size'], digest: digest)
       attachment.filename = data['filename']
       attachment.content_type = data['content_type'] if data['content_type']

@@ -32,7 +32,8 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       result = presign
       unsigned, expires = verify_signed_url(result[:url])
 
-      assert_match %r{\Ahttps://#{DOMAIN}/tmp/incoming/[0-9a-f-]{36}\z}, unsigned
+      assert_match %r{\Ahttps://#{DOMAIN}/tmp/incoming/[0-9a-f-]{36}\.[0-9a-f]{64}\z}, unsigned
+      assert unsigned.end_with?(".#{Digest::SHA256.hexdigest(CONTENT)}"), 'the key ends with the SHA256'
       assert_in_delta Time.now.to_i + 900, expires, 5
       assert_equal({ 'x-amz-checksum-sha256' => sha256_base64(CONTENT) }, result[:headers])
       assert result[:ticket].present?
