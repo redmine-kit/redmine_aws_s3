@@ -156,7 +156,7 @@ Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファ�
 - **受信したメール:** 受信したメールの添付ファイルは、SES が独自にウイルスを判定するので([mail.md](https://redmine-kit.github.io/serverless/ja/mail.html#receiving))、待たずに `files/` に置きます。
 - **CSV のインポート:** インポートのファイルは、タグが `NO_THREATS_FOUND` になってから読みます。断ったファイルは消し、Redmine はファイルを読めないと出します。
 - **バケットポリシー:** オブジェクトのタグが `NO_THREATS_FOUND` でなければ、`tmp/incoming/*` と `imports/*` の `GetObject`(つまり `HeadObject` と `CopyObject` のコピー元)を拒みます。GuardDuty のロールは除きます([iam.md](iam.md#resource-based-policies))。待たないコードがあっても、問題がないとわかる前にファイルが読まれることはありません。
-- **費用:** 東京(ap-northeast-1)で、スキャンした量 1 GB あたり 0.1185 USD(毎月最初の 1 GB は無料)と、オブジェクト 1 つあたり 0.000282 USD(毎月最初の 1,000 は無料)です(2026-10-30 の AWS の価格表)。スキャンするのは `tmp/incoming/` と `imports/` だけなので、サムネイル、zip、`files/` にコピーしたオブジェクトは、もう一度スキャンしません。
+- **費用:** ap-northeast-1 で、スキャンした量 1 GB あたり 0.1185 USD(毎月最初の 1 GB は無料)と、オブジェクト 1 つあたり 0.000282 USD(毎月最初の 1,000 は無料)です(2026-10-30 の AWS の価格表)。スキャンするのは `tmp/incoming/` と `imports/` だけなので、サムネイル、zip、`files/` にコピーしたオブジェクトは、もう一度スキャンしません。
 
 <a id="download"></a>
 
