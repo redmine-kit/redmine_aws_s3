@@ -110,8 +110,8 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | 項目 | 設定 |
 | --- | --- |
 | オリジン | 添付ファイルのバケット。要求に署名するオリジンアクセスコントロール(OAC)を付ける |
-| ビヘイビア `/files/*` | 添付ファイル。GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。キャッシュのキーとオリジンへの要求に、クエリーの `response-content-disposition` と `response-content-type` を入れ、Cookie と `Authorization` のヘッダーは入れない。レスポンスヘッダーポリシーで `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付ける |
-| ビヘイビア `/tmp/*` | サムネイル(`/tmp/thumbnails/`)と zip(`/tmp/bulk/`)を GET で、アップロード(`/tmp/incoming/`)を PUT で受ける。すべてのメソッド、HTTPS だけ。署名付き URL を必須にする。キャッシュのポリシーと応答のヘッダーのポリシーは `/files/*` と同じ(PUT はキャッシュしない)。オリジンへの要求で `x-amz-checksum-sha256` のヘッダーも渡す。ビューワーリクエストの CloudFront Functions が、`/tmp/incoming/` への PUT で `Content-Length` がアップロードの上限を超えるものを拒む |
+| ビヘイビア `/files/*` | 添付ファイル。GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。マネージドのキャッシュポリシーの CachingDisabled(クエリーを S3 に渡さない)、オリジンリクエストポリシーはなし、マネージドのレスポンスヘッダーポリシーの SecurityHeadersPolicy。ビューワーレスポンスの CloudFront Functions が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付け、クエリーの `response-content-disposition` と `response-content-type` から `Content-Disposition` と `Content-Type` を設定する([attachments.md](attachments.md#download)) |
+| ビヘイビア `/tmp/*` | サムネイル(`/tmp/thumbnails/`)と zip(`/tmp/bulk/`)を GET で、アップロード(`/tmp/incoming/`)を PUT で受ける。すべてのメソッド、HTTPS だけ。署名付き URL を必須にする。ポリシーとビューワーレスポンスの関数は `/files/*` と同じ。ビューワーリクエストの CloudFront Functions が、`/tmp/incoming/` への PUT で `Content-Length` がアップロードの上限を超えるものを拒み、オリジンリクエストの Lambda@Edge が、キーの末尾の SHA256 から `x-amz-checksum-sha256` を付ける([attachments.md](attachments.md#upload)) |
 | 信頼されたキーグループ | Redmine が URL の署名に使う秘密鍵の、公開鍵 |
 | ほかのビヘイビア | 今までどおり Redmine。本文のハッシュを入れる関数は、これらだけに付ける |
 
@@ -191,7 +191,7 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 
 ### AWS では確認していないこと
 
-LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto ではこの 2 つを飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、レスポンスヘッダーのポリシー)と GuardDuty は、手元では再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
+LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto ではこの 2 つを飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、関数)と GuardDuty は、手元では再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
 
 <a id="redmines-own-tests"></a>
 

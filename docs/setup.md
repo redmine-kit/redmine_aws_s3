@@ -94,8 +94,8 @@ The plugin uses Redmine's own distribution; no second distribution is needed. Ad
 | Item | Setting |
 | --- | --- |
 | Origin | The attachments bucket, with an origin access control (OAC) that signs requests |
-| Behavior `/files/*` | Attachments. GET and HEAD. Signed URLs required (the trusted key group below). The cache key and the origin request include the query strings `response-content-disposition` and `response-content-type`; no cookies, no `Authorization` header. A response headers policy with `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff` |
-| Behavior `/tmp/*` | Thumbnails (`/tmp/thumbnails/`) and zips (`/tmp/bulk/`) with GET, uploads (`/tmp/incoming/`) with PUT: all methods, HTTPS only. Signed URLs required. The same cache policy and response headers policy as `/files/*` (a PUT is never cached). The origin request also forwards the `x-amz-checksum-sha256` header. A CloudFront Function on viewer request rejects a PUT under `/tmp/incoming/` whose `Content-Length` is over the upload limit |
+| Behavior `/files/*` | Attachments. GET and HEAD. Signed URLs required (the trusted key group below). The managed cache policy CachingDisabled, which forwards no query string to S3, no origin request policy, and the managed response headers policy SecurityHeadersPolicy. A CloudFront Function on viewer response adds `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff`, and sets `Content-Disposition` and `Content-Type` from the query strings `response-content-disposition` and `response-content-type` ([attachments.md](attachments.md#download)) |
+| Behavior `/tmp/*` | Thumbnails (`/tmp/thumbnails/`) and zips (`/tmp/bulk/`) with GET, uploads (`/tmp/incoming/`) with PUT: all methods, HTTPS only. Signed URLs required. The same policies and viewer-response function as `/files/*`. A CloudFront Function on viewer request rejects a PUT under `/tmp/incoming/` whose `Content-Length` is over the upload limit, and Lambda@Edge on origin request adds `x-amz-checksum-sha256` from the SHA256 at the end of the key ([attachments.md](attachments.md#upload)) |
 | Trusted key group | A public key whose private key Redmine uses to sign URLs |
 | Other behaviors | Redmine, as before. The function that adds the body hash stays on them only |
 
@@ -161,7 +161,7 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 
 ### Not checked against AWS
 
-On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the response headers policy) and GuardDuty are not reproduced locally. They are listed in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
+On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the functions) and GuardDuty are not reproduced locally. They are listed in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
 
 ### Redmine's own tests
 
