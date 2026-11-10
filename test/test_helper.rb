@@ -91,9 +91,11 @@ module RedmineServerlessS3
     end
 
     # HeadObject as S3 answers it for an object uploaded with a SHA256
-    # checksum, where the backend does not return the checksum (moto).
-    # On only inside emulate_s3_checksums, from any thread (the system tests'
-    # server runs in its own).
+    # checksum, where the backend does not return the checksum or its type
+    # (moto 5.2.5 returns the SHA256 of a copy without ChecksumType with
+    # aws-sdk-s3 1.240, checked on 2026-11-10). On only inside
+    # emulate_s3_checksums, from any thread (the system tests' server runs in
+    # its own).
     module EmulatedChecksums
       class << self
         attr_accessor :enabled
@@ -101,7 +103,8 @@ module RedmineServerlessS3
 
       def head(key, checksum: false)
         result = super
-        return result unless EmulatedChecksums.enabled && result && checksum && result.checksum_sha256.nil?
+        return result unless EmulatedChecksums.enabled && result && checksum
+        return result unless result.checksum_sha256.nil? || result.checksum_type.nil?
 
         data = client.get_object(bucket: bucket, key: key).body.read
         Struct.new(:content_length, :checksum_sha256, :checksum_type)
