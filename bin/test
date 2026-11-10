@@ -9,11 +9,12 @@
 #                             # (test/core/s3_exclusions.txt lists those left out)
 #   bin/test <files...>       # some of the plugin's tests
 #   PARALLEL_WORKERS=1 bin/test
+#   REDMINE_BRANCH=master bin/test   # on Redmine's master branch
 # Commands that run inside containers are in single quotes on purpose.
 # shellcheck disable=SC2016
 set -euo pipefail
 cd "$(dirname "$0")/.."
-image=redmine-serverless-s3-test
+image=redmine-serverless-s3-test${REDMINE_BRANCH:+-$REDMINE_BRANCH}
 network=redmine-serverless-s3-test_default
 
 if [[ "${1:-}" == "system" ]]; then
@@ -21,7 +22,7 @@ if [[ "${1:-}" == "system" ]]; then
 else
   bin/services >/dev/null
 fi
-docker buildx build --load -q -t "$image" -f test/Dockerfile . >/dev/null
+docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" -f test/Dockerfile . >/dev/null
 workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   backend=localstack endpoint=http://localstack:4566

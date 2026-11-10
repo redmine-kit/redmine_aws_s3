@@ -29,12 +29,23 @@ jobs:
       - run: bin/lint
       - run: for test in test/javascripts/*_test.mjs; do node "$test"; done
 
+  # Redmine's release, and master before the next release (7.1, which adds
+  # the avatars the plugin sends through S3). master is not pinned and does
+  # not fail the run.
   test:
     needs: static
+    name: test (Redmine ${{ matrix.redmine }})
     runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        redmine: ["7.0.3", master]
+    continue-on-error: ${{ matrix.redmine == 'master' }}
     permissions:
       contents: read
       id-token: write # Codecov with OIDC, no token stored
+    env:
+      REDMINE_BRANCH: ${{ matrix.redmine == 'master' && 'master' || '' }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -52,7 +63,8 @@ jobs:
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
       # Not failing the run while the Codecov GitHub App is not installed.
-      - uses: codecov/codecov-action@v7.1.1
+      - if: matrix.redmine != 'master'
+        uses: codecov/codecov-action@v7.1.1
         with:
           files: coverage/coverage.xml
           use_oidc: true
