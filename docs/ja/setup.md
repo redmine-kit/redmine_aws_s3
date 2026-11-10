@@ -62,7 +62,7 @@ bundle install
 | キー | 説明 | パラメーター |
 | --- | --- | --- |
 | `REDMINE_S3_BUCKET` | 添付ファイルのバケット。これでプラグインが有効になる。なければ、Redmine は標準のとおりに動く | 必須 |
-| `REDMINE_S3_REGION` | バケットのリージョン | 省略可。既定は `AWS_REGION`、次に `AWS_DEFAULT_REGION` |
+| `REDMINE_S3_REGION` | バケットのリージョン | 省略可。デフォルトは `AWS_REGION`、次に `AWS_DEFAULT_REGION` |
 | `REDMINE_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/tmp/thumbnails/`、`/tmp/bulk/`、`/tmp/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
 | `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | ディストリビューションの信頼されたキーグループの公開鍵の ID | 必須 |
 | `REDMINE_CLOUDFRONT_PRIVATE_KEY` | CloudFront の URL に署名する PEM の秘密鍵。ファイルやログには書かず、管理画面にも出さない | 必須。秘密の値。Serverless では SSM の SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
@@ -70,8 +70,8 @@ bundle install
 
 | 項目 | 説明 | 変える場所 |
 | --- | --- | --- |
-| ダウンロード URL の有効期限、アップロード URL の有効期限 | 既定は、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
-| ローカルキャッシュサイズの上限 | 既定は 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
+| ダウンロード URL の有効期限、アップロード URL の有効期限 | デフォルトは、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
+| ローカルキャッシュサイズの上限 | デフォルトは 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
 | `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルの最大の大きさ | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
@@ -93,7 +93,7 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | --- | --- |
 | バージョニング | 有効。古いバージョンは 30 日で消す |
 | ライフサイクル | `tmp/incoming/`、`tmp/bulk/`、`tmp/healthcheck/` は 1 日、`imports/` は 7 日、古いバージョンは 30 日で消す。サムネイル(`tmp/thumbnails/`)は消さない |
-| 暗号化 | SSE-S3(S3 の既定) |
+| 暗号化 | SSE-S3(S3 のデフォルト) |
 | 公開 | S3 のパブリックアクセスのブロックを有効にする。TLS でない要求は、バケットポリシーで拒む(`aws:SecureTransport` が `false`) |
 | CORS | なし。ブラウザーは Redmine のドメインだけを使う |
 | バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許す。マルウェアスキャンを使うときは、問題がないとわかる前の `tmp/incoming/` と `imports/` の読み取りを拒む |

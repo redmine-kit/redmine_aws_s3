@@ -76,7 +76,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 CSV のインポートのキーは、`tmp/imports/` ではなく `imports/` のままにします。マルウェアスキャンの対象にしつつ、`tmp/` の下のサムネイルと zip をスキャンしないためです。
 
 - **バージョニング:** 有効にします。ファイルを消すと削除マーカーになり、古いバージョンはライフサイクルで 30 日後に消します。誤って消したファイルを、30 日のあいだは戻せます。
-- **暗号化:** SSE-S3(S3 の既定)にします。
+- **暗号化:** SSE-S3(S3 のデフォルト)にします。
 - **公開しない:** アカウント全体で S3 のパブリックアクセスをブロックしています。バケットポリシーで、TLS でない要求を断り、Redmine の CloudFront のディストリビューションには、そのオリジンアクセスコントロール(OAC)を通したものだけ、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許します([setup.md](setup.md#the-bucket))。
 - **CORS は要らない:** ブラウザーは Redmine 自身のドメインだけを使うので、バケットに CORS の設定は要りません。
 - **バケットに届くもの:** OAC を通した CloudFront と、Redmine を動かすプロセスのロールだけです。ブラウザーに S3 の署名付き URL は渡しません。
@@ -144,7 +144,7 @@ CloudFront を通る要求の本文は、本文のハッシュを入れる Lambd
 
 ## マルウェアスキャン
 
-Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファイルを、Redmine が使う前にスキャンできます。既定では使わないので、GuardDuty がなくてもプラグインは動きます。`REDMINE_S3_MALWARE_SCAN=true` で、結果を待つようにします([setup.md](setup.md#configuration))。
+Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファイルを、Redmine が使う前にスキャンできます。デフォルトでは使わないので、GuardDuty がなくてもプラグインは動きます。`REDMINE_S3_MALWARE_SCAN=true` で、結果を待つようにします([setup.md](setup.md#configuration))。
 
 - **スキャンするもの:** 添付ファイルのバケットの Malware Protection のプランが、`tmp/incoming/`(アップロード)と `imports/`(CSV のインポートのファイル)の下の新しいオブジェクトをスキャンし、`GuardDutyMalwareScanStatus` のタグを付けます。値は `NO_THREATS_FOUND`、`THREATS_FOUND`、`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` のどれかです。
 - **待ち方:** Redmine は、1 回の要求のなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
@@ -196,7 +196,7 @@ sequenceDiagram
 
 ### サムネイル
 
-Redmine の標準のままにします。サムネイルの画像は、Redmine の標準のパス(`/attachments/thumbnail/<id>/<幅>`)で、必要になったときに作ります(Redmine の既定でサムネイルは有効。`thumbnails_enabled`)。
+Redmine の標準のままにします。サムネイルの画像は、Redmine の標準のパス(`/attachments/thumbnail/<id>/<幅>`)で、必要になったときに作ります(Redmine のデフォルトでサムネイルは有効。`thumbnails_enabled`)。
 
 - **作る:** そのパスに初めて届いたときに、S3 から元のファイルを `/tmp` のキャッシュに取り、Redmine の標準の `Redmine::Thumbnail.generate` で作って、`tmp/thumbnails/` に PutObject します。キャッシュの上限(256 MB)より大きな画像はサムネイルを作らず、Redmine の標準のアイコンを出します。
 - **返す:** `/tmp/thumbnails/` の下の、CloudFront の署名付き URL(期限 5 分)にリダイレクトします。応答のヘッダーは、ダウンロードと同じです。
@@ -207,7 +207,7 @@ Redmine の標準のままにします。サムネイルの画像は、Redmine �
 
 ### テキスト、差分、プレビュー
 
-- **テキストと差分の表示:** Redmine の標準のままです。`Attachment#diskfile` が `/tmp` のキャッシュのパスを返すので、標準の表示(`AttachmentsController#show`)がそのまま動きます。表示する大きさは `file_max_size_displayed`(既定 512 KB)までです。
+- **テキストと差分の表示:** Redmine の標準のままです。`Attachment#diskfile` が `/tmp` のキャッシュのパスを返すので、標準の表示(`AttachmentsController#show`)がそのまま動きます。表示する大きさは `file_max_size_displayed`(デフォルト 512 KB)までです。
 - **Office のファイルのプレビュー(Pandoc)、PDF の出力の画像:** ローカルのパスが要るので、`/tmp` のキャッシュから読みます。
 - **添付の一括のダウンロード(zip):** S3 に仮のファイルとして作り、`/tmp/bulk/` の下の、CloudFront の署名付き URL にリダイレクトします(下記)。
 
@@ -238,9 +238,9 @@ sequenceDiagram
 3. **置く:** zip を、1 回の PutObject で `tmp/bulk/<SHA256>.zip` に置きます(`bulk_download_max_size` があるので、1 回の PUT の上限の 5 GB よりずっと小さい)。`/tmp` の zip は消します。
 4. **返す:** CloudFront の署名付き URL(期限 5 分)に 302 でリダイレクトします。ファイル名は Redmine と同じ(`<種類>-<ID>-attachments.zip`)にし、`response-content-disposition` で `attachment` にします。
 
-- **上限:** `bulk_download_max_size` は、Redmine の既定(100 MB)のままにします。zip を作る時間が、`redmine-web` のタイムアウト(60 秒)に収まるかを測り、収まらなければ下げます。
+- **上限:** `bulk_download_max_size` は、Redmine のデフォルト(100 MB)のままにします。zip を作る時間が、`redmine-web` のタイムアウト(60 秒)に収まるかを測り、収まらなければ下げます。
 - **仮のファイルを消す:** `tmp/bulk/` の下は、ライフサイクルで 1 日後に消します。
-- **ほかの出力:** チケットの一覧の CSV や PDF、wiki の HTML などの出力は、Redmine から、そのまま返します。チケットの出力は既定で 500 件まで(`issues_export_limit`)で、ほかの出力も文字が中心で圧縮されるので、6 MB に届かない見込みです([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。
+- **ほかの出力:** チケットの一覧の CSV や PDF、wiki の HTML などの出力は、Redmine から、そのまま返します。チケットの出力はデフォルトで 500 件まで(`issues_export_limit`)で、ほかの出力も文字が中心で圧縮されるので、6 MB に届かない見込みです([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。
 - **作り直さない:** 同じ添付ファイルの組み合わせ(添付ファイルの ID と digest から作るキー)の zip が、まだ `tmp/bulk/` にあれば、作り直さずにリダイレクトします。
 - **ファイルがあるかの確認:** Redmine は、添付ファイルごとに `readable?` で確認します。`readable?` は、手元のキャッシュにファイルがあればそれを使い、なければ添付ファイルごとに S3 の HeadObject を 1 回送ります(添付ファイルが多いときの時間はまだ測っていない)。
 
@@ -256,8 +256,8 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
   - ローカルになく、レコードが保存済みなら、S3 から取ってからパスを返します。別の名前で書いてから名前を変えるので、途中のファイルを読むことはありません。
   - 削除(`delete_from_disk!`)と、ファイルがあるかの確認(`readable?`)は、`diskfile` を通さないように差し替えます。消すだけのファイルや、確認するだけのファイルを取りに行かないためです。
 - **古くならない:** 添付ファイルは一度保存したら変わらないので、キャッシュを確認直す必要はありません。
-- **大きさ:** 関数の `/tmp` は、Lambda の既定の 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。環境が消えると、キャッシュも消えます。
-- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず(SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル(元の画像)、`file_max_size_displayed`(既定 512 KB)までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size`(既定 100 MB)までの一括のダウンロードの zip(元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
+- **大きさ:** 関数の `/tmp` は、Lambda のデフォルトの 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。環境が消えると、キャッシュも消えます。
+- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず(SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル(元の画像)、`file_max_size_displayed`(デフォルト 512 KB)までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size`(デフォルト 100 MB)までの一括のダウンロードの zip(元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
 - **CSV のインポート:** インポートのファイルも、`/tmp/redmine/imports` に書いたあと `imports/` に PutObject し、読むときにローカルになければ S3 から取ります。`Import#filepath` は `Rails.root/tmp/imports` に固定されているので、イメージの `tmp` を `/tmp/redmine` へのシンボリックリンクにします([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#read-only-file-system))。
 - **Markdown のプレビュー:** Redmine は Office のファイルなどを Pandoc で Markdown に変え、`attachments_storage_path` の下の `derived_cache/markdownized_previews/` に置きます。Lambda では `/tmp` のキャッシュの中になるので、ほかに書き込めるパスは要りません。プラグインは、同じパス(`files/derived_cache/markdownized_previews/`)で S3 にも置きます。持っていない環境は Pandoc を動かし直さずに S3 から取り、添付を消すときに一緒に消します。
 
@@ -307,7 +307,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 - AWS でも、`ChecksumAlgorithm` に `SHA256` を指定したコピーの `HeadObject` が、LocalStack と同じく `ChecksumType` が `FULL_OBJECT` の `ChecksumSHA256` を返すこと
 - CloudFront が、CloudFront Functions より前に署名付き URL の署名を確認すること、署名付き URL のクエリーのない OAC からの要求を S3 が受け付けること
-- S3 のオリジンへの PUT で、CloudFront が受け付ける要求の本文の大きさ(資料に見つからない)、オリジンの応答のタイムアウト(既定 30 秒)が大きなアップロードにどう効くか
+- S3 のオリジンへの PUT で、CloudFront が受け付ける要求の本文の大きさ(資料に見つからない)、オリジンの応答のタイムアウト(デフォルト 30 秒)が大きなアップロードにどう効くか
 - 大きなアップロードの本文での WAF(大きすぎる本文の扱い、範囲の絞り込み、`SizeRestrictions_BODY`)
 - CloudFront の定額のプランで、アップロードの通信がどう数えられるか
 - 大きなアップロード (1 GB など) の登録で、S3 でのコピーにどれだけかかるか
