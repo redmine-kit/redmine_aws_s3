@@ -160,7 +160,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 ### AWS とのテストの方法
 
-ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの pull request やトークンのない手元の実行では moto に対して動かします。moto 5.2.5 は、`HeadObject` で `ChecksumSHA256` を返しません (2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、S3 のチェックサムの 2 つのテストはスキップします。署名付き URL は、テストで作った鍵のペアの公開鍵で検証します。
+ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの pull request やトークンのない手元の実行では moto に対して動かします。moto 5.2.5 は、`HeadObject` で `ChecksumSHA256` を返しません (2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、S3 のチェックサムの 2 つのテストはスキップします。署名付き URL は、テストで作った鍵のペアの公開鍵で検証します。LocalStack 2026.10.6 は、複数のテストのプロセスが同時に送ると、チェックサム付きの PutObject にまれに本文のない `400` を返します (約 1,000 回に 1 回。2026-11-11 に再現。チェックサムのヘッダーがなければ起きない)。S3 ではこうならないので、テストではその PutObject をもう一度だけ送ります (`test/localstack_retry.rb`)。
 
 <a id="replaced-code-coverage-and-ci"></a>
 

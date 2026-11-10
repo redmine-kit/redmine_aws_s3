@@ -21,6 +21,8 @@ if ENV['REDMINE_S3_TEST_CORE'] == '1'
                                  region: 'us-east-1', credentials: Aws::Credentials.new('test', 'test'))
     create_bucket.call(client)
     RedmineServerlessS3.client = client
+    require Rails.root.join('plugins/redmine_serverless_s3/test/localstack_retry').to_s
+    RedmineServerlessS3::LocalStackRetry.install
   end
 
   # Each parallel worker has its own database and attachments directory; it

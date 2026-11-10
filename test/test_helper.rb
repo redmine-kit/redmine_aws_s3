@@ -16,6 +16,9 @@ if ENV['COVERAGE'] && defined?(SimpleCov)
   SimpleCov.formatters = [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::HTMLFormatter]
 end
 
+require_relative 'localstack_retry'
+RedmineServerlessS3::LocalStackRetry.install
+
 module RedmineServerlessS3
   # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
   # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
