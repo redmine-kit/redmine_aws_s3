@@ -4,7 +4,7 @@ require 'net/http'
 require 'securerandom'
 
 module RedmineServerlessS3
-  # The checks of the "Attachments in S3" tab (docs/admin.md). Each returns
+  # The connection tests of the "S3" tab (docs/admin.md). Each returns
   # a list of [name, ok, detail].
   module Checks
     module_function
@@ -31,25 +31,28 @@ module RedmineServerlessS3
 
     # A check object under tmp/bulk/ through CloudFront: the signed URL
     # returns it with the sandbox CSP and nosniff, and the URL without the
-    # signature is refused.
+    # signature is denied.
     def delivery
       storage = RedmineServerlessS3.storage
       key = "#{RedmineServerlessS3::BULK_PREFIX}healthcheck-#{SecureRandom.uuid}.txt"
       storage.client.put_object(bucket: storage.bucket, key: key, body: 'ok', content_type: 'text/plain')
       url = RedmineServerlessS3.url_signer.url_for(key, expires_in: 60)
-      signed = get(url)
-      unsigned = get(url.split('?').first)
-      [
-        ['Signed URL', signed.is_a?(Net::HTTPOK), signed.code],
-        ['Sandbox CSP', signed['content-security-policy'].to_s.include?('sandbox'),
-         signed['content-security-policy'].to_s],
-        ['nosniff', signed['x-content-type-options'].to_s.casecmp?('nosniff'), signed['x-content-type-options'].to_s],
-        ['Unsigned URL refused', %w[401 403].include?(unsigned.code), unsigned.code]
-      ]
+      delivery_results(get(url), get(url.split('?').first))
     rescue StandardError => e
-      [['Delivery', false, e.message]]
+      [[::I18n.t(:label_redmine_serverless_s3_delivery), false, e.message]]
     ensure
       storage&.delete(key) if key
+    end
+
+    def delivery_results(signed, unsigned)
+      csp = signed['content-security-policy'].to_s
+      nosniff = signed['x-content-type-options'].to_s
+      [
+        [::I18n.t(:label_redmine_serverless_s3_signed_url), signed.is_a?(Net::HTTPOK), signed.code],
+        ['CSP sandbox', csp.include?('sandbox'), csp],
+        ['nosniff', nosniff.casecmp?('nosniff'), nosniff],
+        [::I18n.t(:label_redmine_serverless_s3_unsigned_url_denied), %w[401 403].include?(unsigned.code), unsigned.code]
+      ]
     end
 
     def step(name)

@@ -1,42 +1,75 @@
 # Administration page
 
-This is the administration page of Redmine Serverless S3. Only Redmine administrators can open it (`require_admin`). The page is the "Attachments in S3" tab under the "Serverless" item of Redmine's administration menu, which all the Redmine Serverless plugins share, whether or not [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu) is installed.
+This is the administration page of Redmine Serverless S3. Only Redmine administrators can open it (`require_admin`). The page is the "S3" tab under the "Serverless" item of Redmine's administration menu, which all the Redmine Serverless plugins share, whether or not [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu) is installed.
 
-## Attachments in S3
+<a id="attachments-in-s3"></a>
 
-![The Attachments in S3 tab after Check reading and writing: the environment, the settings, the results of the check, a malware finding and the last reconciliation](./images/s3-admin.png)
+## S3
 
-| Item | Contents | Source |
+![The S3 tab after "Read/write test": the environment variables, the results of the test, a file blocked by the malware scan, the last consistency check and the settings](./images/s3-admin.png)
+
+| Section | Contents | Source |
 | --- | --- | --- |
-| Environment variables | Bucket name, Region, CloudFront domain and key pair ID, whether the private key is set, the local cache directory | Environment variables ([setup.md](setup.md#configuration)), display only. The private key itself is not shown |
-| Settings | Expiry of download and upload URLs (seconds), size of the local cache (MB) | Plugin settings, changed on the page. Positive whole numbers only |
-| Malware scan | Whether `REDMINE_S3_MALWARE_SCAN` is on, and the files the scan refused (the last 20: time, status, file name, user) | The environment variable; the findings are kept in the plugin settings |
-| Read/write check | Put a check object (`tmp/healthcheck/<UUID>`), read it, and delete it | A button runs `PutObject`, `GetObject`, `DeleteObject` |
-| Reconciliation | The numbers of attachment files in the database and of objects under `files/`; the files that are not in S3 and the objects that no attachment uses (the first 100 of each) | A button starts the job `ServerlessS3ReconcileJob`, which lists `files/`. The result is kept in the plugin settings, so every environment shows the latest one |
-| Delivery check | Put a check object, make a signed URL for it under `/tmp/bulk/`, and request it through CloudFront: it must return the object with the sandbox CSP and `nosniff`, and the same URL without the signature must be refused | A button runs it; the check object is deleted afterwards |
+| Environment variables | "Bucket", "Region", "CloudFront domain", "CloudFront key pair ID", "CloudFront private key" ("Set" or "Not set"), "GuardDuty malware scan" ("Enabled" or "Disabled") and "Local cache". Each value has the name of its environment variable next to it, and "Local cache" has `attachments_storage_path` | Environment variables ([setup.md](setup.md#configuration)) and `config/configuration.yml`, display only. The private key itself is not shown |
+| Connection tests | "Read/write test" puts a test object (`tmp/healthcheck/<UUID>`), reads it and deletes it. "Delivery test" puts a test object, makes a signed URL for it under `/tmp/bulk/`, and requests it through CloudFront, with and without the signature. The results are shown in a table with the columns Name, Status and Details ([below](#connection-tests)) | Text links. The delivery test deletes its object afterwards |
+| Files blocked by malware scan | The last 20 files that the malware scan blocked, with the columns "Time", "Scan result", "File" and "User" (a link to the Redmine user). Shown when "GuardDuty malware scan" is "Enabled" or a blocked file is recorded | Kept in the plugin settings ([attachments.md](attachments.md#malware-scan)) |
+| Consistency check | "Run consistency check" starts the job `ServerlessS3ReconcileJob`, which lists `files/` and compares it with the attachments in the database. While it runs, the box shows "Status: Running" and "Started at". When it is done, it shows "Last run", "Attachments", "S3 objects" (under `files/`), "Files missing in S3" and "Unused objects", then the lists under those two names (the first 100 of each) | A text link. The result is kept in the plugin settings, so every environment shows the latest one |
+| Settings | "Download URL expiry" and "Upload URL expiry" (seconds), "Local cache size limit" (MB) | Plugin settings, changed on the page. Positive whole numbers only; invalid input shows an error that lists the labels of the wrong fields |
 
-- **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), reconciliation lets you check that nothing is missing.
-- **Connection check:** When Redmine Serverless is installed, its connection check also calls `HeadBucket` on the attachment bucket.
-- **No secrets shown:** AWS credentials and the CloudFront private key are not shown. AWS APIs are called only when a button is pressed.
-- **Without the bucket:** The tab still opens and shows that `REDMINE_S3_BUCKET` is not set; the buttons are not shown.
-- **Operations are logged:** Changing the settings, the checks and the reconciliation are written to Redmine's log with the administrator's login.
+<a id="connection-tests"></a>
+
+The results of the connection tests:
+
+| Name | Test | OK when |
+| --- | --- | --- |
+| PutObject, GetObject, DeleteObject | Read/write test | Each call succeeds, and GetObject returns what was put |
+| Signed URL | Delivery test | CloudFront returns the object (200) for the signed URL |
+| CSP sandbox | Delivery test | The response has a `Content-Security-Policy` with `sandbox` |
+| nosniff | Delivery test | The response has `X-Content-Type-Options: nosniff` |
+| Unsigned URL denied | Delivery test | The same URL without the signature returns 401 or 403 |
+| Delivery | Delivery test | Shown only when the test stops with an error, with the error message |
+
+- **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), the consistency check lets you check that nothing is missing.
+- **Status tab:** When Redmine Serverless is installed, its "Connection test" on the "Status" tab has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
+- **No secrets shown:** AWS credentials and the CloudFront private key are not shown. AWS APIs are called only when a link is clicked.
+- **Without the bucket:** The tab still opens and shows the warning "REDMINE_S3_BUCKET is not set, so attachments are stored on the local disk." It shows the environment variables and the settings; the connection tests, the blocked files and the consistency check are not shown.
+- **Operations are logged:** Changing the settings, the connection tests and the consistency check are written to Redmine's log with the administrator's login.
 
 ## The Serverless menu
 
-Every Redmine Serverless plugin ships the same small shared part: `lib/redmine_serverless_admin.rb` (`RedmineServerlessAdmin`), `ServerlessAdminController` (`/admin/serverless`, which opens the first tab) and the view `serverless_admin/_tabs`. Rails loads the first copy and ignores the others, so the "Serverless" item of Redmine's administration menu is added once, whichever plugins are installed. This plugin registers its tab, "Attachments in S3", at position 50 (the last), and, when the bucket is set, an S3 check (`HeadBucket`) for the connection check of [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu).
+Every Redmine Serverless plugin ships the same small shared part: `lib/redmine_serverless_admin.rb` (`RedmineServerlessAdmin`), `ServerlessAdminController` (`/admin/serverless`, which opens the first tab) and the view `serverless_admin/_tabs`. Rails loads the first copy and ignores the others, so the "Serverless" item of Redmine's administration menu is added once, whichever plugins are installed. This plugin registers its tab, "S3", at position 50 (the last), and, when the bucket is set, the "S3" row (`HeadBucket`) for the "Connection test" of [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu).
 
-- **Configure:** "Configure" of the plugin in Redmine's plugin list opens this tab.
+- **Configure:** "Configure" of the plugin in Redmine's plugin list opens the "S3" tab.
 
 ## Maximum attachment size
 
-Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. When the plugin is on, it adds a note on the practical limit next to the setting, with a small script on the settings page: uploads through CloudFront are limited by the CloudFront Function on `/tmp/*` (uploads under `/tmp/incoming/`), which must use the same value, and by what CloudFront accepts for one PUT; on Lambda, the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
+Redmine's "Maximum attachment size" (`attachment_max_size`, Administration › Settings › Files) can still be changed. When the plugin is on, a small script on the settings page adds this note next to the setting: "With S3, keep the CloudFront Function (/tmp/*) limit the same. On Lambda, POST /uploads.json is limited to 1 MB". Uploads through CloudFront are limited by the CloudFront Function on `/tmp/*` (uploads under `/tmp/incoming/`), which must use the same value, and by what CloudFront accepts for one PUT; on Lambda, the REST API `POST /uploads.json` is limited to 1 MB ([attachments.md](attachments.md#upload)).
 
 ## Permissions
 
-For the reconciliation job, the role that runs jobs gets permission to list the bucket. The delivery check uses the same permissions as attachments. The list is in [iam.md](iam.md).
+For the consistency check job, the role that runs jobs gets permission to list the bucket. The delivery test uses the same permissions as attachments. The list is in [iam.md](iam.md).
 
 ## Tests
 
 The page has Redmine functional tests; system tests are not written yet ([testing.md](https://redmine-kit.github.io/serverless/testing.html#administration-pages)).
 
-The screenshot on this page is taken with `bin/screenshots` (headless Chromium in Docker, with Redmine's test data and the S3 of the tests; the bucket, the CloudFront values, the finding and the reconciliation are examples). Run it after changing the page.
+The screenshot on this page is taken with `bin/screenshots` (headless Chromium in Docker, with Redmine's test data and the S3 of the tests; the bucket, the CloudFront values, the blocked file and the consistency check are examples). Run it after changing the page.
+
+<a id="terms"></a>
+
+## Terms
+
+The screen's terms follow the Japanese of the AWS documentation where AWS has one (checked on 2026-11-10). The Japanese GuardDuty documentation is a machine translation.
+
+| Screen (en / ja) | AWS term | Source | Status |
+| --- | --- | --- | --- |
+| GuardDuty malware scan / GuardDuty マルウェアスキャン | Malware scan (「マルウェアスキャン」) | https://docs.aws.amazon.com/ja_jp/guardduty/latest/ug/monitoring-malware-protection-s3-scans-gdu.html | Documentation |
+| Scan result / スキャン結果 | Scan result (「スキャン結果」), the tag `GuardDutyMalwareScanStatus` | Same page | Documentation |
+| Threats found / 脅威を検出 | `THREATS_FOUND` | Same page. The values stay in English. Our Japanese is made from the description 「潜在する脅威を検出しました」 | To recheck in the console |
+| Unsupported / サポート対象外 | `UNSUPPORTED` | Same page. Made from the description (the scan is skipped for files that are not supported) | To recheck in the console |
+| Access denied / アクセス拒否 | `ACCESS_DENIED` | Same page. Made from the description 「GuardDuty はこのオブジェクトにアクセスできず」 | To recheck in the console |
+| Failed / 失敗 | `FAILED` | Same page. Made from the scan status 「失敗」 | To recheck in the console |
+| Bucket / バケット, S3 objects / S3 オブジェクト数 | Bucket (「バケット」), object (「オブジェクト」) | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | Documentation |
+| CloudFront key pair ID / CloudFront キーペア ID | Key pair ID (「キーペア ID」) | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | Documentation |
+| Consistency check / 整合性チェック | — | The product's own term; AWS has no term for it | Product term |
+| Files blocked by malware scan / マルウェアスキャンでブロックしたファイル | — | "Blocked" (「ブロック」) is the product's own term for a file Redmine does not accept after the scan; GuardDuty only tags the object | Product term |

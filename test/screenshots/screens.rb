@@ -3,8 +3,8 @@
 require_relative 'screenshot_case'
 require_relative '../test_helper'
 
-# The "Attachments in S3" tab of docs/admin.md, after "Check reading and
-# writing" against the S3 of the tests (moto). The bucket, the CloudFront
+# The "S3" tab of docs/admin.md, after "Read/write
+# test" against the S3 of the tests (moto). The bucket, the CloudFront
 # domain and key pair, the finding and the reconciliation are examples.
 class RedmineServerlessS3Screens < ScreenshotCase
   include RedmineServerlessS3::TestHelper

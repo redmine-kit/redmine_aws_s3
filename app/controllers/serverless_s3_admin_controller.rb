@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# The "Attachments in S3" tab of the shared "Serverless" administration page
+# The "S3" tab of the shared "Serverless" administration page
 # (docs/admin.md). AWS is called only when a button is pressed.
 class ServerlessS3AdminController < ApplicationController
   layout 'admin'
@@ -19,7 +19,8 @@ class ServerlessS3AdminController < ApplicationController
     values = params.fetch(:settings, {}).permit(*RedmineServerlessS3::DEFAULT_SETTINGS.keys).to_h
     invalid = values.reject { |_, value| value.to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
     if invalid.any?
-      flash[:error] = l(:error_redmine_serverless_s3_invalid_settings, names: invalid.keys.join(', '))
+      names = invalid.keys.map { |name| l(:"field_redmine_serverless_s3_#{name}") }
+      flash[:error] = l(:error_redmine_serverless_s3_invalid_settings, names: names.join(', '))
     else
       RedmineServerlessS3.update_settings(values)
       log("changed the settings #{values.to_json}")

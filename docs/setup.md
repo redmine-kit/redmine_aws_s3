@@ -60,14 +60,14 @@ bundle install
 
 | Item | Description | Where to change |
 | --- | --- | --- |
-| Signed URL expiry | Default: 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) | Plugin settings ([administration page](admin.md#attachments-in-s3)) |
-| Size of the local cache | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
+| Download URL expiry, Upload URL expiry | Default: 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) | Plugin settings ([administration page](admin.md#attachments-in-s3)) |
+| Local cache size limit | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
 | Maximum attachment size | Can still be changed; the CloudFront Function on `/tmp/*` must use the same limit for uploads ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 
 On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
 
-The reconciliation on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/), add this class to the list.
+The consistency check on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/), add this class to the list.
 
 ## AWS resources
 
@@ -151,10 +151,10 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | The object and its thumbnails are deleted, but not a file another attachment uses. Identical content (digest and size) is shared and the newer object deleted | Stubs, LocalStack or moto |
 | `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `tmp/thumbnails/`. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
 | `/s3_uploads/presign` | Permission, extension and size are checked; the URL is a CloudFront signed URL for exactly `/tmp/incoming/<UUID>`, verified with the public key | Stubs |
-| `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. The upload is copied to `files/` with `ChecksumAlgorithm` `SHA256` and deleted; the copy's `ChecksumSHA256` (`FULL_OBJECT`) becomes the digest, and its `ContentLength` must equal the declared size, otherwise the copy is deleted. Identical content is shared and the extra copy deleted. With the malware scan: `202` while there is no tag, refusal and deletion for `THREATS_FOUND` and the other statuses. The same through the REST API | Stubs, LocalStack or moto |
+| `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. The upload is copied to `files/` with `ChecksumAlgorithm` `SHA256` and deleted; the copy's `ChecksumSHA256` (`FULL_OBJECT`) becomes the digest, and its `ContentLength` must equal the declared size, otherwise the copy is deleted. Identical content is shared and the extra copy deleted. With the malware scan: `202` while there is no tag; for `THREATS_FOUND` and the other scan results, the file is blocked and deleted. The same through the REST API | Stubs, LocalStack or moto |
 | `download`<br>`download_all` | Redmine's permission checks, then a redirect to a signed URL with `response-content-disposition` (Japanese names) and `response-content-type`; only PDFs inline. The zip is written to `/tmp` one file at a time, put to `tmp/bulk/` and reused for the same set | Stubs, LocalStack or moto |
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
-| Administration tab | Settings, read/write check, delivery check (the CSP and `nosniff` headers, the unsigned URL refused), reconciliation job, malware findings; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
+| Administration tab | Settings, read/write test, delivery test (the CSP and `nosniff` headers, the unsigned URL denied), consistency check job, files blocked by the malware scan; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
 | Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's | — |
 | Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
 | Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry | Node.js |

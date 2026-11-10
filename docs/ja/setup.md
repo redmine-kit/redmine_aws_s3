@@ -15,7 +15,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 ## インストール
 
 1. プラグインを `plugins/redmine_serverless_s3` に置きます。gem をインストールするか([gem](#gem))、リポジトリをクローンします([gem を使わないとき](#without-the-gem))。
-2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を足します。
+2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 3. migration は要りません。
 4. プラグインの JavaScript `s3_upload.js` を配るために、アセットを作ります(Redmine のいつものアセットの手順でもかまいません)。
 
@@ -70,18 +70,18 @@ bundle install
 
 | 項目 | 説明 | 変える場所 |
 | --- | --- | --- |
-| 署名付き URL の有効期限 | 既定は、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
-| 手元のキャッシュの大きさ | 既定は 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
+| ダウンロード URL の有効期限、アップロード URL の有効期限 | 既定は、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒([attachments.md](attachments.md#upload)) | プラグインの設定([管理画面](admin.md#attachments-in-s3)) |
+| ローカルキャッシュサイズの上限 | 既定は 256 MB([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定(管理画面) |
 | `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルの最大の大きさ | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
 Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロールです。プラグインが自分でアクセスキーを読むことはありません。
 
-管理画面の突き合わせは、Active Job の `ServerlessS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、このクラスを一覧に足します。
+管理画面の整合性チェックは、Active Job の `ServerlessS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、このクラスを一覧に追加します。
 
 <a id="aws-resources"></a>
 
-## AWS のリソース
+## AWS リソース
 
 <a id="the-bucket"></a>
 
@@ -96,8 +96,8 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | 暗号化 | SSE-S3(S3 の既定) |
 | 公開 | S3 のパブリックアクセスのブロックを有効にする。TLS でない要求は、バケットポリシーで拒む(`aws:SecureTransport` が `false`) |
 | CORS | なし。ブラウザーは Redmine のドメインだけを使う |
-| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許す。マルウェアのスキャンを使うときは、問題がないとわかる前の `tmp/incoming/` と `imports/` の読み取りを拒む |
-| マルウェアのスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `tmp/incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
+| バケットポリシー | TLS でない要求を拒む。Redmine の CloudFront のディストリビューションに、オリジンアクセスコントロール(OAC)を通して、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許す。マルウェアスキャンを使うときは、問題がないとわかる前の `tmp/incoming/` と `imports/` の読み取りを拒む |
+| マルウェアスキャン(使うときだけ) | バケットに GuardDuty Malware Protection for S3 のプランを付け、対象を `tmp/incoming/` と `imports/` にし、スキャンしたオブジェクトへのタグ付けを有効にする。`REDMINE_S3_MALWARE_SCAN=true` にする([attachments.md](attachments.md#malware-scan)) |
 
 バケットに届くのは、OAC を通した CloudFront と、Redmine を動かすプロセスのロールだけです。ブラウザーに S3 の署名付き URL は渡しません。
 
@@ -105,7 +105,7 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 
 ### CloudFront のディストリビューション
 
-プラグインは、Redmine 自身のディストリビューションを使い、2 つめのディストリビューションは要りません。次のものを足します。
+プラグインは、Redmine 自身のディストリビューションを使い、2 つめのディストリビューションは要りません。次のものを追加します。
 
 | 項目 | 設定 |
 | --- | --- |
@@ -123,7 +123,7 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 <a id="iam-permissions"></a>
 
-## IAM の権限
+## IAM 権限
 
 プラグインに要る権限と例のポリシーは、[iam.md](iam.md) にあります。
 
@@ -174,17 +174,17 @@ node test/javascripts/complete_test.mjs # アップロードの JavaScript の�
 
 | 対象 | 確認すること | 使うもの |
 | --- | --- | --- |
-| `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアのスキャンを使うときは `tmp/incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
+| `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアスキャンを使うときは `tmp/incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
 | `readable?`<br>`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
 | `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `tmp/thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
 | `/s3_uploads/presign` | 権限、拡張子、サイズを確認する。URL はちょうど `/tmp/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
-| `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。アップロードを `ChecksumAlgorithm` に `SHA256` を指定して `files/` にコピーして削除し、コピーの `ChecksumSHA256` (`FULL_OBJECT`) をダイジェストにする。コピーの `ContentLength` が申告と一致しなければ、コピーを削除する。同じ内容は共有し、余分なコピーを削除する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
+| `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。アップロードを `ChecksumAlgorithm` に `SHA256` を指定して `files/` にコピーして削除し、コピーの `ChecksumSHA256` (`FULL_OBJECT`) をダイジェストにする。コピーの `ContentLength` が申告と一致しなければ、コピーを削除する。同じ内容は共有し、余分なコピーを削除する。マルウェアスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかのスキャン結果ではファイルをブロックして消す。REST API でも同じ | スタブ、LocalStack か moto |
 | `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
-| CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアのスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
-| 管理画面のタブ | 設定、読み書きの確認、配信の確認(CSP と `nosniff` のヘッダー、署名のない URL が断られること)、突き合わせのジョブ、マルウェアの記録。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
+| CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
+| 管理画面のタブ | 設定、読み書きテスト、配信テスト(CSP と `nosniff` のヘッダー、署名のない URL が拒否されること)、整合性チェックのジョブ、マルウェアスキャンでブロックしたファイル。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
 | 置き換える Redmine のコード | 置き換えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい | — |
-| ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアのスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
+| ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
 | ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める | Node.js |
 
 <a id="not-checked-against-aws"></a>

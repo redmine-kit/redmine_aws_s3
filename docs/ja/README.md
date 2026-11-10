@@ -2,10 +2,10 @@
 
 Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon S3 に置く Redmine のプラグインです。アップロードはブラウザーから Redmine の CloudFront のディストリビューションを通して S3 に PUT し、ダウンロードは Redmine のドメインの CloudFront の署名付き URL にリダイレクトするので、ファイルの本体は Redmine を通りません。Redmine 本体のファイルは書き換えず、Redmine の標準の拡張の仕組みだけで作ります。今は開発の初期の段階です(バージョン 0.1.1)。
 
-- [導入](setup.md): 動作環境、インストール、設定、AWS のリソース(バケット、CloudFront のディストリビューション)、ネットワーク、テスト
-- [IAM の権限](iam.md): 権限、ポリシーの例、リソースベースのポリシー
+- [導入](setup.md): 動作環境、インストール、設定、AWS リソース(バケット、CloudFront のディストリビューション)、ネットワーク、テスト
+- [IAM 権限](iam.md): 権限、ポリシーの例、リソースベースのポリシー
 - [添付ファイルと S3](attachments.md): 保存、アップロード、ダウンロード、キャッシュ、差し替える処理
-- [管理画面](admin.md): 設定、読み書きの確認、突き合わせ
+- [管理画面](admin.md): 設定、接続テスト、整合性チェック
 
 <a id="features"></a>
 
@@ -13,8 +13,8 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 
 | 機能 | 内容 | 有効にする条件 | 資料 |
 | --- | --- | --- | --- |
-| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアのスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
-| 管理画面 | 共有の「Serverless」のメニューの「添付ファイルの S3」のタブ。バケットと設定、S3 への読み書きの確認、CloudFront からの配信の確認、データベースと S3 の突き合わせ | 管理者 | [admin.md](admin.md) |
+| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
+| 管理画面 | 共有の「Serverless」のメニューの「S3」のタブ。環境変数と設定、S3 の読み書きテストと CloudFront からの配信テスト、マルウェアスキャンでブロックしたファイル、データベースと S3 の整合性チェック | 管理者 | [admin.md](admin.md) |
 
 <a id="outside-lambda"></a>
 
@@ -26,7 +26,7 @@ S3 に届き、CloudFront で配信している Redmine なら、どこでも動
 
 ## gem とデータベース
 
-依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。データベースのテーブルは足さないので、実行する migration はありません。
+依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。データベースのテーブルを追加しないので、実行する migration はありません。
 
 <a id="tests"></a>
 

@@ -71,9 +71,9 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 | `tmp/imports/<ファイル名>`(`Import#filepath`) | `imports/<ファイル名>` | なし | CSV のインポートのファイル。Redmine が付ける名前(16 進) | インポートが終わったとき。残ったものはライフサイクルで 7 日 |
 | なし(Redmine はメモリで zip を作る) | `tmp/bulk/<SHA256>.zip` | `/tmp/bulk/...` | 添付の一括のダウンロードの zip。名前は添付ファイルの ID と digest の SHA256 | ライフサイクルで 1 日 |
 | なし | `tmp/incoming/<UUID>` | `/tmp/incoming/...`(PUT) | ブラウザーが送ったファイル(登録の前) | 登録したとき。残ったものはライフサイクルで 1 日 |
-| なし | `tmp/healthcheck/<UUID>` | なし | 読み書きの確認のオブジェクト | 確認のすぐあと。残ったものはライフサイクルで 1 日 |
+| なし | `tmp/healthcheck/<UUID>` | なし | 管理画面の「読み書きテスト」のオブジェクト | テストのすぐあと。残ったものはライフサイクルで 1 日 |
 
-CSV のインポートのキーは、`tmp/imports/` ではなく `imports/` のままにします。マルウェアのスキャンの対象にしつつ、`tmp/` の下のサムネイルと zip をスキャンしないためです。
+CSV のインポートのキーは、`tmp/imports/` ではなく `imports/` のままにします。マルウェアスキャンの対象にしつつ、`tmp/` の下のサムネイルと zip をスキャンしないためです。
 
 - **バージョニング:** 有効にします。ファイルを消すと削除マーカーになり、古いバージョンはライフサイクルで 30 日後に消します。誤って消したファイルを、30 日のあいだは戻せます。
 - **暗号化:** SSE-S3(S3 の既定)にします。
@@ -138,21 +138,21 @@ sequenceDiagram
 
 CloudFront を通る要求の本文は、本文のハッシュを入れる Lambda@Edge が読める 1 MB までです([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。大きなファイルを API で送るときは、CloudFront を通したアップロード(上の流れ。API キーと OAuth でも使える)を使います。
 
-これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外を発生させ、レコードを保存しません。マルウェアのスキャンを使うときは、代わりに `tmp/incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません(下記)。
+これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ(下記)に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外を発生させ、レコードを保存しません。マルウェアスキャンを使うときは、代わりに `tmp/incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません(下記)。
 
 <a id="malware-scan"></a>
 
-## マルウェアのスキャン
+## マルウェアスキャン
 
 Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファイルを、Redmine が使う前にスキャンできます。既定では使わないので、GuardDuty がなくてもプラグインは動きます。`REDMINE_S3_MALWARE_SCAN=true` で、結果を待つようにします([setup.md](setup.md#configuration))。
 
 - **スキャンするもの:** 添付ファイルのバケットの Malware Protection のプランが、`tmp/incoming/`(アップロード)と `imports/`(CSV のインポートのファイル)の下の新しいオブジェクトをスキャンし、`GuardDutyMalwareScanStatus` のタグを付けます。値は `NO_THREATS_FOUND`、`THREATS_FOUND`、`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` のどれかです。
 - **待ち方:** Redmine は、1 回の要求のなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
 - **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202`(`{"status":"scanning"}`、`Retry-After: 2`)を返します。ブラウザーは、1、2、4、8、15、30 秒後に同じ要求を送り直し、それでも終わらなければ、まだスキャン中だと出します。REST API のクライアントにも `202` を返すので、`complete.json` を送り直します。
-- **断るファイル:** `THREATS_FOUND` なら、オブジェクトを消し、「マルウェアのスキャンで脅威が見つかった」としてファイルを断ります。`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` も、状態を添えて同じように断ります。断ったファイルは、ログに書き、[管理画面](admin.md#attachments-in-s3)に出します(最新の 20 件)。
+- **ブロックするファイル:** `THREATS_FOUND` なら、オブジェクトを消し、「マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。」と出してファイルをブロックします。`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` も同じようにブロックし、「マルウェアスキャンが完了しなかったため、ファイルをブロックしました(`<status>`)。」と出します。ブロックしたファイルは、ログに書き、[管理画面](admin.md#attachments-in-s3)の「マルウェアスキャンでブロックしたファイル」に出します(最新の 20 件)。
 - **Lambda を通るアップロード:** 先に `tmp/incoming/` に置きます([上記](#uploads-through-lambda))。20 秒たっても結果がなければ、「まだスキャン中」としてアップロードを失敗させるので、送り直します。
 - **受信したメール:** 受信したメールの添付ファイルは、SES が独自にウイルスを判定するので([mail.md](https://redmine-kit.github.io/serverless/ja/mail.html#receiving))、待たずに `files/` に置きます。
-- **CSV のインポート:** インポートのファイルは、タグが `NO_THREATS_FOUND` になってから読みます。断ったファイルは消し、Redmine はファイルを読めないと出します。
+- **CSV のインポート:** インポートのファイルは、タグが `NO_THREATS_FOUND` になってから読みます。ブロックしたファイルは消し、Redmine はファイルを読めないと出します。
 - **バケットポリシー:** オブジェクトのタグが `NO_THREATS_FOUND` でなければ、`tmp/incoming/*` と `imports/*` の `GetObject`(つまり `HeadObject` と `CopyObject` のコピー元)を拒みます。GuardDuty のロールは除きます([iam.md](iam.md#resource-based-policies))。待たないコードがあっても、問題がないとわかる前にファイルが読まれることはありません。
 - **費用:** ap-northeast-1 で、スキャンした量 1 GB あたり 0.1185 USD(毎月最初の 1 GB は無料)と、オブジェクト 1 つあたり 0.000282 USD(毎月最初の 1,000 は無料)です(2026-10-30 の AWS の価格表)。スキャンするのは `tmp/incoming/` と `imports/` だけなので、サムネイル、zip、`files/` にコピーしたオブジェクトは、もう一度スキャンしません。
 
@@ -160,7 +160,7 @@ Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファ�
 
 ## ダウンロード
 
-すべてのダウンロードを、Redmine 自身のドメインの、CloudFront の署名付き URL へのリダイレクトにします。Redmine の CloudFront のディストリビューションに、S3 のキーのプレフィックスをパスのパターンにしたキャッシュビヘイビアを足し、そのパスは添付ファイルのバケットから返します。
+すべてのダウンロードを、Redmine 自身のドメインの、CloudFront の署名付き URL へのリダイレクトにします。Redmine の CloudFront のディストリビューションに、S3 のキーのプレフィックスをパスのパターンにしたキャッシュビヘイビアを追加し、そのパスは添付ファイルのバケットから返します。
 
 ```mermaid
 sequenceDiagram
@@ -186,7 +186,7 @@ sequenceDiagram
 - **Redmine のパスと重ならない:** Redmine には、`/files`、`/tmp` で始まるルートはありません。添付ファイルは `/attachments/...`、プロジェクトのファイルは `/projects/<id>/files` です。`public/` にも、その名前のディレクトリはありません(2026-11-09 に Redmine 7.0.3 の `config/routes.rb` で確認)。
 - **CSP:** これらのビヘイビアのビューワーレスポンスの CloudFront Functions(Serverless では `redmine-attachment-headers`)が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` を付けます。CSP は、Redmine の `AttachmentsController` が添付ファイルを返すときに付けるのと同じ値です(2026-11-09 に Redmine 7.0.3 のコードで確認)。`X-Content-Type-Options: nosniff` は、マネージドポリシーの `SecurityHeadersPolicy` がすべてのレスポンスに付けます。この CSP を持つマネージドのレスポンスヘッダーポリシーはなく、カスタムのレスポンスヘッダーポリシーはビジネスプランからです (「CloudFront flat-rate pricing plans」、2026-11-10 に確認)。成功の応答では、署名付き URL の `response-content-disposition` と `response-content-type` をデコードして、`Content-Disposition` と `Content-Type` に設定します。印字できる ASCII でない値は使いません。署名はクエリーを含むので、これらの値は Redmine が決めたものです。
 - **Redmine と同じオリジン:** 添付ファイルは、Redmine の標準と同じく、Redmine のオリジンから返ります。それを切り離すのは sandbox の CSP です。sandbox の文書は不透明なオリジンになり、スクリプトも動かないので、HTML や SVG の添付ファイルは、Redmine の Cookie を読むことも、Redmine を呼ぶこともできません。そのため、このヘッダーは必ず付いている必要があります。デプロイのあとの確認で、`/files/` の下の応答に sandbox の CSP と `nosniff` が付いていることを確認します([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment))。
-- **CloudFront を使う理由:** S3 の署名付きの GET で上書きできるのは、`response-content-type`、`-language`、`-expires`、`-cache-control`、`-disposition`、`-encoding` だけです。ほかのヘッダーは足せないので、CSP を S3 から付けることはできません。
+- **CloudFront を使う理由:** S3 の署名付きの GET で上書きできるのは、`response-content-type`、`-language`、`-expires`、`-cache-control`、`-disposition`、`-encoding` だけです。ほかのヘッダーは追加できないので、CSP を S3 から付けることはできません。
 - **ディストリビューションは 1 つ:** 2 つめのディストリビューション、証明書、DNS のレコードは要りません。Redmine のディストリビューションの WAF が、添付ファイルにも効きます。
 - **ファイルがあるかの確認:** Redmine は、ダウンロードの前にローカルのファイルがあるかを確認します(`file_readable`、`Attachment#readable?`)。この確認は、手元のキャッシュのファイル、なければ S3 の HeadObject に替えます。
 - **画像の表示:** wiki やチケットの本文の画像(`/attachments/download/<id>/<名前>`)も、同じリダイレクトで表示されます。`<img>` は、`attachment` の指定があっても画像を表示し、sandbox の CSP も画像の表示は止めません。画像の数だけ Lambda が呼ばれるので、画像の多いページでは、同時の要求の数だけ環境が起動します(推測。作ったあとで測る)。
@@ -273,7 +273,7 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
 
 ## 差し替える処理
 
-Redmine 本体のファイルは書き換えず、プラグインから `prepend` で差し替えます。足す画面(`/s3_uploads/presign`、`/s3_uploads/complete`)は、プラグインのルートとコントローラーに置きます。
+Redmine 本体のファイルは書き換えず、プラグインから `prepend` で差し替えます。追加する画面(`/s3_uploads/presign`、`/s3_uploads/complete`)は、プラグインのルートとコントローラーに置きます。
 
 | 対象 | 差し替え | 理由 |
 | --- | --- | --- |
@@ -287,8 +287,8 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
-| `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアのスキャンを待たない | [マルウェアのスキャン](#malware-scan) |
-| `SettingsController#plugin`(このプラグインの GET だけ) | 「添付ファイルの S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
+| `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアスキャンを待たない | [マルウェアスキャン](#malware-scan) |
+| `SettingsController#plugin`(このプラグインの GET だけ) | 「S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
 | `attachments.js` の `uploadBlob` | CloudFront 署名付き URL に PUT する | アップロード |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。

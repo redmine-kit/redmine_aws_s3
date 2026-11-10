@@ -61,7 +61,7 @@ The keys follow Redmine's own storage: the part of a path under `attachments_sto
 | `tmp/imports/<file name>` (`Import#filepath`) | `imports/<file name>` | None | CSV import files, under Redmine's name for them (hexadecimal) | The import finishes. Leftovers after 7 days, by lifecycle |
 | None (Redmine builds the zip in memory) | `tmp/bulk/<SHA256>.zip` | `/tmp/bulk/...` | zip files for downloading all attachments, named by the SHA256 of the attachment IDs and digests | After 1 day, by lifecycle |
 | None | `tmp/incoming/<UUID>` | `/tmp/incoming/...` (PUT) | Files sent by the browser, before registration | On registration. Leftovers after 1 day, by lifecycle |
-| None | `tmp/healthcheck/<UUID>` | None | The object of the read/write check | Right after the check. Leftovers after 1 day, by lifecycle |
+| None | `tmp/healthcheck/<UUID>` | None | The object of the "Read/write test" on the administration page | Right after the test. Leftovers after 1 day, by lifecycle |
 
 The keys of CSV imports stay under `imports/` (not `tmp/imports/`), so that the malware scan covers them without scanning the thumbnails and zips under `tmp/`.
 
@@ -133,10 +133,10 @@ Amazon GuardDuty Malware Protection for S3 can scan what users upload before Red
 - **What is scanned:** A Malware Protection plan for the attachment bucket scans new objects under `tmp/incoming/` (uploads) and `imports/` (CSV import files) and tags each with `GuardDutyMalwareScanStatus`: `NO_THREATS_FOUND`, `THREATS_FOUND`, `UNSUPPORTED`, `ACCESS_DENIED` or `FAILED`.
 - **Waiting:** Redmine reads the tag with `GetObjectTagging` once a second, up to 20 seconds in one request.
 - **Uploads through CloudFront:** `POST /s3_uploads/complete` registers the file only when the tag is `NO_THREATS_FOUND`. Without a tag yet, it answers `202` (`{"status":"scanning"}`, `Retry-After: 2`) and keeps the object; the browser sends the same request again after 1, 2, 4, 8, 15 and 30 seconds, then shows that the file is still being scanned. REST API clients get `202` too and send `complete.json` again.
-- **Refused files:** With `THREATS_FOUND`, Redmine deletes the object and refuses the file with "the malware scan found a threat in it". `UNSUPPORTED`, `ACCESS_DENIED` and `FAILED` are refused the same way, with the status in the message. Each refused file is logged and listed on the [administration page](admin.md#attachments-in-s3) (the last 20).
+- **Blocked files:** With `THREATS_FOUND`, Redmine deletes the object and blocks the file with "The malware scan found threats, so the file was blocked." `UNSUPPORTED`, `ACCESS_DENIED` and `FAILED` are blocked the same way, with "The malware scan did not complete, so the file was blocked (`<status>`)." Each blocked file is logged and listed under "Files blocked by malware scan" on the [administration page](admin.md#attachments-in-s3) (the last 20).
 - **Uploads through Lambda:** They go to `tmp/incoming/` first ([above](#uploads-through-lambda)). After 20 seconds without a result, the upload fails with "still being scanned" and can be sent again.
 - **Received mail:** Attachments of received mail are not waited for, because SES gives its own virus verdict ([mail.md](https://redmine-kit.github.io/serverless/mail.html#receiving)); they go straight to `files/`.
-- **CSV import:** The import file is read only after its tag is `NO_THREATS_FOUND`. A refused file is deleted, and Redmine shows that the file cannot be read.
+- **CSV import:** The import file is read only after its tag is `NO_THREATS_FOUND`. A blocked file is deleted, and Redmine shows that the file cannot be read.
 - **The bucket policy:** It denies `GetObject` (and so `HeadObject` and the source of `CopyObject`) on `tmp/incoming/*` and `imports/*` unless the object's tag is `NO_THREATS_FOUND`, except for GuardDuty's role ([iam.md](iam.md#resource-based-policies)). A file is therefore never read before it is found clean, even by code that does not wait.
 - **Cost:** In ap-northeast-1, USD 0.1185 per GB scanned (the first 1 GB per month free) and USD 0.000282 per object (the first 1,000 per month free), from the AWS price list of 2026-10-30. Only `tmp/incoming/` and `imports/` are scanned, so thumbnails, zip files and objects copied to `files/` are not scanned again.
 
@@ -258,7 +258,7 @@ Redmine's own files are not modified; the plugin replaces code with `prepend`. T
 | `AttachmentsController#download_all` | Write the zip to `/tmp`, store it as a temporary file in S3, and redirect to a CloudFront signed URL | Downloading all attachments |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | Store in S3; fetch from S3 if not local; delete from S3 | CSV import |
 | `MailHandler#receive` | No malware scan wait for attachments of received mail | [Malware scan](#malware-scan) |
-| `SettingsController#plugin` (only for this plugin, only GET) | Redirect to the "Attachments in S3" tab | "Configure" in the plugin list ([admin.md](admin.md)) |
+| `SettingsController#plugin` (only for this plugin, only GET) | Redirect to the "S3" tab | "Configure" in the plugin list ([admin.md](admin.md)) |
 | `uploadBlob` in `attachments.js` | PUT the file to a CloudFront signed URL | Upload |
 
 - **Enabling condition:** The replacements are enabled only when the S3 bucket is configured (`REDMINE_S3_BUCKET`). Without it, Redmine behaves as standard. This lets Redmine's own tests pass as is ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).

@@ -1,40 +1,50 @@
 en:
   label_serverless_admin: Serverless
-  label_redmine_serverless_s3_admin: Attachments in S3
-  label_redmine_serverless_s3_check: S3 (HeadBucket)
+  label_redmine_serverless_s3_admin: S3
+  label_redmine_serverless_s3_check: S3
   label_redmine_serverless_s3_environment: Environment variables
   label_redmine_serverless_s3_set: Set
   label_redmine_serverless_s3_not_set: Not set
-  label_redmine_serverless_s3_checks: Checks
-  label_redmine_serverless_s3_detail: Detail
+  label_redmine_serverless_s3_enabled: Enabled
+  label_redmine_serverless_s3_disabled: Disabled
+  label_redmine_serverless_s3_checks: Connection tests
   label_redmine_serverless_s3_ok: OK
   label_redmine_serverless_s3_failed: Failed
-  label_redmine_serverless_s3_reconciliation: Reconciliation
-  label_redmine_serverless_s3_malware_findings: Files refused by the malware scan
-  field_redmine_serverless_s3_malware_scan: Wait for the GuardDuty malware scan
-  error_redmine_serverless_s3_malware_found: The file was refused because the malware scan found a threat in it.
-  error_redmine_serverless_s3_malware_not_scanned: "The file was refused because the malware scan could not check it (%{status})."
-  button_redmine_serverless_s3_read_write: Check reading and writing
-  button_redmine_serverless_s3_delivery: Check delivery through CloudFront
-  button_redmine_serverless_s3_reconcile: Reconcile
+  label_redmine_serverless_s3_signed_url: Signed URL
+  label_redmine_serverless_s3_unsigned_url_denied: Unsigned URL denied
+  label_redmine_serverless_s3_delivery: Delivery
+  label_redmine_serverless_s3_reconciliation: Consistency check
+  label_redmine_serverless_s3_running: Running
+  label_redmine_serverless_s3_malware_findings: Files blocked by malware scan
+  label_redmine_serverless_s3_time: Time
+  label_redmine_serverless_s3_scan_result: Scan result
+  label_redmine_serverless_s3_scan_result_threats_found: Threats found
+  label_redmine_serverless_s3_scan_result_unsupported: Unsupported
+  label_redmine_serverless_s3_scan_result_access_denied: Access denied
+  label_redmine_serverless_s3_scan_result_failed: Failed
+  field_redmine_serverless_s3_malware_scan: GuardDuty malware scan
+  error_redmine_serverless_s3_malware_found: The malware scan found threats, so the file was blocked.
+  error_redmine_serverless_s3_malware_not_scanned: "The malware scan did not complete, so the file was blocked (%{status})."
+  button_redmine_serverless_s3_read_write: Read/write test
+  button_redmine_serverless_s3_delivery: Delivery test
+  button_redmine_serverless_s3_reconcile: Run consistency check
   field_redmine_serverless_s3_bucket: Bucket
   field_redmine_serverless_s3_region: Region
   field_redmine_serverless_s3_domain: CloudFront domain
   field_redmine_serverless_s3_key_pair_id: CloudFront key pair ID
   field_redmine_serverless_s3_private_key: CloudFront private key
   field_redmine_serverless_s3_storage_path: Local cache
-  field_redmine_serverless_s3_download_url_expiry: Download URL expiry (seconds)
-  field_redmine_serverless_s3_upload_url_expiry: Upload URL expiry (seconds)
-  field_redmine_serverless_s3_cache_size_mb: Local cache size (MB)
-  field_redmine_serverless_s3_finished_at: Finished at
-  field_redmine_serverless_s3_attachments: Files of attachments in the database
-  field_redmine_serverless_s3_objects: Objects under files/
-  field_redmine_serverless_s3_missing: Not in S3
-  field_redmine_serverless_s3_unused: Not used by any attachment
-  notice_redmine_serverless_s3_reconciliation_started: The reconciliation was started as a job.
+  field_redmine_serverless_s3_download_url_expiry: Download URL expiry
+  field_redmine_serverless_s3_upload_url_expiry: Upload URL expiry
+  field_redmine_serverless_s3_cache_size_mb: Local cache size limit
+  label_redmine_serverless_s3_seconds: seconds
+  field_redmine_serverless_s3_started_at: Started at
+  field_redmine_serverless_s3_finished_at: Last run
+  field_redmine_serverless_s3_attachments: Attachments
+  field_redmine_serverless_s3_objects: S3 objects
+  field_redmine_serverless_s3_missing: Files missing in S3
+  field_redmine_serverless_s3_unused: Unused objects
+  notice_redmine_serverless_s3_reconciliation_started: Consistency check started.
   error_redmine_serverless_s3_invalid_settings: "Enter a positive whole number: %{names}"
-  text_redmine_serverless_s3_off: "%{name} is not set, so attachments are stored on the local disk as standard."
-  text_redmine_serverless_s3_reconciliation_running: "Running since %{time}."
-  text_redmine_serverless_s3_max_size: >-
-    With attachments in S3, uploads from browsers are also limited by the CloudFront Function on /tmp/* (uploads under /tmp/incoming/),
-    which must use the same value. On Lambda, POST /uploads.json of the REST API is limited to 1 MB.
+  text_redmine_serverless_s3_off: "%{name} is not set, so attachments are stored on the local disk."
+  text_redmine_serverless_s3_max_size: With S3, keep the CloudFront Function (/tmp/*) limit the same. On Lambda, POST /uploads.json is limited to 1 MB

@@ -1,4 +1,4 @@
-# IAM の権限
+# IAM 権限
 
 プラグインを入れた Redmine を動かすプロセス(画面の要求、ジョブ、rake)には、どれもバケットへの同じ権限を渡します。ブラウザーはこの認証情報を使いません。アップロードとダウンロードは、CloudFront の秘密鍵で署名した URL で、CloudFront を通ります。
 
@@ -8,9 +8,9 @@
 
 | 操作 | 対象 | 理由 |
 | --- | --- | --- |
-| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`imports/*`<br>`tmp/*` | 添付ファイル、Markdown のプレビュー、サムネイルの保存と削除、登録時の `tmp/incoming/` からのコピーと、コピーのチェックサム付きの `HeadObject`、アップロードとコピーの削除、CSV のインポート、一括のダウンロードの zip、読み書きの確認(`tmp/healthcheck/`) |
-| `s3:GetObjectTagging` | バケットの<br>`tmp/incoming/*`<br>`imports/*` | マルウェアのスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
-| `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、突き合わせ、接続の確認の `HeadBucket` |
+| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`imports/*`<br>`tmp/*` | 添付ファイル、Markdown のプレビュー、サムネイルの保存と削除、登録時の `tmp/incoming/` からのコピーと、コピーのチェックサム付きの `HeadObject`、アップロードとコピーの削除、CSV のインポート、一括のダウンロードの zip、読み書きテスト(`tmp/healthcheck/`) |
+| `s3:GetObjectTagging` | バケットの<br>`tmp/incoming/*`<br>`imports/*` | マルウェアスキャンを使うときに、GuardDuty の結果を読む([attachments.md](attachments.md#malware-scan)) |
+| `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、整合性チェック、接続テストの `HeadBucket` |
 | CloudFront の秘密鍵を読む | それを入れた秘密の値(Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
 
 <a id="example-policy"></a>
@@ -83,7 +83,7 @@ OAC を通した CloudFront を許すバケットポリシーです。
 }
 ```
 
-マルウェアのスキャンを使うときに、問題がないとわかる前のアップロードとインポートのファイルの読み取りを拒むバケットポリシーです。2 つの条件がどちらも成り立つときだけ拒むので、GuardDuty のロールはスキャンのためにオブジェクトを読めます。
+マルウェアスキャンを使うときに、問題がないとわかる前のアップロードとインポートのファイルの読み取りを拒むバケットポリシーです。2 つの条件がどちらも成り立つときだけ拒むので、GuardDuty のロールはスキャンのためにオブジェクトを読めます。
 
 ```json
 {

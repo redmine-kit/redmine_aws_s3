@@ -36,9 +36,9 @@ class RedmineServerlessS3ChecksTest < ActiveSupport::TestCase
       results = RedmineServerlessS3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
 
       assert results['Signed URL']
-      assert_not results['Sandbox CSP']
+      assert_not results['CSP sandbox']
       assert_not results['nosniff']
-      assert_not results['Unsigned URL refused']
+      assert_not results['Unsigned URL denied']
     end
   end
 
