@@ -4,7 +4,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 
 - [Setup](setup.md): requirements, installation, configuration, AWS resources (the bucket, the CloudFront distribution), network, tests
 - [IAM permissions](iam.md): permissions, example policy, resource-based policies
-- [Attachments and S3](attachments.md): storage, uploads, downloads, cache, replaced code
+- [Attachments and S3](attachments.md): storage, uploads, downloads, avatars, cache, replaced code
 - [Administration page](admin.md): settings, connection tests, consistency check
 
 ## Features
@@ -12,6 +12,7 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 | Feature | Contents | Enabled when | Page |
 | --- | --- | --- | --- |
 | S3 attachments | Storing and deleting, uploads through CloudFront to S3 (S3 computes the SHA256), redirects to CloudFront signed URLs with the sandbox CSP (downloads and thumbnails), the `/tmp` cache, CSV import files, zip files for downloading all attachments, an optional wait for GuardDuty's malware scan | `REDMINE_S3_BUCKET` is set, with the CloudFront settings ([setup.md](setup.md#configuration)). Without it, Redmine behaves as standard | [attachments.md](attachments.md) |
+| Avatars (Redmine 7.1) | The avatar form sends the image through CloudFront to S3, so photos of several MB can be used, and Redmine registers it with its own rules; the cropped thumbnails are kept in S3 and shown by Redmine | The S3 bucket is set and Redmine has avatars (7.1). On Redmine 7.0 nothing changes | [attachments.md](attachments.md#avatars) |
 | Administration page | The "S3" tab under the shared "Serverless" menu: environment variables and settings, the read/write test of S3 and the delivery test through CloudFront, files blocked by the malware scan, the consistency check between the database and S3 | Administrators | [admin.md](admin.md) |
 
 ## Outside Lambda

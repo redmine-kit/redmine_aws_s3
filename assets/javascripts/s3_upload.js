@@ -100,7 +100,9 @@
     }
   }
 
-  window.RedmineS3Upload = { complete: complete, uploadBlob: s3UploadBlob, retryDelays: COMPLETE_RETRY_DELAYS };
+  window.RedmineS3Upload = {
+    complete: complete, uploadBlob: s3UploadBlob, retryDelays: COMPLETE_RETRY_DELAYS, put: put, errorText: errorText
+  };
   document.addEventListener('DOMContentLoaded', install);
   ['change', 'drop', 'paste'].forEach(function(type) { document.addEventListener(type, install, true); });
 })();

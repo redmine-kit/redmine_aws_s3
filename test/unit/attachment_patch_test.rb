@@ -231,6 +231,54 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
     assert_equal 800, a.thumbnail_size(size: 2000)
   end
 
+  def test_thumbnail_comes_from_s3_when_it_is_there
+    skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
+
+    Attachment.clear_thumbnails
+    with_s3(stub_client(head_object: { content_length: 1 }, get_object: { body: 'from S3' })) do |client|
+      a = Attachment.find(16)
+      path = a.thumbnail(size: 100)
+
+      assert_equal 'from S3', File.read(path)
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_100.thumb",
+                   client.api_requests.find { |r| r[:operation_name] == :get_object }[:params][:key]
+      assert_not_includes operations(client), :put_object
+    end
+  ensure
+    Attachment.clear_thumbnails
+  end
+
+  # Cropped thumbnails (avatars of Redmine 7.1) have their own key, as their
+  # own file name in Redmine; Redmine 7.0 does not crop.
+  def test_cropped_thumbnail_key
+    with_s3(stub_client(head_object: { content_length: 1 })) do
+      a = Attachment.find(16)
+      suffix = RedmineServerlessS3.thumbnail_crop? ? '100_crop' : '100'
+
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_#{suffix}.thumb", a.s3_thumbnail(size: 100, crop: true)
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_100.thumb", a.s3_thumbnail(size: 100)
+    end
+  end
+
+  def test_cropped_thumbnail_is_stored_under_its_own_key
+    skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
+    skip 'Redmine crops from 7.1' unless RedmineServerlessS3.thumbnail_crop?
+
+    Attachment.clear_thumbnails
+    set_fixtures_attachments_directory
+    with_s3(stub_client(head_object: { content_length: 1 }, get_object: 'NoSuchKey')) do |client|
+      a = Attachment.find(16)
+
+      assert a.thumbnail(size: 100, crop: true)
+      put = client.api_requests.find { |r| r[:operation_name] == :put_object }
+
+      assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_100_crop.thumb", put[:params][:key]
+    end
+  ensure
+    set_tmp_attachments_directory
+    Attachment.clear_thumbnails
+  end
+
   private
 
   def with_plugin_settings(values)

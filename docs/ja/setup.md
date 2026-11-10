@@ -17,7 +17,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 1. プラグインを `plugins/redmine_serverless_s3` に置きます。gem をインストールするか([gem](#gem))、リポジトリをクローンします([gem を使わないとき](#without-the-gem))。
 2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 3. migration は要りません。
-4. プラグインの JavaScript `s3_upload.js` を配るために、アセットを作ります(Redmine のいつものアセットの手順でもかまいません)。
+4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配るために、アセットを作ります(Redmine のいつものアセットの手順でもかまいません)。
 
    ```sh
    bin/rails assets:precompile
@@ -141,7 +141,7 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 ## テスト
 
-Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。
+Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。
 
 ```sh
 bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
@@ -149,9 +149,11 @@ bin/test core            # プラグインを入れた(無効の)状態で、Red
 bin/test core-s3         # プラグインを有効にして、Redmine の添付ファイルのテスト
 bin/test system          # システムのテスト。ヘッドレスの Chromium で
 bin/test <ファイル...>    # プラグインのテストの一部
+REDMINE_BRANCH=master bin/test   # Redmine の master ブランチで (7.1、アバターあり)
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
+node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確認処理
 ```
 
 <a id="how-aws-is-tested"></a>
@@ -164,7 +166,7 @@ node test/javascripts/complete_test.mjs # アップロードの JavaScript の�
 
 ### 置き換えたコード、カバレッジ、CI
 
-置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。
+置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、置き換えたコードのテストで、master が変更したメソッドがわかります。
 
 <a id="what-the-tests-check"></a>
 
@@ -177,15 +179,16 @@ node test/javascripts/complete_test.mjs # アップロードの JavaScript の�
 | `files_to_final_location` | Redmine を通るアップロード(REST API、フォーム)を、SHA256 のチェックサム付きで `files/<年>/<月>/` に置き、digest は SHA256 のまま。PutObject が失敗したら保存しない。マルウェアスキャンを使うときは `tmp/incoming/` を通し、脅威は検証のエラーにする | スタブ、LocalStack か moto |
 | `readable?`<br>`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
-| `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `tmp/thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
+| `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `tmp/thumbnails/` に置く。切り抜いたものは別の名前で置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
+| アバター (Redmine 7.1) | CloudFront 経由で、数 KB の画像と 1 MB を超える画像がユーザーのアバターになり、画像が `files/` に、100 px の切り抜いたサムネイルが `tmp/thumbnails/` にあり、アップロードが削除される。JavaScript のないフォーム。管理者がほかのユーザーのためにアップロードでき、管理者でないユーザーは拒否される。ほかのユーザーのチケットと、画像でないファイルは Redmine のメッセージで拒否される。置き換えと削除で S3 の古いオブジェクトが削除される。表示では、画像を読まずに S3 の切り抜いたサムネイルを返し、画像そのものは返さず、キーを確認し、`Cache-Control` は public、ログインが必須なら private。マルウェアスキャンでは、確認が `202` を返し、JavaScript なしで送ったファイルはフォームのエラーになる。Redmine 7.0 では、どれもない | LocalStack か moto |
 | `/s3_uploads/presign` | 権限、拡張子、サイズを確認する。URL はちょうど `/tmp/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
 | `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。アップロードを `ChecksumAlgorithm` に `SHA256` を指定して `files/` にコピーして削除し、コピーの `ChecksumSHA256` (`FULL_OBJECT`) をダイジェストにする。コピーの `ContentLength` が申告と一致しなければ、コピーを削除する。同じ内容は共有し、余分なコピーを削除する。マルウェアスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかのスキャン結果ではファイルをブロックして消す。REST API でも同じ | スタブ、LocalStack か moto |
 | `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
 | CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
 | 管理画面のタブ | 設定、読み書きテスト、配信テスト(CSP と `nosniff` のヘッダー、署名のない URL が拒否されること)、整合性チェックのジョブ、マルウェアスキャンでブロックしたファイル。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
-| 置き換える Redmine のコード | 置き換えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい | — |
-| ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
-| ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める | Node.js |
+| 置き換える Redmine のコード | 置き換えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい (`Attachment#thumbnail` は master とも)。master では `AvatarsController#update`、`#show`、`User#update_avatar` も | — |
+| ブラウザー(システムのテスト) | ヘッドレスの Chromium(Selenium、別のコンテナー)で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。Redmine 7.1 では、1 MB を超えるアバターが CloudFront を通り、フォームがファイルを含めずにチケットを付けて Redmine に届き、アップロードのエラーがフォームの上に出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける(`test/system/fake_cloudfront.rb`) | LocalStack か moto |
+| ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める。アバターの `check` も同じ | Node.js |
 
 <a id="not-checked-against-aws"></a>
 

@@ -220,6 +220,67 @@ sequenceDiagram
 - **No rebuilding:** If a zip for the same set of attachments (a key made from the attachment IDs and digests) is still in `tmp/bulk/`, redirect to it without rebuilding.
 - **Checking that files exist:** Redmine checks each attachment with `readable?`. `readable?` uses the local cache when the file is there, and otherwise sends one S3 HeadObject per attachment (not measured yet with many attachments).
 
+## Avatars
+
+Redmine 7.1 lets users upload an avatar in Redmine, in place of Gravatar. 7.1 is not released yet; this section follows Redmine's master branch (7519645, checked on 2026-11-10). On Redmine 7.0 nothing of it is active: the plugin turns it on only when Redmine has `AvatarsController` and `User#update_avatar`.
+
+How Redmine 7.1 handles avatars:
+
+- **Upload:** The user's own page ("Change avatar", `/my/avatar`) and the administrator's page for another user (`/users/<id>/avatar`) send the image to Rails in a form (`AvatarsController#update`). `User#update_avatar` makes an attachment whose container is the user and accepts only AVIF, GIF, JPEG, PNG and WebP, detected from the contents (`User::AVATAR_CONTENT_TYPES`), that ImageMagick can make a thumbnail of. Before it replaces the current avatar, it makes a cropped thumbnail of 100 px and refuses the image if that fails. The old avatar is deleted. The size limit is `attachment_max_size`.
+- **Showing:** Only a cropped thumbnail is shown, never the image itself, which may hold metadata such as where a photo was taken (`AvatarsController#show`, `/users/<id>/avatar/<avatar_key>/<size>`). `avatar_key` is an HMAC of the attachment's ID, so avatars cannot be found by trying IDs. The response has `Cache-Control: max-age=86400`, `public` unless login is required.
+- **The image itself:** Only the user and administrators can download it (`User#attachments_visible?`), from the link on the avatar page.
+
+A photo from a phone is often several MB, more than the 1 MB that a request through CloudFront to Redmine can carry ([lambda.md](https://redmine-kit.github.io/serverless/lambda.html#the-6-mb-limit)). The plugin therefore sends the image to S3 the way attachments are sent, and lets Redmine's own form register it.
+
+### Upload of avatars
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant C as CloudFront (Redmine's domain)
+  participant R as Redmine (Lambda)
+  participant S as S3
+  B->>C: POST /s3_uploads/avatar/presign (file name, size)
+  C->>R: Request
+  R-->>B: CloudFront signed URL for PUT /tmp/incoming/UUID, ticket
+  B->>C: PUT /tmp/incoming/UUID (image)
+  C->>S: PutObject (OAC)
+  B->>C: POST /s3_uploads/avatar/check (ticket)
+  C->>R: Request
+  R-->>B: 202 while the malware scan has no result; 200
+  B->>C: PUT /my/avatar (Redmine's form, with the ticket in place of the file)
+  C->>R: Request
+  R->>S: GetObject tmp/incoming/UUID, into a temporary file
+  R->>R: Redmine's own update with that file
+  R->>S: PutObject files/year/month/name and the 100 px cropped thumbnail
+  R->>S: DeleteObject tmp/incoming/UUID
+  R-->>B: Redirect to the avatar page (Redmine's own response)
+```
+
+1. **The form:** On the avatar pages only, the plugin loads `s3_avatar_upload.js`, with the two URLs in `<meta>` tags. When the form is submitted with a file, the script takes the submission over.
+2. **Get the signed URL:** `POST /s3_uploads/avatar/presign` checks the extension and `attachment_max_size` and returns a signed URL for `/tmp/incoming/<UUID>` and a ticket, as `/s3_uploads/presign` does for attachments ([Upload](#upload)). It needs a login, not the attachments' upload permission, because in Redmine every user can change their own avatar.
+3. **PUT through CloudFront:** The same behavior `/tmp/*`, size check by the CloudFront Function and malware scan as for attachments.
+4. **Wait for the scan:** `POST /s3_uploads/avatar/check` answers `200` when the upload can be used and `202` while the malware scan has no result; the script asks again after 1, 2, 4, 8, 15 and 30 seconds.
+5. **Submit Redmine's form:** The script adds the ticket (`s3_ticket`) to Redmine's own form, leaves the file out and submits it. Redmine's `AvatarsController` decides who may change which avatar, as usual: users their own, administrators anyone's. The replaced `update` checks that the ticket is the current user's, reads the upload from S3 into a temporary file and passes it to Redmine's own `update` as the file of the form. `User#update_avatar` then runs unchanged: the content type, the thumbnail check, the 100 px cropped thumbnail, replacing and deleting the old avatar, and the messages. The image is saved as an upload through Lambda ([below](#uploads-through-lambda)), without a second malware scan, since it was scanned in `tmp/incoming/`. The upload in `tmp/incoming/` is deleted.
+6. **Errors:** Errors of steps 2 to 4 (too large, an extension not allowed, a blocked file) are shown above the form with the markup of Redmine's `error_messages_for`; errors of step 5 are Redmine's own.
+
+- **Why Redmine reads the image:** Unlike attachments, Redmine reads every avatar: it detects the type from the contents and makes a thumbnail with ImageMagick. So the image is read into Lambda anyway, and registering it through Redmine's own `update` keeps all of Redmine's rules. The image does not travel in the request, so the 1 MB and 6 MB limits do not apply; it is written to `/tmp` (512 MB).
+- **Without JavaScript:** The form sends the file to Redmine, as in standard Redmine (up to 1 MB through CloudFront), and it is saved as an upload through Lambda. With the malware scan on, a file the scan refuses or has no result for after 20 seconds is shown as an error of the form: `User#update_avatar` saves with `save!`, and the plugin turns the refused save into that error.
+- **Ordinary servers:** Without the S3 bucket setting, the plugin is off and the avatar form is Redmine's.
+
+### Showing avatars
+
+Redmine's own `AvatarsController#show` is not replaced: the key check, `404` for an avatar without a thumbnail, the cropped thumbnail only, `Cache-Control: max-age=86400, public` (`private` when login is required) and the ETag stay as they are. Its thumbnail comes from the replaced `Attachment#thumbnail`: the local file, else the one in S3, else one made from the image (fetched into the `/tmp` cache) and stored in S3. A cropped thumbnail has its own name with `_crop`, as in Redmine: `tmp/thumbnails/<digest>_<filesize>_<size>_crop.thumb`.
+
+- **Through Lambda, not a signed URL:** Unlike the thumbnails of attachments, an avatar is sent by Redmine. A signed URL is valid for 5 minutes, and Redmine lets the browser keep an avatar for a day. Thumbnails of avatars are small (Redmine asks for the size of the place and twice that for high-density screens, at most 800 px), far within the 6 MB of a response.
+- **Never public by mistake:** Redmine's behavior in CloudFront does not cache (`CachingDisabled`), so CloudFront keeps no avatar, and no signed URL gives one out. `public` and `private` reach only the browser, as Redmine sets them.
+- **Requests:** Each avatar on a page is a request to Lambda the first time; after that the browser keeps it for a day. The first request of an environment reads the thumbnail from S3, or makes it from the image.
+- **Deletion:** Deleting the avatar, replacing it or deleting the user deletes the attachment; `delete_from_disk!` deletes the image in `files/` and the thumbnails `tmp/thumbnails/<digest>_<filesize>_*`, cropped ones included ([Deletion](#deletion)).
+
+### The favicon
+
+Redmine 7.1 also lets administrators set a favicon ("Custom favicon" in Administration › Settings › Display, PNG or ICO up to 32 KB). Redmine keeps it in the settings table, not as an attachment, so this plugin does nothing with it. Serverless caches it in CloudFront ([lambda.md](https://redmine-kit.github.io/serverless/lambda.html#the-favicon)).
+
 ## The /tmp cache
 
 Redmine's `attachments_storage_path` is set to `/tmp/redmine/files`, and this is used as a cache of S3.
@@ -243,7 +304,7 @@ Redmine's `attachments_storage_path` is set to `/tmp/redmine/files`, and this is
 
 ## Replaced code
 
-Redmine's own files are not modified; the plugin replaces code with `prepend`. The added endpoints (`/s3_uploads/presign`, `/s3_uploads/complete`) are in the plugin's routes and controller.
+Redmine's own files are not modified; the plugin replaces code with `prepend`. The added endpoints (`/s3_uploads/presign`, `/s3_uploads/complete`, and `/s3_uploads/avatar/presign` and `/s3_uploads/avatar/check` for avatars) are in the plugin's routes and controllers.
 
 | Target | Replacement | Reason |
 | --- | --- | --- |
@@ -253,16 +314,18 @@ Redmine's own files are not modified; the plugin replaces code with `prepend`. T
 | Code that uses `Attachment#diskfile` | Fetch into the `/tmp` cache before use | Thumbnails, previews, PDF, zip |
 | `Attachment#delete_from_disk!` | Delete from S3 | Deletion |
 | `Attachment#reuse_existing_file_if_possible` | Compare by digest and size | Sharing identical content |
-| `Attachment#thumbnail` | Use the one in S3 if it exists; otherwise create and store it | Thumbnails |
+| `Attachment#thumbnail` | Use the local one, else the one in S3, else create and store it (a cropped one under its own name with `_crop`) | Thumbnails, [avatars](#showing-avatars) |
 | `AttachmentsController#download`<br>`#thumbnail` | Redirect to a CloudFront signed URL (with `Cache-Control` for thumbnails) | Download, thumbnails |
+| `AvatarsController#update` (Redmine 7.1) | With a ticket in place of the file, read the upload from S3 and pass it to Redmine's own `update` as the file; a save the malware scan refuses becomes an error of the form | [Avatars](#upload-of-avatars) |
 | `AttachmentsController#download_all` | Write the zip to `/tmp`, store it as a temporary file in S3, and redirect to a CloudFront signed URL | Downloading all attachments |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | Store in S3; fetch from S3 if not local; delete from S3 | CSV import |
 | `MailHandler#receive` | No malware scan wait for attachments of received mail | [Malware scan](#malware-scan) |
 | `SettingsController#plugin` (only for this plugin, only GET) | Redirect to the "S3" tab | "Configure" in the plugin list ([admin.md](admin.md)) |
 | `uploadBlob` in `attachments.js` | PUT the file to a CloudFront signed URL | Upload |
+| The avatar form (Redmine 7.1) | PUT the image to a CloudFront signed URL and submit the form with the ticket | [Avatars](#upload-of-avatars) |
 
 - **Enabling condition:** The replacements are enabled only when the S3 bucket is configured (`REDMINE_S3_BUCKET`). Without it, Redmine behaves as standard. This lets Redmine's own tests pass as is ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
-- **Redmine upgrades:** When upgrading Redmine, check that the original code of the replaced methods has not changed. This table is the authoritative list of replacements. If the original code changes, a test must fail: `test/unit/replaced_code_test.rb` compares the SHA256 of each method in this table, and of the Redmine code the plugin copies (`Attachment.create_diskfile`, `Attachment.archive_attachments`, the thumbnail size of `Attachment#thumbnail`), with Redmine 7.0.3 ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)).
+- **Redmine upgrades:** When upgrading Redmine, check that the original code of the replaced methods has not changed. This table is the authoritative list of replacements. If the original code changes, a test must fail: `test/unit/replaced_code_test.rb` compares the SHA256 of each method in this table, and of the Redmine code the plugin copies (`Attachment.create_diskfile`, `Attachment.archive_attachments`, the thumbnail size of `Attachment#thumbnail`), with Redmine 7.0.3 ([testing.md](https://redmine-kit.github.io/serverless/testing.html#redmines-own-tests)). `Attachment#thumbnail` is also compared with Redmine's master branch (7519645), and on master the test also covers `AvatarsController#update`, `#show` and `User#update_avatar`, which the avatars rely on.
 - **Tests:** Each piece of replaced code gets tests written with Redmine's test framework ([setup.md](setup.md#what-the-tests-check)).
 
 ## Permissions
@@ -280,3 +343,4 @@ Every process that runs Redmine with the plugin gets read and write permissions 
 - Whether Japanese file names are saved correctly with the `Content-Disposition` that the viewer-response function sets
 - Whether pasted images and drag and drop work as in standard Redmine after replacing `uploadBlob`
 - How errors (such as exceeding the size, or a size that does not match) are shown
+- Avatars (Redmine 7.1) through a real distribution: the upload of a phone photo of several MB, and how long Lambda takes to read it and make its thumbnail

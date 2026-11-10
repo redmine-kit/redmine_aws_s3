@@ -244,6 +244,75 @@ sequenceDiagram
 - **作り直さない:** 同じ添付ファイルの組み合わせ(添付ファイルの ID と digest から作るキー)の zip が、まだ `tmp/bulk/` にあれば、作り直さずにリダイレクトします。
 - **ファイルがあるかの確認:** Redmine は、添付ファイルごとに `readable?` で確認します。`readable?` は、手元のキャッシュにファイルがあればそれを使い、なければ添付ファイルごとに S3 の HeadObject を 1 回送ります(添付ファイルが多いときの時間はまだ測っていない)。
 
+<a id="avatars"></a>
+
+## アバター
+
+Redmine 7.1 では、Gravatar の代わりに、ユーザーが Redmine にアバターをアップロードできます。7.1 はまだリリースされていないので、この節は Redmine の master ブランチ (7519645、2026-11-10 に確認) に基づきます。Redmine 7.0 では、ここに書くことは何も動きません。プラグインは、Redmine に `AvatarsController` と `User#update_avatar` があるときだけ有効にします。
+
+Redmine 7.1 のアバターの扱いは次のとおりです。
+
+- **アップロード:** 自分の画面 (「アバター変更」、`/my/avatar`) と、管理者がほかのユーザーのために使う画面 (`/users/<id>/avatar`) は、フォームで画像を Rails に送ります (`AvatarsController#update`)。`User#update_avatar` は、ユーザーをコンテナにした添付ファイルを作り、内容から判定した AVIF、GIF、JPEG、PNG、WebP (`User::AVATAR_CONTENT_TYPES`) で、ImageMagick がサムネイルを作れる画像だけを受け付けます。今のアバターを置き換える前に 100 px の切り抜いたサムネイルを作り、作れなければ画像を拒否します。古いアバターは削除します。サイズの上限は `attachment_max_size` です。
+- **表示:** 表示するのは切り抜いたサムネイルだけで、画像そのものは返しません。写真には撮影場所などのメタデータが含まれることがあるからです (`AvatarsController#show`、`/users/<id>/avatar/<avatar_key>/<サイズ>`)。`avatar_key` は添付ファイルの ID の HMAC なので、ID を順に試してアバターを探すことはできません。レスポンスには `Cache-Control: max-age=86400` を付け、ログインが必須でなければ `public` にします。
+- **画像そのもの:** ダウンロードできるのは本人と管理者だけで (`User#attachments_visible?`)、アバターの画面のリンクから取得します。
+
+スマートフォンの写真は数 MB になることが多く、CloudFront を経由して Redmine に届くリクエストの上限の 1 MB を超えます ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。そこでプラグインは、添付ファイルと同じ方法で画像を S3 に送り、Redmine 自身のフォームで登録させます。
+
+<a id="upload-of-avatars"></a>
+
+### アバターのアップロード
+
+```mermaid
+sequenceDiagram
+  participant B as ブラウザー
+  participant C as CloudFront (Redmine のドメイン)
+  participant R as Redmine (Lambda)
+  participant S as S3
+  B->>C: POST /s3_uploads/avatar/presign (ファイル名、サイズ)
+  C->>R: リクエスト
+  R-->>B: PUT /tmp/incoming/UUID 用の CloudFront 署名付き URL、チケット
+  B->>C: PUT /tmp/incoming/UUID (画像)
+  C->>S: PutObject (OAC)
+  B->>C: POST /s3_uploads/avatar/check (チケット)
+  C->>R: リクエスト
+  R-->>B: マルウェアスキャンの結果がなければ 202、あれば 200
+  B->>C: PUT /my/avatar (Redmine のフォーム。ファイルの代わりにチケット)
+  C->>R: リクエスト
+  R->>S: tmp/incoming/UUID を GetObject して一時ファイルに書く
+  R->>R: そのファイルで Redmine 自身の update を実行する
+  R->>S: files/年/月/名前 と 100 px の切り抜いたサムネイルを PutObject
+  R->>S: tmp/incoming/UUID を DeleteObject
+  R-->>B: アバターの画面へのリダイレクト (Redmine 自身のレスポンス)
+```
+
+1. **フォーム:** プラグインは、アバターの画面でだけ `s3_avatar_upload.js` を読み込み、2 つの URL を `<meta>` タグで渡します。ファイルを選んでフォームを送信すると、このスクリプトが送信を引き継ぎます。
+2. **署名付き URL を受け取る:** `POST /s3_uploads/avatar/presign` は、拡張子と `attachment_max_size` を確認し、`/tmp/incoming/<UUID>` 用の署名付き URL とチケットを返します。添付ファイルの `/s3_uploads/presign` と同じです ([アップロード](#upload))。Redmine ではどのユーザーも自分のアバターを変更できるので、添付ファイルのアップロードの権限ではなく、ログインだけを必要とします。
+3. **CloudFront 経由で PUT する:** 添付ファイルと同じビヘイビア `/tmp/*`、CloudFront Functions によるサイズの確認、マルウェアスキャンを使います。
+4. **スキャンを待つ:** `POST /s3_uploads/avatar/check` は、アップロードを使えるときは `200` を、マルウェアスキャンの結果がまだないときは `202` を返します。スクリプトは、1、2、4、8、15、30 秒後に問い合わせ直します。
+5. **Redmine のフォームを送信する:** スクリプトは、Redmine 自身のフォームにチケット (`s3_ticket`) を追加し、ファイルを含めずに送信します。誰がどのアバターを変更できるかは、通常どおり Redmine の `AvatarsController` が判断します。ユーザーは自分のアバターを、管理者はすべてのユーザーのアバターを変更できます。差し替えた `update` は、チケットが現在のユーザーのものかを確認し、アップロードを S3 から一時ファイルに読み込んで、フォームのファイルとして Redmine 自身の `update` に渡します。そのあとは `User#update_avatar` がそのまま動きます。コンテンツタイプ、サムネイルの可否、100 px の切り抜いたサムネイル、古いアバターの置き換えと削除、メッセージは、どれも Redmine のとおりです。画像は Lambda を通るアップロードとして保存します ([下記](#uploads-through-lambda))。`tmp/incoming/` でスキャン済みなので、マルウェアスキャンはもう一度は行いません。`tmp/incoming/` のアップロードは削除します。
+6. **エラー:** 手順 2 から 4 のエラー (大きすぎる、許可されていない拡張子、ブロックされたファイル) は、Redmine の `error_messages_for` と同じマークアップでフォームの上に表示します。手順 5 のエラーは Redmine 自身のものです。
+
+- **Redmine が画像を読む理由:** 添付ファイルと違い、Redmine はアバターの画像を必ず読みます。内容から種類を判定し、ImageMagick でサムネイルを作るからです。どのみち画像を Lambda に読み込むので、Redmine 自身の `update` で登録し、Redmine のルールをすべてそのまま使います。画像はリクエストに含まれないので、1 MB と 6 MB の上限は関係ありません。画像は `/tmp` (512 MB) に書きます。
+- **JavaScript がないとき:** 標準の Redmine と同じく、フォームがファイルを Redmine に送り (CloudFront 経由では 1 MB まで)、Lambda を通るアップロードとして保存します。マルウェアスキャンを使うときは、スキャンが拒否したファイルや、20 秒たっても結果のないファイルを、フォームのエラーとして表示します。`User#update_avatar` は `save!` で保存するので、プラグインが保存の失敗をそのエラーに変えます。
+- **通常のサーバー:** S3 のバケットの設定がなければプラグインは無効で、アバターのフォームは Redmine のままです。
+
+<a id="showing-avatars"></a>
+
+### アバターの表示
+
+Redmine 自身の `AvatarsController#show` は差し替えません。キーの確認、サムネイルのないアバターへの `404`、切り抜いたサムネイルだけを返すこと、`Cache-Control: max-age=86400, public` (ログインが必須なら `private`)、ETag は、そのままです。サムネイルは、差し替えた `Attachment#thumbnail` から取ります。ローカルのファイルがあればそれを、なければ S3 のものを使い、それもなければ画像 (`/tmp` のキャッシュに取得したもの) から作って S3 に置きます。切り抜いたサムネイルは、Redmine と同じく `_crop` の付いた別の名前です。`tmp/thumbnails/<digest>_<filesize>_<サイズ>_crop.thumb` になります。
+
+- **署名付き URL ではなく Lambda から返す:** 添付ファイルのサムネイルと違い、アバターは Redmine が返します。署名付き URL の有効期限は 5 分ですが、Redmine はブラウザーにアバターを 1 日キャッシュさせるからです。アバターのサムネイルは小さく (Redmine は表示する場所の大きさと、高解像度の画面向けにその 2 倍を要求し、最大 800 px)、レスポンスの 6 MB に十分収まります。
+- **誤って公開しない:** CloudFront の Redmine のビヘイビアはキャッシュしない (`CachingDisabled`) ので、CloudFront にアバターは残らず、署名付き URL でアバターを渡すこともありません。`public` と `private` は、Redmine が設定したとおりブラウザーにだけ効きます。
+- **リクエスト:** 画面のアバターは、最初はそれぞれ Lambda へのリクエストになり、そのあとはブラウザーが 1 日キャッシュします。実行環境で最初のリクエストは、サムネイルを S3 から読むか、画像から作ります。
+- **削除:** アバターの削除、置き換え、ユーザーの削除で添付ファイルを削除します。`delete_from_disk!` が、`files/` の画像と、切り抜いたものを含むサムネイル `tmp/thumbnails/<digest>_<filesize>_*` を削除します ([削除](#deletion))。
+
+<a id="the-favicon"></a>
+
+### ファビコン
+
+Redmine 7.1 では、管理者がファビコンも設定できます (管理 › 設定 › 表示 の「カスタムファビコン」、PNG または ICO で 32 KB まで)。Redmine はこれを添付ファイルではなく設定のテーブルに保存するので、このプラグインは何もしません。Serverless が CloudFront でキャッシュします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-favicon))。
+
 <a id="the-tmp-cache"></a>
 
 ## /tmp のキャッシュ
@@ -273,7 +342,7 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
 
 ## 差し替える処理
 
-Redmine 本体のファイルは書き換えず、プラグインから `prepend` で差し替えます。追加する画面(`/s3_uploads/presign`、`/s3_uploads/complete`)は、プラグインのルートとコントローラーに置きます。
+Redmine 本体のファイルは書き換えず、プラグインから `prepend` で差し替えます。追加する画面 (`/s3_uploads/presign`、`/s3_uploads/complete` と、アバター用の `/s3_uploads/avatar/presign`、`/s3_uploads/avatar/check`) は、プラグインのルートとコントローラーに置きます。
 
 | 対象 | 差し替え | 理由 |
 | --- | --- | --- |
@@ -283,16 +352,18 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `Attachment#diskfile` を使う処理 | 使う前に `/tmp` のキャッシュに取る | サムネイル、プレビュー、PDF、zip |
 | `Attachment#delete_from_disk!` | S3 から消す | 削除 |
 | `Attachment#reuse_existing_file_if_possible` | digest とサイズで比べる | 同じ内容の共有 |
-| `Attachment#thumbnail` | S3 にあればそれを使い、なければ作って置く | サムネイル |
+| `Attachment#thumbnail` | ローカルにあればそれを、なければ S3 のものを使い、それもなければ作って置く (切り抜いたものは `_crop` の付いた別の名前) | サムネイル、[アバター](#showing-avatars) |
 | `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
+| `AvatarsController#update` (Redmine 7.1) | ファイルの代わりにチケットがあれば、アップロードを S3 から読み、ファイルとして Redmine 自身の `update` に渡す。マルウェアスキャンが拒否した保存は、フォームのエラーにする | [アバター](#upload-of-avatars) |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
 | `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアスキャンを待たない | [マルウェアスキャン](#malware-scan) |
 | `SettingsController#plugin`(このプラグインの GET だけ) | 「S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
 | `attachments.js` の `uploadBlob` | CloudFront 署名付き URL に PUT する | アップロード |
+| アバターのフォーム (Redmine 7.1) | 画像を CloudFront 署名付き URL に PUT し、チケットを付けてフォームを送信する | [アバター](#upload-of-avatars) |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
+- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。`Attachment#thumbnail` は Redmine の master ブランチ (7519645) のものとも比べます。master では、アバターが前提にする `AvatarsController#update`、`#show`、`User#update_avatar` も比べます。
 - **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([setup.md](setup.md#what-the-tests-check))。
 
 <a id="permissions"></a>
@@ -314,3 +385,4 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 - ビューワーレスポンスの CloudFront Functions が設定する `Content-Disposition` で、日本語のファイル名が正しく保存されるか
 - `uploadBlob` を差し替えたときに、貼り付けた画像とドラッグ・アンド・ドロップが標準と同じに動くか
 - エラー (サイズの超過、申告と違うサイズなど) の表示
+- 実際のディストリビューションでのアバター (Redmine 7.1): 数 MB のスマートフォンの写真のアップロードと、Lambda が画像を読んでサムネイルを作るまでの時間

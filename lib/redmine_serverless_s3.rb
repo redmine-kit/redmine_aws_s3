@@ -41,13 +41,12 @@ module RedmineServerlessS3
 
     # Called from init.rb, on every code reload.
     def setup
-      Attachment.prepend(AttachmentPatch) unless Attachment < AttachmentPatch
-      unless AttachmentsController < AttachmentsControllerPatch
-        AttachmentsController.prepend(AttachmentsControllerPatch)
+      { Attachment => AttachmentPatch, AttachmentsController => AttachmentsControllerPatch, Import => ImportPatch,
+        SettingsController => SettingsControllerPatch, MailHandler => MailHandlerPatch }.each do |target, patch|
+        target.prepend(patch) unless target < patch
       end
-      Import.prepend(ImportPatch) unless Import < ImportPatch
-      SettingsController.prepend(SettingsControllerPatch) unless SettingsController < SettingsControllerPatch
-      MailHandler.prepend(MailHandlerPatch) unless MailHandler < MailHandlerPatch
+      # Avatars of Redmine 7.1 (docs/attachments.md#avatars).
+      AvatarsController.prepend(AvatarsControllerPatch) if avatars? && !(AvatarsController < AvatarsControllerPatch)
       # Loaded here so that the listener registers itself in every environment.
       Hooks.name
       RedmineServerlessAdmin.register_tab(:s3, label: :label_redmine_serverless_s3_admin,
@@ -62,6 +61,22 @@ module RedmineServerlessS3
 
     def enabled?
       bucket.present?
+    end
+
+    # The S3 key of a thumbnail at path under Redmine's tmp/thumbnails.
+    def thumbnail_key(path)
+      "#{THUMBNAILS_PREFIX}#{File.basename(path)}"
+    end
+
+    # Whether Redmine makes cropped thumbnails (Redmine 7.1, for avatars).
+    def thumbnail_crop?
+      Redmine::Thumbnail.method(:generate).parameters.include?(%i[key crop])
+    end
+
+    # Whether Redmine has avatars uploaded to Redmine (7.1); 7.0 has
+    # Gravatar only.
+    def avatars?
+      defined?(::AvatarsController) && ::User.method_defined?(:update_avatar)
     end
 
     def bucket

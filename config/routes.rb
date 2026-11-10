@@ -6,6 +6,8 @@ get 'admin/serverless', to: 'serverless_admin#index'
 
 post 's3_uploads/presign', to: 's3_uploads#presign'
 post 's3_uploads/complete', to: 's3_uploads#complete'
+post 's3_uploads/avatar/presign', to: 's3_avatar_uploads#presign'
+post 's3_uploads/avatar/check', to: 's3_avatar_uploads#check'
 
 get 'admin/serverless/s3', to: 'serverless_s3_admin#show', as: 'serverless_s3_admin'
 patch 'admin/serverless/s3', to: 'serverless_s3_admin#update'

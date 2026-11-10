@@ -4,7 +4,7 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 
 - [導入](setup.md): 動作環境、インストール、設定、AWS リソース(バケット、CloudFront のディストリビューション)、ネットワーク、テスト
 - [IAM 権限](iam.md): 権限、ポリシーの例、リソースベースのポリシー
-- [添付ファイルと S3](attachments.md): 保存、アップロード、ダウンロード、キャッシュ、差し替える処理
+- [添付ファイルと S3](attachments.md): 保存、アップロード、ダウンロード、アバター、キャッシュ、差し替える処理
 - [管理画面](admin.md): 設定、接続テスト、整合性チェック
 
 <a id="features"></a>
@@ -14,6 +14,7 @@ Redmine Serverless S3(`redmine_serverless_s3`)は、添付ファイルを Amazon
 | 機能 | 内容 | 有効にする条件 | 資料 |
 | --- | --- | --- | --- |
 | S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
+| アバター (Redmine 7.1) | アバターのフォームが画像を CloudFront 経由で S3 に送るので、数 MB の写真も使え、Redmine が自身のルールで登録する。切り抜いたサムネイルは S3 に置き、Redmine が返す | S3 のバケットを設定し、Redmine にアバターがある (7.1) とき。Redmine 7.0 では何も変わらない | [attachments.md](attachments.md#avatars) |
 | 管理画面 | 共有の「Serverless」のメニューの「S3」のタブ。環境変数と設定、S3 の読み書きテストと CloudFront からの配信テスト、マルウェアスキャンでブロックしたファイル、データベースと S3 の整合性チェック | 管理者 | [admin.md](admin.md) |
 
 <a id="outside-lambda"></a>

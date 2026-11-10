@@ -130,7 +130,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
     skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
 
     Attachment.clear_thumbnails
-    with_s3(stub_client(head_object: 'NotFound')) do |client|
+    with_s3(stub_client(head_object: 'NotFound', get_object: 'NoSuchKey')) do |client|
       @request.session[:user_id] = 1
       get :thumbnail, params: { id: 16, size: 100 }
 

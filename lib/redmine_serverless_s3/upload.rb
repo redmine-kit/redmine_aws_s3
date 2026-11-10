@@ -48,12 +48,8 @@ module RedmineServerlessS3
     # Registers the uploaded object and returns the attachment, saved unless
     # its validations fail. The upload is deleted in every case but Pending.
     def complete(ticket)
-      data = verifier.verified(ticket.to_s, purpose: TICKET_PURPOSE)
-      raise Error, 'the upload ticket is invalid or expired' unless data && data['user_id'] == user.id
-
+      data = verify!(ticket)
       key = data['key']
-      raise Error, 'the key is not an upload' unless key.to_s.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
-
       scan!(key, data)
       attachment = Attachment.new(author: user, filesize: data['size'])
       attachment.filename = data['filename']
@@ -68,6 +64,14 @@ module RedmineServerlessS3
     end
 
     private
+
+    def verify!(ticket)
+      data = verifier.verified(ticket.to_s, purpose: TICKET_PURPOSE)
+      raise Error, 'the upload ticket is invalid or expired' unless data && data['user_id'] == user.id
+      raise Error, 'the key is not an upload' unless data['key'].to_s.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
+
+      data
+    end
 
     def check_attachment(filename, size)
       unless Attachment.valid_extension?(File.extname(filename))

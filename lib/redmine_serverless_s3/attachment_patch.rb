@@ -61,14 +61,16 @@ module RedmineServerlessS3
       super && filesize.to_i <= RedmineServerlessS3.cache_size
     end
 
-    # Creates the thumbnail as Redmine does, from the file in the /tmp cache,
-    # and stores it in S3.
+    # The thumbnail at Redmine's path: the local one, else the one in S3, else
+    # one created as Redmine does from the file in the /tmp cache and stored
+    # in S3. Avatars (Redmine 7.1) are served this way, cropped.
     def thumbnail(options = {})
-      target = super
-      return target unless RedmineServerlessS3.enabled? && target
+      return super unless RedmineServerlessS3.enabled? && thumbnailable? && readable?
 
-      RedmineServerlessS3.storage.put_file(s3_thumbnail_key(thumbnail_size(options)), target)
-      target
+      path = thumbnail_path(thumbnail_name(options))
+      return path if RedmineServerlessS3::Cache.fetch(RedmineServerlessS3.thumbnail_key(path), path)
+
+      super.tap { |made| RedmineServerlessS3.storage.put_file(RedmineServerlessS3.thumbnail_key(made), made) if made }
     end
 
     # Keeps the Markdown preview in S3 (MarkdownizedPreview).
@@ -83,14 +85,17 @@ module RedmineServerlessS3
     def s3_thumbnail(options = {})
       return nil unless thumbnailable? && readable?
 
-      key = s3_thumbnail_key(thumbnail_size(options))
+      key = RedmineServerlessS3.thumbnail_key(thumbnail_path(thumbnail_name(options)))
       return key if RedmineServerlessS3.storage.exists?(key)
 
-      key if thumbnail(options)
+      (target = thumbnail(options)) && RedmineServerlessS3.thumbnail_key(target)
     end
 
-    def s3_thumbnail_key(size)
-      "#{RedmineServerlessS3::THUMBNAILS_PREFIX}#{File.basename(thumbnail_path(size))}"
+    # The part of the thumbnail's name after the digest and size, as
+    # Redmine's Attachment#thumbnail makes it: the size, then _crop for a
+    # cropped one where Redmine crops (from 7.1, for avatars).
+    def thumbnail_name(options)
+      "#{thumbnail_size(options)}#{'_crop' if options[:crop] && RedmineServerlessS3.thumbnail_crop?}"
     end
 
     # The size Redmine's Attachment#thumbnail computes.

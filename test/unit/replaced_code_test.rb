@@ -5,13 +5,16 @@ require_relative '../test_helper'
 # The code of Redmine 7.0.3 that the plugin replaces or copies
 # (docs/attachments.md#replaced-code). When Redmine changes one of these, the
 # test fails: check the plugin against the new code, then update the SHA256.
+# A method with two values has been checked on Redmine's master branch too
+# (7519645, 2026-11-10).
 class RedmineServerlessS3ReplacedCodeTest < ActiveSupport::TestCase
   METHODS = {
     'Attachment#files_to_final_location' => '35b195687039465548e4b2822521dfb436af2c8202196562687b9f6f2cc412a2',
     'Attachment#diskfile' => '65c7710000bd7f7c123ccb6dbcaa9f6081fec6ca7cbd4325891d859cf7ae5d06',
     'Attachment#readable?' => '3efe672350e43acda27a1b66780b8e213e69367c98794b81f42f51b09a3e1361',
     'Attachment#thumbnailable?' => 'f51c88d043d780f80962c1cca702b83884dc6a7bf1a199415aa23af04538f466',
-    'Attachment#thumbnail' => '9f8cd48e6af280df350883d0b3890df7de4eb7958914409f1e2a8d8c791becd3',
+    'Attachment#thumbnail' => %w[9f8cd48e6af280df350883d0b3890df7de4eb7958914409f1e2a8d8c791becd3
+                                 b6c8fc72e7fc5097a23f619566c62b3f0760d6afb873416dac6542d9506a8792],
     'Attachment#thumbnail_path' => '0ed1c88fbcc36dcc590140c227c1a50e4fd17cf0c0513c25d11d3057761f8110',
     'Attachment#reuse_existing_file_if_possible' => '23dc82dbed448edfc47f17988e76a57b1a790a905fa2ed6e795c2d1f4ef210d5',
     'Attachment#delete_from_disk!' => '11dd94b8432905a5ff4f69a25e5b430bcc666eb8c8b39a3ab2b8a29a1774b833',
@@ -32,12 +35,30 @@ class RedmineServerlessS3ReplacedCodeTest < ActiveSupport::TestCase
     'SettingsController#plugin' => 'afe34e0132b3743946110b8feff0aaa4f5ccd72ec6dddbe9c09cf16db89ceab1'
   }.freeze
 
+  # Avatars of Redmine 7.1 (docs/attachments.md#avatars), on the master branch
+  # (7519645): update is replaced; show and User#update_avatar run unchanged
+  # with the file the plugin reads from S3 and the thumbnails it keeps there.
+  AVATAR_METHODS = {
+    'AvatarsController#update' => '2335df066abbcc818b1d86a4febb3dd92cebcb57643aa055d289c891f5911fba',
+    'AvatarsController#show' => '71036e3a205882ffe9b9f6d089c6daa138af3b619b9f5f2438eb0b6ae2c00c0e',
+    'User#update_avatar' => 'aa221757e3483aaebf7043155e42656a965544c48ed805e6268479633c64d7a1'
+  }.freeze
+
   JAVASCRIPT = {
     'uploadBlob' => 'b05426c4ee9c2a1c37cbcd4f8052f53028177a88c317b68f34d86e169ac77375'
   }.freeze
 
   METHODS.each do |target, sha256|
     define_method("test_#{target.tr('#.?!=', '__pbs')}") do
+      assert_includes Array(sha256), Digest::SHA256.hexdigest(source_of(original_method(target))),
+                      "#{target} of Redmine changed"
+    end
+  end
+
+  AVATAR_METHODS.each do |target, sha256|
+    define_method("test_#{target.tr('#.?!=', '__pbs')}") do
+      skip 'Redmine has no avatars before 7.1' unless RedmineServerlessS3.avatars?
+
       assert_equal sha256, Digest::SHA256.hexdigest(source_of(original_method(target))),
                    "#{target} of Redmine changed"
     end

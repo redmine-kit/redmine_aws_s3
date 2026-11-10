@@ -13,7 +13,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 1. Put the plugin in `plugins/redmine_serverless_s3`: install the gem ([Gem](#gem)) or clone the repository ([Without the gem](#without-the-gem)).
 2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.178 or later (which has the full-object checksums, `ChecksumType`) and `aws-sdk-cloudfront` 1.x.
 3. No migrations are needed.
-4. Build the assets, so that the plugin's JavaScript `s3_upload.js` is served (or use Redmine's usual asset step):
+4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
 
    ```sh
    bin/rails assets:precompile
@@ -119,7 +119,7 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 
 ## Tests
 
-Redmine's standard plugin tests, in Docker with Redmine 7.0.3, PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which):
+Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which):
 
 ```sh
 bin/test                 # the plugin's tests, with coverage in coverage/
@@ -127,9 +127,11 @@ bin/test core            # Redmine's own tests with the plugin installed (off)
 bin/test core-s3         # Redmine's attachment tests with the plugin on
 bin/test system          # the system tests, in headless Chromium
 bin/test <files...>      # some of the plugin's tests
+REDMINE_BRANCH=master bin/test   # on Redmine's master branch (7.1, with avatars)
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
 node test/javascripts/complete_test.mjs # the upload script's complete step
+node test/javascripts/avatar_check_test.mjs # the avatar script's check step
 ```
 
 ### How AWS is tested
@@ -138,7 +140,7 @@ Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration t
 
 ### Replaced code, coverage and CI
 
-A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) with OIDC.
+A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed.
 
 ### What the tests check
 
@@ -149,15 +151,16 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | `files_to_final_location` | Uploads through Redmine (REST API, forms) are put to `files/<year>/<month>/` with a SHA256 checksum, the digest stays SHA256, and a failed PutObject stops the save. With the malware scan, the file goes through `tmp/incoming/` and a threat is a validation error | Stubs, LocalStack or moto |
 | `readable?`<br>`diskfile` | The local file is used when it is there; otherwise `HeadObject`, and `diskfile` fetches the object through a temporary file and a rename. New records fetch nothing | Stubs, LocalStack or moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | The object and its thumbnails are deleted, but not a file another attachment uses. Identical content (digest and size) is shared and the newer object deleted | Stubs, LocalStack or moto |
-| `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `tmp/thumbnails/`. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
+| `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `tmp/thumbnails/`, a cropped one under its own name. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
+| Avatars (Redmine 7.1) | Through CloudFront: an image of a few KB and one over 1 MB become the user's avatar, with the image in `files/`, the 100 px cropped thumbnail in `tmp/thumbnails/` and the upload deleted; the form without JavaScript; an administrator uploading for another user, and a user who is not one refused; another user's ticket and a file that is not an image refused with Redmine's message; replacing and deleting delete the old objects in S3. Showing: the cropped thumbnail from S3 without reading the image, not the image itself, the key checked, `Cache-Control` public, or private when login is required. With the malware scan: `202` from the check, and a form error for a file sent without JavaScript. On Redmine 7.0 nothing of it is there | LocalStack or moto |
 | `/s3_uploads/presign` | Permission, extension and size are checked; the URL is a CloudFront signed URL for exactly `/tmp/incoming/<UUID>`, verified with the public key | Stubs |
 | `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. The upload is copied to `files/` with `ChecksumAlgorithm` `SHA256` and deleted; the copy's `ChecksumSHA256` (`FULL_OBJECT`) becomes the digest, and its `ContentLength` must equal the declared size, otherwise the copy is deleted. Identical content is shared and the extra copy deleted. With the malware scan: `202` while there is no tag; for `THREATS_FOUND` and the other scan results, the file is blocked and deleted. The same through the REST API | Stubs, LocalStack or moto |
 | `download`<br>`download_all` | Redmine's permission checks, then a redirect to a signed URL with `response-content-disposition` (Japanese names) and `response-content-type`; only PDFs inline. The zip is written to `/tmp` one file at a time, put to `tmp/bulk/` and reused for the same set | Stubs, LocalStack or moto |
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
 | Administration tab | Settings, read/write test, delivery test (the CSP and `nosniff` headers, the unsigned URL denied), consistency check job, files blocked by the malware scan; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
-| Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's | — |
-| Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
-| Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry | Node.js |
+| Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's (for `Attachment#thumbnail`, also master's). On master, also `AvatarsController#update`, `#show` and `User#update_avatar` | — |
+| Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown; on Redmine 7.1, an avatar over 1 MB goes through CloudFront, the form reaches Redmine with the ticket and without the file, and an upload error is shown above the form. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
+| Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry; the same for the avatar's `check` | Node.js |
 
 ### Not checked against AWS
 

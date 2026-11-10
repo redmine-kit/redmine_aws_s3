@@ -33,6 +33,14 @@ module RedmineServerlessS3
       FileUtils.rm_f(temp) if temp
     end
 
+    # Writes the object into io. Returns false if the object does not exist.
+    def read(key, io)
+      client.get_object(bucket: bucket, key: key, response_target: io)
+      true
+    rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::NotFound
+      false
+    end
+
     # HeadObject, or nil if the object does not exist.
     def head(key, checksum: false)
       params = { bucket: bucket, key: key }
