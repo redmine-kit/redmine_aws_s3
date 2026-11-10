@@ -29,7 +29,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.3 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.2.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local

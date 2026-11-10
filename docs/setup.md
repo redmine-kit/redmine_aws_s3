@@ -23,7 +23,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.3. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.2.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
 ```ruby
 # Redmine's Gemfile.local

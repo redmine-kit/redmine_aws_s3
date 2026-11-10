@@ -7,7 +7,7 @@ Redmine::Plugin.register :redmine_serverless_s3 do
   name 'Redmine Serverless S3'
   author 'Redmine Kit'
   description 'Stores attachments in Amazon S3, uploaded and downloaded through CloudFront'
-  version '0.1.3'
+  version '0.2.0'
   url 'https://github.com/redmine-kit/redmine_serverless_s3'
   author_url 'https://github.com/redmine-kit'
   requires_redmine version_or_higher: '7.0.0'

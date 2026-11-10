@@ -6,7 +6,7 @@
 # Gemfile is not in it: Redmine's Gemfile would load it again.
 Gem::Specification.new do |spec|
   spec.name = 'redmine_serverless_s3'
-  spec.version = '0.1.3'
+  spec.version = '0.2.0'
   spec.summary = 'Stores Redmine attachments in Amazon S3'
   spec.authors = ['Redmine Kit']
   spec.license = 'GPL-2.0-or-later'
