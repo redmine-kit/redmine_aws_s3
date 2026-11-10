@@ -10,14 +10,26 @@ if ENV['REDMINE_S3_TEST_CORE'] == '1'
   ENV['REDMINE_CLOUDFRONT_KEY_PAIR_ID'] ||= 'KTESTKEYPAIR'
   ENV['REDMINE_CLOUDFRONT_PRIVATE_KEY'] ||= OpenSSL::PKey::RSA.new(2048).to_pem
 
+  create_bucket = lambda do |client|
+    client.create_bucket(bucket: ENV.fetch('REDMINE_S3_BUCKET'))
+  rescue Aws::S3::Errors::BucketAlreadyOwnedByYou, Aws::S3::Errors::BucketAlreadyExists
+    nil
+  end
+
   config.after_initialize do
     client = Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true,
                                  region: 'us-east-1', credentials: Aws::Credentials.new('test', 'test'))
-    begin
-      client.create_bucket(bucket: ENV.fetch('REDMINE_S3_BUCKET'))
-    rescue Aws::S3::Errors::BucketAlreadyOwnedByYou, Aws::S3::Errors::BucketAlreadyExists
-      nil
-    end
+    create_bucket.call(client)
     RedmineServerlessS3.client = client
+  end
+
+  # Each parallel worker has its own database and attachments directory; it
+  # gets its own bucket too, so that two workers saving files of the same
+  # name in the same second do not write the same key.
+  ActiveSupport.on_load(:active_support_test_case) do
+    parallelize_setup do |worker|
+      ENV['REDMINE_S3_BUCKET'] = "#{ENV.fetch('REDMINE_S3_BUCKET')}-#{worker}"
+      create_bucket.call(RedmineServerlessS3.client)
+    end
   end
 end
