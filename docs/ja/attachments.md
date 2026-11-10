@@ -39,7 +39,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 
 | 項目 | プラグイン | このプラグイン | 理由 |
 | --- | --- | --- | --- |
-| アップロード | Rails が受けて S3 に送る | ブラウザーが CloudFront を通して S3 に PUT し、S3 が SHA256 を確認する | Lambda の 6 MB の制限 |
+| アップロード | Rails が受けて S3 に送る | ブラウザーが CloudFront 経由で S3 に PUT し、Redmine がコピーするときに S3 が SHA256 を計算する | Lambda の 6 MB の制限 |
 | ダウンロード | S3 の署名付き URL にリダイレクトする | Redmine のドメインの CloudFront の署名付き URL(`/files/...`)にリダイレクトし、S3 から返す | Redmine が添付ファイルに付ける sandbox の CSP を、S3 では付けられない(下記) |
 | digest | hgyoon-w のものは、保存の時刻に置き換える | SHA256 のまま | トークン、ETag、サムネイル、同じ内容の共有が digest に頼っている |
 | ローカルのパスを使う処理 | `diskfile` のたびに S3 から取る(cloud_attachment_pro) | `/tmp` にキャッシュして使い回す | 同じ環境での取り直しを減らす。ファイルは一度保存したら変わらないので、キャッシュが古くならない |
@@ -85,48 +85,46 @@ CSV のインポートのキーは、`tmp/imports/` ではなく `imports/` の�
 
 ## アップロード
 
-すべてのファイルを、ブラウザーから Redmine の CloudFront のディストリビューションを通して、S3 に PUT します。ブラウザーがファイルの SHA256 を計算して PUT に付け、中身が合わなければ S3 がアップロードを断ります。そのあと Redmine は、ファイルを読まずに、S3 が確認したチェックサムを読みます。
+すべてのファイルを、ブラウザーから Redmine の CloudFront ディストリビューションを経由して、S3 に PUT します。Redmine はアップロードを登録するときに、ファイルを S3 の中の保存先にコピーし、コピーの SHA256 を S3 に計算させます。この SHA256 を添付ファイルのダイジェストにするので、ブラウザーも Redmine も、ハッシュの計算のためにファイルを読みません。
 
 ```mermaid
 sequenceDiagram
   participant B as ブラウザー
-  participant C as CloudFront(Redmine のドメイン)
-  participant R as Redmine(Lambda)
+  participant C as CloudFront (Redmine のドメイン)
+  participant R as Redmine (Lambda)
   participant S as S3
   participant G as GuardDuty
-  B->>B: ファイルの SHA256 を計算する
-  B->>C: POST /s3_uploads/presign(ファイル名、サイズ、SHA256)
-  C->>R: 要求(Redmine のビヘイビア)
+  B->>C: POST /s3_uploads/presign (ファイル名、サイズ)
+  C->>R: リクエスト (Redmine のビヘイビア)
   R->>R: 権限、拡張子、サイズを確認する
-  R-->>B: PUT /tmp/incoming/UUID.SHA256 のための CloudFront の署名付き URL
-  B->>C: PUT /tmp/incoming/UUID.SHA256(本体)
-  C->>C: 上限を超える本文を断る(CloudFront Functions)
-  C->>C: キーから x-amz-checksum-sha256 を付ける(Lambda@Edge)
-  C->>S: PutObject tmp/incoming/UUID.SHA256(OAC)
-  S->>S: 中身が SHA256 と合わなければ断る
-  G->>S: tmp/incoming/UUID.SHA256 をスキャンし、結果をタグに付ける(スキャンを使うとき)
-  B->>C: POST /s3_uploads/complete(チケット)
-  C->>R: 要求
-  R->>S: GetObjectTagging を最大 20 秒(スキャンを使うとき)
-  R-->>B: 結果がなければ 202。ブラウザーが complete をもう一度送る
-  R->>S: HeadObject(ChecksumMode=ENABLED)
-  R->>S: CopyObject(files/年/月/名前)、DeleteObject(incoming)
-  R-->>B: トークン(標準の流れと同じ応答)
+  R-->>B: PUT /tmp/incoming/UUID 用の CloudFront 署名付き URL
+  B->>C: PUT /tmp/incoming/UUID (ファイル本体)
+  C->>C: 上限を超える本文を拒否する (CloudFront Functions)
+  C->>S: PutObject tmp/incoming/UUID (OAC)
+  G->>S: tmp/incoming/UUID をスキャンし、結果をタグに設定する (スキャンを使うとき)
+  B->>C: POST /s3_uploads/complete (チケット)
+  C->>R: リクエスト
+  R->>S: GetObjectTagging を最大 20 秒 (スキャンを使うとき)
+  R-->>B: 結果がなければ 202。ブラウザーが complete を再送する
+  R->>S: files/年/月/名前 に CopyObject (ChecksumAlgorithm=SHA256)
+  R->>S: tmp/incoming/UUID を DeleteObject
+  R->>S: コピーを HeadObject (ChecksumMode=ENABLED)
+  R-->>B: トークン (標準の流れと同じレスポンス)
 ```
 
-1. **ブラウザーで SHA256 を計算する:** ブラウザーが、ファイルを 4 MB ずつ読みながら、プラグインが持つ JavaScript の SHA-256(`assets/javascripts/s3_upload.js`、外部のライブラリなし)で SHA256 を計算します。Web Crypto(`crypto.subtle.digest`)は、ファイル全体をメモリに読む必要があるので使いません。Redmine の進み具合のバーは、前半で計算を、後半で PUT を表します。
-2. **署名付き URL を受け取る:** `POST /s3_uploads/presign` を足します。ファイル名、サイズ、SHA256(base64)を受け取ります。同一オリジンなので、rails-ujs が CSRF のトークンを付けます。権限は、標準のアップロードと同じもの(`authorize_global`)を確認します。拡張子は `Attachment.valid_extension?` で、サイズは Redmine の添付の上限(`attachment_max_size`)で確認します。Redmine は、ちょうど `https://<ドメイン>/tmp/incoming/<UUID>.<SHA256 の 16 進数>` だけに効く既定ポリシー(canned policy)の CloudFront の署名付き URL と、チケットを返します。URL の期限は 15 分です。チケットは、キー、申告されたファイル名、サイズ、SHA256、コンテンツタイプと、ユーザーを、Rails の message verifier(`secret_key_base`)で署名したもので、URL と同じときに期限が切れます。2 つの要求のあいだで Redmine は状態を持たないので、2 つが別の実行環境に届いてもかまいません。
-3. **CloudFront を通して PUT する:** ブラウザーが、署名付き URL にファイルを PUT します。キャッシュビヘイビアの `/tmp/*` は、PUT を許し、署名付き URL を必須にし、キャッシュしません。署名付き URL では大きさを限れないので、ビューワーリクエストの CloudFront Functions が、`Content-Length` がアップロードの上限を超える要求を断ります。CloudFront の定額プランの Free では、オリジンリクエストポリシーはマネージドのものだけを使えて、ヘッダーを 1 つだけ渡すものはありません。そこで、ブラウザーのヘッダーは S3 に渡さず、オリジンリクエストの Lambda@Edge が、キーの末尾の SHA256 を `x-amz-checksum-sha256`(base64)として付けます。OAC はこのヘッダーを含めて要求に署名します。S3 は中身をチェックサムと照らし、合わなければ PUT を断ります(CloudFront を通したときのことは、まだ確認していない)。署名はキーを含むので、ブラウザーはチェックサムを変えられません。ブラウザーは今もヘッダーを送りますが、意味があるのは CloudFront を通さないときだけです。
-4. **登録する:** チケットを受け取る `POST /s3_uploads/complete` を足します。チケットは、正しく、期限内で、いまのユーザーのものである必要があります。マルウェアのスキャンを使うときは、まずその結果を待ちます([下記](#malware-scan))。Redmine は `ChecksumMode=ENABLED` で `HeadObject` を呼びます。`ChecksumSHA256`(`ChecksumType` が `FULL_OBJECT`)と `ContentLength` が、手順 2 で申告された SHA256 とサイズに等しくなければ、オブジェクトを消して登録を失敗させます。オブジェクトは読みません。SHA256(base64 を 16 進に直したもの)を digest にします。同じ digest とサイズの添付がすでにあれば、そのファイルを共有し、送られたオブジェクトは消します(Redmine の `reuse_existing_file_if_possible` と同じ考え方)。なければ `files/<年>/<月>/<ファイル名>` にコピーし、`tmp/incoming/` のオブジェクトを消します。ファイル名は Redmine と同じ作り方(`yymmddHHMMSS_` と名前。ASCII でない名前はそのハッシュ)で、S3 とデータベースで重ならないものにします。そのうえで、添付のレコードを `disk_directory`、`disk_filename`、`digest`、`filesize` を指定して作ります。ファイルの本体を Redmine に渡さないので、`files_to_final_location` は何もしません。
-5. **トークンを返す:** 応答は、標準の `POST /uploads.js` と同じテンプレート(`attachments/upload.js.erb`)で返します。ブラウザーの側は、標準の流れと同じくトークンをフォームに入れます。
+1. **署名付き URL を受け取る:** `POST /s3_uploads/presign` を追加します。ファイル名、サイズ、コンテンツタイプを受け取ります。同一オリジンなので、rails-ujs が CSRF トークンを付けます。権限は、標準のアップロードと同じもの (`authorize_global`) を確認します。拡張子は `Attachment.valid_extension?` で、サイズは Redmine の添付ファイルの上限 (`attachment_max_size`) で確認します。Redmine は、`https://<ドメイン>/tmp/incoming/<UUID>` だけに有効な既定ポリシー (canned policy) の CloudFront 署名付き URL と、チケットを返します。URL の有効期限は 15 分です。チケットは、キー、申告されたファイル名、サイズ、コンテンツタイプと、ユーザーを、Rails の message verifier (`secret_key_base`) で署名したもので、URL と同時に期限が切れます。2 つのリクエストの間で Redmine は状態を持たないので、2 つが別の実行環境に届いてもかまいません。
+2. **CloudFront 経由で PUT する:** ブラウザーが、署名付き URL にファイルを PUT します。追加のヘッダーは付けません。キャッシュビヘイビア `/tmp/*` は、PUT を許可し、署名付き URL を必須にし、キャッシュしません。署名付き URL ではサイズを制限できないので、ビューワーリクエストの CloudFront Functions が、`Content-Length` がアップロードの上限を超えるリクエストを拒否します。Redmine のプログレスバーは PUT の進行状況を表示します。
+3. **登録する:** チケットを受け取る `POST /s3_uploads/complete` を追加します。チケットは、有効で、期限内で、現在のユーザーのものである必要があります。マルウェアスキャンを使うときは、まずその結果を待ちます ([下記](#malware-scan))。Redmine は、Redmine と同じ方法 (`yymmddHHMMSS_` と名前。ASCII 以外の名前はそのハッシュ) で、S3 とデータベースで重複しないファイル名を作り、`CopyObject` で `ChecksumAlgorithm` に `SHA256` を指定して、アップロードを `files/<年>/<月>/<ファイル名>` にコピーします。次に、アップロードを削除し、コピーに `ChecksumMode=ENABLED` で `HeadObject` を呼び出します。コピーに `ChecksumType` が `FULL_OBJECT` の `ChecksumSHA256` があり、`ContentLength` が手順 1 で申告されたサイズと一致しなければ、コピーを削除して登録を失敗させます。SHA256 (base64 を 16 進数に変換したもの) をダイジェストにします。同じダイジェストとサイズの読み取り可能な添付ファイルがすでにあれば、そのファイルを共有し、コピーを削除します (Redmine の `reuse_existing_file_if_possible` と同じ考え方)。重複するファイルでは、コピーが 1 回余分にかかります。そのうえで、`disk_directory`、`disk_filename`、`digest`、`filesize` を設定して、添付ファイルのレコードを作成します。ファイル本体を Redmine に渡さないので、`files_to_final_location` は何もしません。
+4. **トークンを返す:** レスポンスは、標準の `POST /uploads.js` と同じテンプレート (`attachments/upload.js.erb`) で返します。ブラウザー側では、標準の流れと同じくトークンをフォームに入れます。
 
-- **POST でなく PUT にする理由:** オリジンアクセスコントロールは、CloudFront が S3 に送る要求に署名し、PUT に対応しています。S3 の POST のフォームのポリシーには署名できないので、CloudFront を通した POST は使いません(AWS のブログ「Implementing secure file uploads to Amazon S3 at the edge: Choosing the right pattern」、2026-02-24、と CloudFront の S3 のオリジンの資料)。
-- **ブラウザーの側:** プラグインの JavaScript が `attachments.js` の `uploadBlob` を差し替え、アップロードの前にハッシュを計算します。キュー、進み具合の表示、トークンの扱いは標準のままで、エラーは Redmine が出す場所に出ます。JavaScript は、プラグインが有効なときだけ、Redmine のビューのフック(`view_layouts_base_html_head`)で読み込み、2 つの URL は `<meta>` のタグで渡します。`attachments.js` は Ajax で届くフォームと一緒に読み込み直されることがあるので、ファイルを選ぶ、落とす、貼り付けるたびに、差し替えを戻します。
-- **REST API:** `POST /s3_uploads/presign.json` と `POST /s3_uploads/complete.json` は、Redmine の `POST /uploads.json` と同じく API キーを受け付けます。クライアントは、返された URL に、返されたヘッダーを付けてファイルを PUT します。`complete.json` は、`/uploads.json` と同じ `upload`(`id`、`token`)を返します。
-- **ブラウザーの値だけを信用しない:** digest は、S3 が送られたバイトと照らした値で、手順 2 の申告と等しい必要があります。ほかのファイルの SHA256 を申告して、その中身を共有させようとしても、中身が合わないので S3 で失敗します。
-- **ファイルの大きさの上限:** 登録のときに Redmine がファイルを読まないので、Lambda のタイムアウトで大きさは限られません。上限は、CloudFront Functions で守る Redmine の `attachment_max_size` と、1 回の PUT で CloudFront が受け付ける大きさです(資料に見つからない。確認すること)。大きなファイルは、ブラウザーでのハッシュの計算に時間がかかります。
-- **WAF:** 同じ WAF がアップロードにも効きます。WAF が調べる大きさを超える本文には、`/tmp/incoming/` に当てるルールの、大きすぎる本文の扱いか、範囲の絞り込みが要ります。`SizeRestrictions_BODY` のルールがアップロードを止めないようにします(確認すること)。
-- **本文のハッシュ:** 本文のハッシュを入れる Lambda@Edge は、Redmine のビヘイビアだけに付けます([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#function-that-adds-the-body-hash-lambdaedge))。`/tmp/incoming/*` は、Lambda ではなく S3 に届きます。
+- **S3 が計算する SHA256:** チェックサムのアルゴリズムを指定したコピーでは、S3 がオブジェクト全体のチェックサムを計算します。元のオブジェクトがマルチパートアップロードでも同じです。`PutObject` で書き込んだオブジェクトは、オブジェクト全体のチェックサムタイプになります (「Checking object integrity for data uploads in Amazon S3」、2026-11-10 に確認)。1 回の `CopyObject` で 5 GB までコピーでき、アップロードの上限を大きく上回ります。`CopyObject` の結果の `ChecksumSHA256` は、アップロード時のチェックサムについてだけ説明されているので、コピーのチェックサムは `HeadObject` で読み取ります。プラグインのテストでは、LocalStack も同じ値を返します (単一の PUT とマルチパートアップロードの元のオブジェクト)。moto は返さないので、moto のテストでは、保存されたバイト列からその結果を計算します ([setup.md](setup.md#what-the-tests-check))。
+- **ブラウザーの値は使わない:** ダイジェストは、S3 が保存されたバイト列から計算した値です。ブラウザーが申告するのは名前、サイズ、コンテンツタイプだけで、サイズはコピーと照合します。
+- **POST ではなく PUT にする理由:** オリジンアクセスコントロールは、CloudFront が S3 に送るリクエストに署名し、PUT に対応しています。S3 の POST フォームのポリシーには署名できないので、CloudFront 経由の POST は使いません (AWS のブログ「Implementing secure file uploads to Amazon S3 at the edge: Choosing the right pattern」、2026-02-24、と CloudFront の S3 オリジンのドキュメント)。
+- **ブラウザー側:** プラグインの JavaScript が `attachments.js` の `uploadBlob` を差し替えます。キュー、進行状況の表示、トークンの扱いは標準のままで、エラーは Redmine が表示する場所に表示されます。JavaScript は、プラグインが有効なときだけ、Redmine のビューフック (`view_layouts_base_html_head`) で読み込み、2 つの URL は `<meta>` タグで渡します。`attachments.js` は Ajax で届くフォームと一緒に読み込み直されることがあるので、ファイルの選択、ドロップ、貼り付けのたびに、差し替えを戻します。
+- **REST API:** `POST /s3_uploads/presign.json` と `POST /s3_uploads/complete.json` は、Redmine の `POST /uploads.json` と同じく API キーを受け付けます。クライアントは、返された URL にファイルを PUT します。`complete.json` は、`/uploads.json` と同じ `upload` (`id`、`token`) を返します。
+- **ファイルサイズの上限:** 登録時に Redmine がファイルを読まないので、Lambda のタイムアウトではサイズが制限されません。大きなファイルほど S3 でのコピーに時間がかかります (計測すること)。上限は、CloudFront Functions で守る Redmine の `attachment_max_size` と、1 回の PUT で CloudFront が受け付けるサイズです (ドキュメントに記載が見つからない。確認すること)。
+- **WAF:** 同じ WAF がアップロードにも適用されます。WAF が検査するサイズを超える本文には、`/tmp/incoming/` に適用するルールのオーバーサイズの処理か、スコープダウンが必要です。`SizeRestrictions_BODY` のルールがアップロードをブロックしないようにします (確認すること)。
+- **本文のハッシュ:** 本文のハッシュを追加する Lambda@Edge は、Redmine のビヘイビアだけに関連付けます ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#function-that-adds-the-body-hash-lambdaedge))。`/tmp/incoming/*` は、Lambda ではなく S3 に届きます。
 
 <a id="uploads-through-lambda"></a>
 
@@ -186,7 +184,7 @@ sequenceDiagram
 
 - **キャッシュビヘイビア:** `/files/*`(添付ファイル)と `/tmp/*`(サムネイル、zip、アップロード)は、OAC で添付ファイルのバケットに送ります。Redmine と `/assets/*` を合わせても 4 つで、CloudFront の定額プランの Free の上限(5 つ)に収まります。ほかのパスは、今までどおり Redmine に送ります。閲覧する側には、ディストリビューションの信頼されたキーグループの鍵で作った署名付き URL が要ります。Free で使えるとおり、ポリシーはマネージドのものだけです。キャッシュポリシーは CachingDisabled、オリジンリクエストポリシーはなし、レスポンスヘッダーポリシーは SecurityHeadersPolicy です。CachingDisabled は、クエリー、Cookie、ヘッダーを S3 に渡しません。署名付き URL のクエリーを渡すと、その `Signature` が OAC の署名と並び、S3 は認証の方法が 2 つある要求を断ります。キャッシュはしないので、ダウンロードのたびに S3 を 1 回読みます。
 - **Redmine のパスと重ならない:** Redmine には、`/files`、`/tmp` で始まるルートはありません。添付ファイルは `/attachments/...`、プロジェクトのファイルは `/projects/<id>/files` です。`public/` にも、その名前のディレクトリはありません(2026-11-09 に Redmine 7.0.3 の `config/routes.rb` で確認)。
-- **CSP:** これらのビヘイビアのビューワーレスポンスの CloudFront Functions(Serverless では `redmine-attachment-headers`)が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付けます。CSP は、Redmine の `AttachmentsController` が添付ファイルを返すときに付けるのと同じ値です(2026-11-09 に Redmine 7.0.3 のコードで確認)。この CSP を持つマネージドのレスポンスヘッダーポリシーはなく、Free では独自のものを使えません。成功の応答では、署名付き URL の `response-content-disposition` と `response-content-type` をデコードして、`Content-Disposition` と `Content-Type` に設定します。印字できる ASCII でない値は使いません。署名はクエリーを含むので、これらの値は Redmine が決めたものです。
+- **CSP:** これらのビヘイビアのビューワーレスポンスの CloudFront Functions(Serverless では `redmine-attachment-headers`)が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` を付けます。CSP は、Redmine の `AttachmentsController` が添付ファイルを返すときに付けるのと同じ値です(2026-11-09 に Redmine 7.0.3 のコードで確認)。`X-Content-Type-Options: nosniff` は、マネージドポリシーの `SecurityHeadersPolicy` がすべてのレスポンスに付けます。この CSP を持つマネージドのレスポンスヘッダーポリシーはなく、カスタムのレスポンスヘッダーポリシーはビジネスプランからです (「CloudFront flat-rate pricing plans」、2026-11-10 に確認)。成功の応答では、署名付き URL の `response-content-disposition` と `response-content-type` をデコードして、`Content-Disposition` と `Content-Type` に設定します。印字できる ASCII でない値は使いません。署名はクエリーを含むので、これらの値は Redmine が決めたものです。
 - **Redmine と同じオリジン:** 添付ファイルは、Redmine の標準と同じく、Redmine のオリジンから返ります。それを切り離すのは sandbox の CSP です。sandbox の文書は不透明なオリジンになり、スクリプトも動かないので、HTML や SVG の添付ファイルは、Redmine の Cookie を読むことも、Redmine を呼ぶこともできません。そのため、このヘッダーは必ず付いている必要があります。デプロイのあとの確認で、`/files/` の下の応答に sandbox の CSP と `nosniff` が付いていることを確認します([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment))。
 - **CloudFront を使う理由:** S3 の署名付きの GET で上書きできるのは、`response-content-type`、`-language`、`-expires`、`-cache-control`、`-disposition`、`-encoding` だけです。ほかのヘッダーは足せないので、CSP を S3 から付けることはできません。
 - **ディストリビューションは 1 つ:** 2 つめのディストリビューション、証明書、DNS のレコードは要りません。Redmine のディストリビューションの WAF が、添付ファイルにも効きます。
@@ -259,7 +257,7 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
   - 削除(`delete_from_disk!`)と、ファイルがあるかの確認(`readable?`)は、`diskfile` を通さないように差し替えます。消すだけのファイルや、確認するだけのファイルを取りに行かないためです。
 - **古くならない:** 添付ファイルは一度保存したら変わらないので、キャッシュを確認直す必要はありません。
 - **大きさ:** 関数の `/tmp` は、Lambda の既定の 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。環境が消えると、キャッシュも消えます。
-- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず(SHA256 は S3 が確認する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル(元の画像)、`file_max_size_displayed`(既定 512 KB)までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size`(既定 100 MB)までの一括のダウンロードの zip(元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
+- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず(SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル(元の画像)、`file_max_size_displayed`(既定 512 KB)までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size`(既定 100 MB)までの一括のダウンロードの zip(元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
 - **CSV のインポート:** インポートのファイルも、`/tmp/redmine/imports` に書いたあと `imports/` に PutObject し、読むときにローカルになければ S3 から取ります。`Import#filepath` は `Rails.root/tmp/imports` に固定されているので、イメージの `tmp` を `/tmp/redmine` へのシンボリックリンクにします([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#read-only-file-system))。
 - **Markdown のプレビュー:** Redmine は Office のファイルなどを Pandoc で Markdown に変え、`attachments_storage_path` の下の `derived_cache/markdownized_previews/` に置きます。Lambda では `/tmp` のキャッシュの中になるので、ほかに書き込めるパスは要りません。プラグインは、同じパス(`files/derived_cache/markdownized_previews/`)で S3 にも置きます。持っていない環境は Pandoc を動かし直さずに S3 から取り、添付を消すときに一緒に消します。
 
@@ -291,7 +289,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
 | `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアのスキャンを待たない | [マルウェアのスキャン](#malware-scan) |
 | `SettingsController#plugin`(このプラグインの GET だけ) | 「添付ファイルの S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
-| `attachments.js` の `uploadBlob` | SHA256 を計算し、その値を付けて CloudFront の署名付き URL に PUT する | アップロード |
+| `attachments.js` の `uploadBlob` | CloudFront 署名付き URL に PUT する | アップロード |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
 - **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
@@ -307,12 +305,12 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 ## 未確認の事項
 
-- CloudFront(OAC)を通した PUT の中身が、Lambda@Edge の付けた `x-amz-checksum-sha256` と合わないときに S3 が断ること、合うときに `HeadObject` が `ChecksumSHA256` と `ChecksumType` の `FULL_OBJECT` を返すこと。オリジンリクエストで付けたヘッダーに OAC が署名すること
-- CloudFront が、CloudFront Functions と Lambda@Edge より前に署名付き URL の署名を確認すること、署名付き URL のクエリーのない OAC からの要求を S3 が受け付けること
+- AWS でも、`ChecksumAlgorithm` に `SHA256` を指定したコピーの `HeadObject` が、LocalStack と同じく `ChecksumType` が `FULL_OBJECT` の `ChecksumSHA256` を返すこと
+- CloudFront が、CloudFront Functions より前に署名付き URL の署名を確認すること、署名付き URL のクエリーのない OAC からの要求を S3 が受け付けること
 - S3 のオリジンへの PUT で、CloudFront が受け付ける要求の本文の大きさ(資料に見つからない)、オリジンの応答のタイムアウト(既定 30 秒)が大きなアップロードにどう効くか
 - 大きなアップロードの本文での WAF(大きすぎる本文の扱い、範囲の絞り込み、`SizeRestrictions_BODY`)
 - CloudFront の定額のプランで、アップロードの通信がどう数えられるか
-- 大きなファイル(1 GB など)で、ブラウザーでのハッシュの計算にどれだけかかるか。プラグインの SHA-256 は、テストの Node.js 26 で毎秒およそ 100 MB でした(2026-11-09)
+- 大きなアップロード (1 GB など) の登録で、S3 でのコピーにどれだけかかるか
 - ビューワーレスポンスの CloudFront Functions が設定する `Content-Disposition` で、日本語のファイル名が正しく保存されるか
 - `uploadBlob` を差し替えたときに、貼り付けた画像とドラッグ・アンド・ドロップが標準と同じに動くか
-- エラー(サイズの超過、チェックサムが合わないなど)の表示
+- エラー (サイズの超過、申告と違うサイズなど) の表示

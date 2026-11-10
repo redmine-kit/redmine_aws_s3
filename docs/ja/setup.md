@@ -29,7 +29,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.2 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.3 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -110,8 +110,8 @@ Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmi
 | 項目 | 設定 |
 | --- | --- |
 | オリジン | 添付ファイルのバケット。要求に署名するオリジンアクセスコントロール(OAC)を付ける |
-| ビヘイビア `/files/*` | 添付ファイル。GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。マネージドのキャッシュポリシーの CachingDisabled(クエリーを S3 に渡さない)、オリジンリクエストポリシーはなし、マネージドのレスポンスヘッダーポリシーの SecurityHeadersPolicy。ビューワーレスポンスの CloudFront Functions が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` と `X-Content-Type-Options: nosniff` を付け、クエリーの `response-content-disposition` と `response-content-type` から `Content-Disposition` と `Content-Type` を設定する([attachments.md](attachments.md#download)) |
-| ビヘイビア `/tmp/*` | サムネイル(`/tmp/thumbnails/`)と zip(`/tmp/bulk/`)を GET で、アップロード(`/tmp/incoming/`)を PUT で受ける。すべてのメソッド、HTTPS だけ。署名付き URL を必須にする。ポリシーとビューワーレスポンスの関数は `/files/*` と同じ。ビューワーリクエストの CloudFront Functions が、`/tmp/incoming/` への PUT で `Content-Length` がアップロードの上限を超えるものを拒み、オリジンリクエストの Lambda@Edge が、キーの末尾の SHA256 から `x-amz-checksum-sha256` を付ける([attachments.md](attachments.md#upload)) |
+| ビヘイビア `/files/*` | 添付ファイル。GET と HEAD。署名付き URL を必須にする(下の信頼されたキーグループ)。マネージドのキャッシュポリシーの CachingDisabled(クエリーを S3 に渡さない)、オリジンリクエストポリシーはなし、マネージドのレスポンスヘッダーポリシーの SecurityHeadersPolicy (`X-Content-Type-Options: nosniff` を付ける)。ビューワーレスポンスの CloudFront Functions が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` を付け、クエリーの `response-content-disposition` と `response-content-type` から `Content-Disposition` と `Content-Type` を設定する([attachments.md](attachments.md#download)) |
+| ビヘイビア `/tmp/*` | サムネイル(`/tmp/thumbnails/`)と zip(`/tmp/bulk/`)を GET で、アップロード(`/tmp/incoming/`)を PUT で受ける。すべてのメソッド、HTTPS だけ。署名付き URL を必須にする。ポリシーとビューワーレスポンスの関数は `/files/*` と同じ。ビューワーリクエストの CloudFront Functions が、`/tmp/incoming/` への PUT で `Content-Length` がアップロードの上限を超えるものを拒否する ([attachments.md](attachments.md#upload)) |
 | 信頼されたキーグループ | Redmine が URL の署名に使う秘密鍵の、公開鍵 |
 | ほかのビヘイビア | 今までどおり Redmine。本文のハッシュを入れる関数は、これらだけに付ける |
 
@@ -151,14 +151,14 @@ bin/test system          # システムのテスト。ヘッドレスの Chromiu
 bin/test <ファイル...>    # プラグインのテストの一部
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
-node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の SHA-256
+node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
 ```
 
 <a id="how-aws-is-tested"></a>
 
 ### AWS とのテストの方法
 
-ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの pull request やトークンのない手元の実行では moto に対して動かします。moto 5.2.5 は、`x-amz-checksum-sha256` を確認せず、`HeadObject` で `ChecksumSHA256` を返しません(2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、この 2 つの S3 の確認のテストは飛ばします。署名付き URL は、テストで作った鍵のペアの公開鍵で検証します。
+ユニットと機能のテストでは、SDK の `stub_responses` で S3 を置き換えます。統合のテストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの pull request やトークンのない手元の実行では moto に対して動かします。moto 5.2.5 は、`HeadObject` で `ChecksumSHA256` を返しません (2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、S3 のチェックサムの 2 つのテストはスキップします。署名付き URL は、テストで作った鍵のペアの公開鍵で検証します。
 
 <a id="replaced-code-coverage-and-ci"></a>
 
@@ -178,8 +178,8 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 | `readable?`<br>`diskfile` | ローカルにファイルがあればそれを使い、なければ `HeadObject`。`diskfile` は一時ファイルと名前の変更でオブジェクトを取る。新しいレコードでは何も取らない | スタブ、LocalStack か moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | オブジェクトとサムネイルを消す。ほかの添付ファイルが使うファイルは消さない。同じ内容(digest とサイズ)は共有し、新しいオブジェクトを消す | スタブ、LocalStack か moto |
 | `thumbnail`<br>`thumbnailable?` | S3 のサムネイルがあれば使い、なければキャッシュのファイルから ImageMagick で作って `tmp/thumbnails/` に置く。キャッシュより大きいものは作らない。リダイレクトに `Cache-Control` が付く | スタブ、LocalStack か moto |
-| `/s3_uploads/presign` | 権限、拡張子、サイズ、SHA256 の形を確認する。URL はちょうど `/tmp/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
-| `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。`ChecksumSHA256`(`FULL_OBJECT`)と `ContentLength` が申告と等しく、そうでなければオブジェクトを消す。同じ内容は共有する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
+| `/s3_uploads/presign` | 権限、拡張子、サイズを確認する。URL はちょうど `/tmp/incoming/<UUID>` の CloudFront の署名付き URL で、公開鍵で検証する | スタブ |
+| `/s3_uploads/complete` | チケットが正しく、期限内で、そのユーザーのもの。アップロードを `ChecksumAlgorithm` に `SHA256` を指定して `files/` にコピーして削除し、コピーの `ChecksumSHA256` (`FULL_OBJECT`) をダイジェストにする。コピーの `ContentLength` が申告と一致しなければ、コピーを削除する。同じ内容は共有し、余分なコピーを削除する。マルウェアのスキャンでは、タグがなければ `202`、`THREATS_FOUND` やほかの状態では断って消す。REST API でも同じ | スタブ、LocalStack か moto |
 | `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition`(日本語の名前)と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
 | CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアのスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
 | 管理画面のタブ | 設定、読み書きの確認、配信の確認(CSP と `nosniff` のヘッダー、署名のない URL が断られること)、突き合わせのジョブ、マルウェアの記録。管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
@@ -191,7 +191,7 @@ node test/javascripts/sha256_test.mjs   # アップロードの JavaScript の S
 
 ### AWS では確認していないこと
 
-LocalStack では、中身が `x-amz-checksum-sha256` と合わない PUT を S3 が断ることと、オブジェクト全体のチェックサムを返すことを確認します。moto ではこの 2 つを飛ばし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、関数)と GuardDuty は、手元では再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
+LocalStack では、`ChecksumAlgorithm` に `SHA256` を指定したコピーに、単一の PUT からでもマルチパートアップロードからでも、オブジェクト全体の SHA256 が付くことを確認します。moto ではこの 2 つをスキップし、スタブで確認します。CloudFront(署名付き URL の受け付け、OAC、関数)と GuardDuty は、手元では再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
 
 <a id="redmines-own-tests"></a>
 

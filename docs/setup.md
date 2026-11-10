@@ -23,7 +23,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.2. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.3. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
 
 ```ruby
 # Redmine's Gemfile.local
@@ -94,8 +94,8 @@ The plugin uses Redmine's own distribution; no second distribution is needed. Ad
 | Item | Setting |
 | --- | --- |
 | Origin | The attachments bucket, with an origin access control (OAC) that signs requests |
-| Behavior `/files/*` | Attachments. GET and HEAD. Signed URLs required (the trusted key group below). The managed cache policy CachingDisabled, which forwards no query string to S3, no origin request policy, and the managed response headers policy SecurityHeadersPolicy. A CloudFront Function on viewer response adds `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff`, and sets `Content-Disposition` and `Content-Type` from the query strings `response-content-disposition` and `response-content-type` ([attachments.md](attachments.md#download)) |
-| Behavior `/tmp/*` | Thumbnails (`/tmp/thumbnails/`) and zips (`/tmp/bulk/`) with GET, uploads (`/tmp/incoming/`) with PUT: all methods, HTTPS only. Signed URLs required. The same policies and viewer-response function as `/files/*`. A CloudFront Function on viewer request rejects a PUT under `/tmp/incoming/` whose `Content-Length` is over the upload limit, and Lambda@Edge on origin request adds `x-amz-checksum-sha256` from the SHA256 at the end of the key ([attachments.md](attachments.md#upload)) |
+| Behavior `/files/*` | Attachments. GET and HEAD. Signed URLs required (the trusted key group below). The managed cache policy CachingDisabled, which forwards no query string to S3, no origin request policy, and the managed response headers policy SecurityHeadersPolicy, which adds `X-Content-Type-Options: nosniff`. A CloudFront Function on viewer response adds `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and sets `Content-Disposition` and `Content-Type` from the query strings `response-content-disposition` and `response-content-type` ([attachments.md](attachments.md#download)) |
+| Behavior `/tmp/*` | Thumbnails (`/tmp/thumbnails/`) and zips (`/tmp/bulk/`) with GET, uploads (`/tmp/incoming/`) with PUT: all methods, HTTPS only. Signed URLs required. The same policies and viewer-response function as `/files/*`. A CloudFront Function on viewer request rejects a PUT under `/tmp/incoming/` whose `Content-Length` is over the upload limit ([attachments.md](attachments.md#upload)) |
 | Trusted key group | A public key whose private key Redmine uses to sign URLs |
 | Other behaviors | Redmine, as before. The function that adds the body hash stays on them only |
 
@@ -129,12 +129,12 @@ bin/test system          # the system tests, in headless Chromium
 bin/test <files...>      # some of the plugin's tests
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
-node test/javascripts/sha256_test.mjs   # the SHA-256 of the upload script
+node test/javascripts/complete_test.mjs # the upload script's complete step
 ```
 
 ### How AWS is tested
 
-Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration tests run the same suite on LocalStack in CI, with the organization's token, and on moto for pull requests from forks and local runs without the token. moto 5.2.5 neither checks `x-amz-checksum-sha256` nor returns `ChecksumSHA256` from `HeadObject` (checked on 2026-11-09), so on moto the tests compute that `HeadObject` result from the stored bytes and skip the two tests of these S3 checks. For signed URLs, the tests make a key pair and verify each URL with the public key.
+Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration tests run the same suite on LocalStack in CI, with the organization's token, and on moto for pull requests from forks and local runs without the token. moto 5.2.5 does not return `ChecksumSHA256` from `HeadObject` (checked on 2026-11-09), so on moto the tests compute that `HeadObject` result from the stored bytes and skip the two tests of S3's checksums. For signed URLs, the tests make a key pair and verify each URL with the public key.
 
 ### Replaced code, coverage and CI
 
@@ -150,8 +150,8 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | `readable?`<br>`diskfile` | The local file is used when it is there; otherwise `HeadObject`, and `diskfile` fetches the object through a temporary file and a rename. New records fetch nothing | Stubs, LocalStack or moto |
 | `delete_from_disk!`<br>`reuse_existing_file_if_possible` | The object and its thumbnails are deleted, but not a file another attachment uses. Identical content (digest and size) is shared and the newer object deleted | Stubs, LocalStack or moto |
 | `thumbnail`<br>`thumbnailable?` | A thumbnail in S3 is used; otherwise it is made from the cached file with ImageMagick and put to `tmp/thumbnails/`. No thumbnail beyond the cache size. The redirect has `Cache-Control` | Stubs, LocalStack or moto |
-| `/s3_uploads/presign` | Permission, extension, size and SHA256 format are checked; the URL is a CloudFront signed URL for exactly `/tmp/incoming/<UUID>`, verified with the public key | Stubs |
-| `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. `ChecksumSHA256` (`FULL_OBJECT`) and `ContentLength` must equal the declared values, otherwise the object is deleted. Identical content is shared. With the malware scan: `202` while there is no tag, refusal and deletion for `THREATS_FOUND` and the other statuses. The same through the REST API | Stubs, LocalStack or moto |
+| `/s3_uploads/presign` | Permission, extension and size are checked; the URL is a CloudFront signed URL for exactly `/tmp/incoming/<UUID>`, verified with the public key | Stubs |
+| `/s3_uploads/complete` | The ticket must be valid, unexpired and the user's. The upload is copied to `files/` with `ChecksumAlgorithm` `SHA256` and deleted; the copy's `ChecksumSHA256` (`FULL_OBJECT`) becomes the digest, and its `ContentLength` must equal the declared size, otherwise the copy is deleted. Identical content is shared and the extra copy deleted. With the malware scan: `202` while there is no tag, refusal and deletion for `THREATS_FOUND` and the other statuses. The same through the REST API | Stubs, LocalStack or moto |
 | `download`<br>`download_all` | Redmine's permission checks, then a redirect to a signed URL with `response-content-disposition` (Japanese names) and `response-content-type`; only PDFs inline. The zip is written to `/tmp` one file at a time, put to `tmp/bulk/` and reused for the same set | Stubs, LocalStack or moto |
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
 | Administration tab | Settings, read/write check, delivery check (the CSP and `nosniff` headers, the unsigned URL refused), reconciliation job, malware findings; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
@@ -161,7 +161,7 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 
 ### Not checked against AWS
 
-On LocalStack, the tests check that S3 refuses a PUT whose contents do not match `x-amz-checksum-sha256` and returns the full-object checksum; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the functions) and GuardDuty are not reproduced locally. They are listed in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
+On LocalStack, the tests check that a copy with `ChecksumAlgorithm` `SHA256` gets the SHA256 of the whole object, from a single PUT and from a multipart upload; on moto they are skipped and covered by stubs. CloudFront (signed URLs accepted, OAC, the functions) and GuardDuty are not reproduced locally. They are listed in [To verify](attachments.md#to-verify) and in the checks after deployment of [Serverless](https://redmine-kit.github.io/serverless/testing.html#checks-after-deployment).
 
 ### Redmine's own tests
 
