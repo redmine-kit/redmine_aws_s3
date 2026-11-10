@@ -16,9 +16,6 @@ if ENV['COVERAGE'] && defined?(SimpleCov)
   SimpleCov.formatters = [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::HTMLFormatter]
 end
 
-require_relative 'localstack_retry'
-RedmineServerlessS3::LocalStackRetry.install
-
 module RedmineServerlessS3
   # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
   # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
@@ -73,11 +70,18 @@ module RedmineServerlessS3
       ENV.fetch('S3_TEST_BACKEND', 'moto')
     end
 
+    # LocalStack 2026.10.6 sometimes answers 400 with no body to a request on
+    # a reused connection when several test processes send at once (about 1
+    # in 1,000 PutObject with 4 processes, none with new connections;
+    # reproduced on 2026-11-11). S3 does not, so the tests' client does not
+    # keep idle connections. Also used by test/core/additional_environment.rb.
+    LOCALSTACK_CONNECTIONS = { http_idle_timeout: 0 }.freeze
+
     # A client of the S3 of the tests; skips the test without it.
     def s3_test_client
       skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
       Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true, region: 'us-east-1',
-                          credentials: Aws::Credentials.new('test', 'test'))
+                          credentials: Aws::Credentials.new('test', 'test'), **LOCALSTACK_CONNECTIONS)
     end
 
     def with_test_s3(&)
