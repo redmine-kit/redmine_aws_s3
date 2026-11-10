@@ -119,6 +119,7 @@ sequenceDiagram
 
 - **S3 が計算する SHA256:** チェックサムのアルゴリズムを指定したコピーでは、S3 がオブジェクト全体のチェックサムを計算します。元のオブジェクトがマルチパートアップロードでも同じです。`PutObject` で書き込んだオブジェクトは、オブジェクト全体のチェックサムタイプになります (「Checking object integrity for data uploads in Amazon S3」、2026-11-10 に確認)。1 回の `CopyObject` で 5 GB までコピーでき、アップロードの上限を大きく上回ります。`CopyObject` の結果の `ChecksumSHA256` は、アップロード時のチェックサムについてだけ説明されているので、コピーのチェックサムは `HeadObject` で読み取ります。プラグインのテストでは、LocalStack も同じ値を返します (単一の PUT とマルチパートアップロードの元のオブジェクト)。moto は返さないので、moto のテストでは、保存されたバイト列からその結果を計算します ([setup.md](setup.md#what-the-tests-check))。
 - **ブラウザーの値は使わない:** ダイジェストは、S3 が保存されたバイト列から計算した値です。ブラウザーが申告するのは名前、サイズ、コンテンツタイプだけで、サイズはコピーと照合します。
+- **コンテンツタイプ:** Redmine 7.0 では、Redmine 自身の `POST /uploads` と同じく、申告されたコンテンツタイプを添付ファイルに設定します。Redmine 7.1 は、添付ファイルを保存するときに内容とファイル名から種類を判定し (`Attachment#set_content_type`)、申告された種類を使いません。プラグインも、登録のときに同じことをします。コピーの先頭 64 KB (範囲を指定した `GetObject` 1 回) とファイル名から、Redmine と同じく Marcel で判定します (master ブランチ 7519645 で 2026-11-10 に確認)。この種類で、ファイルを PDF として inline で表示できるかなども決まります (下記)。
 - **POST ではなく PUT にする理由:** オリジンアクセスコントロールは、CloudFront が S3 に送るリクエストに署名し、PUT に対応しています。S3 の POST フォームのポリシーには署名できないので、CloudFront 経由の POST は使いません (AWS のブログ「Implementing secure file uploads to Amazon S3 at the edge: Choosing the right pattern」、2026-02-24、と CloudFront の S3 オリジンのドキュメント)。
 - **ブラウザー側:** プラグインの JavaScript が `attachments.js` の `uploadBlob` を差し替えます。キュー、進行状況の表示、トークンの扱いは標準のままで、エラーは Redmine が表示する場所に表示されます。JavaScript は、プラグインが有効なときだけ、Redmine のビューフック (`view_layouts_base_html_head`) で読み込み、2 つの URL は `<meta>` タグで渡します。`attachments.js` は Ajax で届くフォームと一緒に読み込み直されることがあるので、ファイルの選択、ドロップ、貼り付けのたびに、差し替えを戻します。
 - **REST API:** `POST /s3_uploads/presign.json` と `POST /s3_uploads/complete.json` は、Redmine の `POST /uploads.json` と同じく API キーを受け付けます。クライアントは、返された URL にファイルを PUT します。`complete.json` は、`/uploads.json` と同じ `upload` (`id`、`token`) を返します。
@@ -179,7 +180,7 @@ sequenceDiagram
 
 1. Redmine の標準の確認(ログイン、プロジェクトの権限)を通します。
 2. ダウンロードの回数を数えます(バージョンとプロジェクトのファイル。Redmine の標準と同じ)。
-3. CloudFront の署名付き URL `https://<ドメイン>/files/<年>/<月>/<ファイル名>?...`(期限 5 分)に、302 でリダイレクトします。クエリーの `response-content-disposition` と `response-content-type` で、Redmine と同じファイル名と表示のしかたを指定します。Redmine は、PDF だけを `inline`、ほかを `attachment` にします(`AttachmentsController#disposition`)。
+3. CloudFront の署名付き URL `https://<ドメイン>/files/<年>/<月>/<ファイル名>?...`(期限 5 分)に、302 でリダイレクトします。クエリーの `response-content-disposition` と `response-content-type` で、Redmine と同じファイル名と表示のしかたを指定します。Redmine 7.0 は、PDF だけを `inline`、ほかを `attachment` にします(`AttachmentsController#disposition`)。Redmine 7.1 が `inline` にするのは、PDF のプレビューが要求したとき (`?disposition=inline`) で、判定した種類が PDF か PDF 互換 (`Attachment#pdf_previewable?`。Illustrator など) のファイルだけです。そのファイルは、Redmine と同じく `application/pdf` で返します。プラグインは Redmine 自身の `disposition` を呼ぶので、使っている Redmine のとおりになります。
 4. CloudFront が署名を確認し、パスをキーにして、OAC で S3 からオブジェクトを読みます。クエリーは S3 に渡しません。ビューワーレスポンスの CloudFront Functions が、2 つのクエリーから `Content-Disposition` と `Content-Type` を設定し、sandbox の CSP と `nosniff` を付けます([下](#download))。
 
 - **キャッシュビヘイビア:** `/files/*`(添付ファイル)と `/tmp/*`(サムネイル、zip、アップロード)は、OAC で添付ファイルのバケットに送ります。Redmine と `/assets/*` を合わせても 4 つで、CloudFront の定額プランの Free の上限(5 つ)に収まります。ほかのパスは、今までどおり Redmine に送ります。閲覧する側には、ディストリビューションの信頼されたキーグループの鍵で作った署名付き URL が要ります。Free で使えるとおり、ポリシーはマネージドのものだけです。キャッシュポリシーは CachingDisabled、オリジンリクエストポリシーはなし、レスポンスヘッダーポリシーは SecurityHeadersPolicy です。CachingDisabled は、クエリー、Cookie、ヘッダーを S3 に渡しません。署名付き URL のクエリーを渡すと、その `Signature` が OAC の署名と並び、S3 は認証の方法が 2 つある要求を断ります。キャッシュはしないので、ダウンロードのたびに S3 を 1 回読みます。
@@ -353,7 +354,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `Attachment#delete_from_disk!` | S3 から消す | 削除 |
 | `Attachment#reuse_existing_file_if_possible` | digest とサイズで比べる | 同じ内容の共有 |
 | `Attachment#thumbnail` | ローカルにあればそれを、なければ S3 のものを使い、それもなければ作って置く (切り抜いたものは `_crop` の付いた別の名前) | サムネイル、[アバター](#showing-avatars) |
-| `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける) | ダウンロード、サムネイル |
+| `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト(サムネイルは `Cache-Control` を付ける。Redmine 7.1 では、inline で表示する PDF 互換のファイルを `application/pdf` にする) | ダウンロード、サムネイル |
 | `AvatarsController#update` (Redmine 7.1) | ファイルの代わりにチケットがあれば、アップロードを S3 から読み、ファイルとして Redmine 自身の `update` に渡す。マルウェアスキャンが拒否した保存は、フォームのエラーにする | [アバター](#upload-of-avatars) |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
@@ -363,7 +364,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | アバターのフォーム (Redmine 7.1) | 画像を CloudFront 署名付き URL に PUT し、チケットを付けてフォームを送信する | [アバター](#upload-of-avatars) |
 
 - **有効にする条件:** S3 のバケットの設定(`REDMINE_S3_BUCKET`)があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。`Attachment#thumbnail` は Redmine の master ブランチ (7519645) のものとも比べます。master では、アバターが前提にする `AvatarsController#update`、`#show`、`User#update_avatar` も比べます。
+- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード(`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ)の SHA256 を、Redmine 7.0.3 のものと比べます([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。master が変更したメソッド (`Attachment#files_to_final_location`、`#thumbnail`、`AttachmentsController#download`、`#disposition`、`#upload`、`uploadBlob`) は、プラグインをそれに合わせて確認したうえで、Redmine の master ブランチ (7519645) のものとも比べます。master では、アバターが前提にする `AvatarsController#update`、`#show`、`User#update_avatar` と、CloudFront を経由するアップロードが同じ判定をする `Attachment#set_content_type` も比べます。
 - **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます([setup.md](setup.md#what-the-tests-check))。
 
 <a id="permissions"></a>

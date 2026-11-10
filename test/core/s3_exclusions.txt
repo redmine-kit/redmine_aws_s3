@@ -14,6 +14,10 @@ AttachmentsControllerTest#test_download_should_assign_application_octet_stream_i
 AttachmentsTest#test_download_should_set_sendfile_header  # no X-Sendfile; CloudFront serves the file
 AttachmentsTest#test_upload_as_js_and_preview_as_inline_attachment  # the preview is a redirect to the signed URL
 Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/download/:id/:filename_should_return_the_attachment_content  # redirect, no contents
+AttachmentsControllerTest#test_download_should_not_send_a_non_pdf_file_inline_even_with_a_pdf_extension  # redirect (Redmine 7.1); the plugin's tests check the disposition and type
+AttachmentsControllerTest#test_download_pdf_compatible_illustrator_file_should_be_sent_as_pdf_only_with_inline_disposition_param  # same
+AttachmentsControllerTest#test_download_pdf_file_with_inline_disposition_param_should_be_sent_inline  # same
+AttachmentsControllerTest#test_download_non_pdf_file_with_inline_disposition_param_should_be_sent_as_a_download  # same
 #
 # Thumbnails redirect to a signed URL under /tmp/thumbnails/.
 AttachmentsControllerTest#test_thumbnail  # redirect, no image
@@ -24,6 +28,7 @@ Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/thumbnail/:id_should_ret
 AttachmentsControllerTest#test_thumbnail_should_return_404_if_thumbnail_generation_failed  # thumbnail already in S3
 AttachmentTest#test_thumbnail_should_return_nil_if_generation_fails  # thumbnail already in S3; Attachment#thumbnail reads it
 AttachmentTest#test_thumbnail_should_timeout  # same
+AttachmentTest#test_thumbnail_should_kill_and_detach_process_group_on_timeout  # same (Redmine 7.1)
 #
 # "Download all" stores the zip in S3 and redirects to it under /tmp/bulk/.
 AttachmentsControllerTest#test_download_all_with_valid_container  # redirect, no zip in the response

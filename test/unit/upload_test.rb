@@ -86,6 +86,27 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     end
   end
 
+  # Redmine 7.1 detects the type from the contents and the name, and ignores
+  # the declared one; 7.0 takes the declared one.
+  def test_the_content_type_of_the_upload
+    pdf = "%PDF-1.4\n#{'x' * 32}"
+    stubs = { head_object: ['NotFound', head_of(pdf)], get_object: { body: pdf } }
+    with_s3(stub_client(**stubs)) do |client|
+      ticket = upload.presign(filename: 'report.txt', size: pdf.bytesize, content_type: 'text/plain')[:ticket]
+      attachment = upload.complete(ticket)
+      read = client.api_requests.find { |request| request[:operation_name] == :get_object }
+
+      if RedmineServerlessS3.detects_content_type?
+        assert_equal 'application/pdf', attachment.content_type
+        assert_equal attachment.s3_key, read[:params][:key]
+        assert_equal 'bytes=0-65535', read[:params][:range]
+      else
+        assert_equal 'text/plain', attachment.content_type
+        assert_nil read
+      end
+    end
+  end
+
   def test_complete_shares_a_file_with_the_same_content
     existing = Attachment.find(1)
     content = 'shared'

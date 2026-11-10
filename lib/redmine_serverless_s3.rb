@@ -68,6 +68,14 @@ module RedmineServerlessS3
       "#{THUMBNAILS_PREFIX}#{File.basename(path)}"
     end
 
+    # Whether Redmine detects the type of an attachment from its contents and
+    # ignores the declared one (Redmine 7.1, Attachment#set_content_type).
+    def detects_content_type? = ::Attachment.method_defined?(:set_content_type)
+
+    # Whether Redmine sends PDF compatible files inline only when asked
+    # (Redmine 7.1, Attachment#pdf_previewable? and ?disposition=inline).
+    def pdf_previewable? = ::Attachment.method_defined?(:pdf_previewable?)
+
     # Whether Redmine makes cropped thumbnails (Redmine 7.1, for avatars).
     def thumbnail_crop?
       Redmine::Thumbnail.method(:generate).parameters.include?(%i[key crop])

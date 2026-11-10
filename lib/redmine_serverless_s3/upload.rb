@@ -53,9 +53,9 @@ module RedmineServerlessS3
       scan!(key, data)
       attachment = Attachment.new(author: user, filesize: data['size'])
       attachment.filename = data['filename']
-      attachment.content_type = data['content_type'] if data['content_type']
       copy!(attachment, key)
       copied = attachment.s3_key
+      attachment.content_type = content_type_of(attachment, data['content_type'])
       share_existing(attachment)
       return attachment if attachment.save
 
@@ -121,6 +121,18 @@ module RedmineServerlessS3
 
       storage.delete(attachment.s3_key)
       raise Error, error
+    end
+
+    # Redmine 7.1 detects the type from the contents and the name when it
+    # saves an attachment (Attachment#set_content_type) and ignores the type
+    # the client declares; the same here, from the first 64 KB of the copy,
+    # which is enough for the magic numbers Marcel knows.
+    # Redmine 7.0 takes the declared type, as its POST /uploads does.
+    def content_type_of(attachment, declared)
+      return declared unless RedmineServerlessS3.detects_content_type?
+
+      head = storage.read_start(attachment.s3_key, 64.kilobytes) if attachment.filesize.to_i.positive?
+      Marcel::MimeType.for(StringIO.new(head.to_s), name: attachment.filename)
     end
 
     # Shares an existing file with the same SHA256 and size instead of the

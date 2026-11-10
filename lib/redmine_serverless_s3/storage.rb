@@ -41,6 +41,13 @@ module RedmineServerlessS3
       false
     end
 
+    # The first bytes of the object, or nil if it does not exist.
+    def read_start(key, bytes)
+      client.get_object(bucket: bucket, key: key, range: "bytes=0-#{bytes - 1}").body.read
+    rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::NotFound
+      nil
+    end
+
     # HeadObject, or nil if the object does not exist.
     def head(key, checksum: false)
       params = { bucket: bucket, key: key }

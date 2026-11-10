@@ -9,7 +9,7 @@ module RedmineServerlessS3
       return super unless RedmineServerlessS3.enabled?
 
       @attachment.increment_download if @attachment.container.is_a?(Version) || @attachment.container.is_a?(Project)
-      redirect_to_signed_url(@attachment.s3_key, @attachment.filename, detect_content_type(@attachment),
+      redirect_to_signed_url(@attachment.s3_key, @attachment.filename, download_content_type,
                              disposition(@attachment))
     end
 
@@ -38,6 +38,14 @@ module RedmineServerlessS3
     end
 
     private
+
+    # Redmine 7.1 sends a PDF compatible file (such as Illustrator) shown
+    # inline as PDF, so that browsers display it.
+    def download_content_type
+      inline_pdf = RedmineServerlessS3.pdf_previewable? && disposition(@attachment) == 'inline' &&
+                   @attachment.pdf_previewable?
+      inline_pdf ? 'application/pdf' : detect_content_type(@attachment)
+    end
 
     def redirect_to_signed_url(key, filename, content_type, disposition)
       url = RedmineServerlessS3.url_signer.url_for(
