@@ -5,11 +5,10 @@ require 'securerandom'
 module RedmineServerlessS3
   # Uploads from the browser through CloudFront (docs/attachments.md#upload).
   # presign checks the request and returns a CloudFront signed URL for a PUT
-  # to tmp/incoming/<UUID>.<SHA256 in hex>, with a ticket that keeps the
-  # declared name, size and SHA256 signed by Redmine. CloudFront gives S3 the
-  # checksum from the key, so S3 refuses any other content. complete reads the
-  # checksum S3 has checked and registers the attachment without reading the
-  # file.
+  # to tmp/incoming/<UUID>, with a ticket that keeps the declared name, size
+  # and content type signed by Redmine. complete copies the upload to its
+  # files/ key, where S3 computes the SHA256 that becomes the digest, and
+  # registers the attachment without reading the file.
   class Upload
     class Error < StandardError; end
 
@@ -20,7 +19,6 @@ module RedmineServerlessS3
       end
     end
 
-    SHA256_BASE64 = %r{\A[A-Za-z0-9+/]{43}=\z}
     TICKET_PURPOSE = :redmine_serverless_s3_upload
 
     attr_reader :user
@@ -29,28 +27,26 @@ module RedmineServerlessS3
       @user = user
     end
 
-    # Returns { url:, ticket:, headers: } for the browser.
-    def presign(filename:, size:, sha256:, content_type: nil)
+    # Returns { url:, ticket: } for the browser.
+    def presign(filename:, size:, content_type: nil)
       filename = filename.to_s
       size = Integer(size, exception: false)
       raise Error, 'filename is missing' if filename.blank?
       raise Error, 'size is invalid' if size.nil? || size.negative?
-      raise Error, 'sha256 is invalid' unless SHA256_BASE64.match?(sha256.to_s)
 
       check_attachment(filename, size)
-      key = "#{RedmineServerlessS3::INCOMING_PREFIX}#{SecureRandom.uuid}.#{hex(sha256)}"
+      key = "#{RedmineServerlessS3::INCOMING_PREFIX}#{SecureRandom.uuid}"
       expiry = RedmineServerlessS3.upload_url_expiry
       ticket = verifier.generate(
-        { 'key' => key, 'filename' => filename, 'size' => size, 'sha256' => sha256,
+        { 'key' => key, 'filename' => filename, 'size' => size,
           'content_type' => content_type.to_s.presence, 'user_id' => user.id },
         purpose: TICKET_PURPOSE, expires_in: expiry
       )
-      { url: RedmineServerlessS3.url_signer.url_for(key, expires_in: expiry),
-        ticket: ticket, headers: { 'x-amz-checksum-sha256' => sha256 } }
+      { url: RedmineServerlessS3.url_signer.url_for(key, expires_in: expiry), ticket: ticket }
     end
 
-    # Registers the uploaded object and returns the saved attachment. On a
-    # mismatch the object is deleted and Error is raised.
+    # Registers the uploaded object and returns the attachment, saved unless
+    # its validations fail. The upload is deleted in every case but Pending.
     def complete(ticket)
       data = verifier.verified(ticket.to_s, purpose: TICKET_PURPOSE)
       raise Error, 'the upload ticket is invalid or expired' unless data && data['user_id'] == user.id
@@ -59,18 +55,19 @@ module RedmineServerlessS3
       raise Error, 'the key is not an upload' unless key.to_s.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
 
       scan!(key, data)
-      head = storage.head(key, checksum: true)
-      raise Error, 'the upload is not in S3' unless head
+      attachment = Attachment.new(author: user, filesize: data['size'])
+      attachment.filename = data['filename']
+      attachment.content_type = data['content_type'] if data['content_type']
+      copy!(attachment, key)
+      copied = attachment.s3_key
+      share_existing(attachment)
+      return attachment if attachment.save
 
-      verify!(head, data, key)
-      register(key, data)
+      storage.delete(copied) if attachment.s3_key == copied
+      attachment
     end
 
     private
-
-    def hex(sha256)
-      Base64.strict_decode64(sha256).unpack1('H*')
-    end
 
     def check_attachment(filename, size)
       unless Attachment.valid_extension?(File.extname(filename))
@@ -94,44 +91,44 @@ module RedmineServerlessS3
       raise Error, e.message
     end
 
-    def verify!(head, data, key)
-      return if head.checksum_sha256 == data['sha256'] && head.checksum_type == 'FULL_OBJECT' &&
-                head.content_length == data['size']
-
+    # Copies the upload to a new files/<year>/<month>/<name> key, where S3
+    # computes the SHA256 of the whole object, and deletes the upload. The
+    # SHA256 becomes the digest; a size other than the declared one fails.
+    def copy!(attachment, key)
+      attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
+      attachment.disk_filename = DiskName.free(attachment.filename, attachment.disk_directory)
+      begin
+        storage.copy(key, attachment.s3_key)
+      rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::NotFound
+        raise Error, 'the upload is not in S3'
+      end
       storage.delete(key)
-      raise Error, 'the uploaded file does not match its SHA256 or size'
+      attachment.digest = digest!(attachment)
     end
 
-    def register(key, data)
-      digest = hex(data['sha256'])
-      attachment = Attachment.new(author: user, filesize: data['size'], digest: digest)
-      attachment.filename = data['filename']
-      attachment.content_type = data['content_type'] if data['content_type']
-      copied = place(attachment, key)
-      return attachment if attachment.save
+    def digest!(attachment)
+      head = storage.head(attachment.s3_key, checksum: true)
+      error = if head&.content_length != attachment.filesize
+                'the uploaded file does not match its size'
+              elsif head.checksum_type != 'FULL_OBJECT' || head.checksum_sha256.blank?
+                'S3 returned no SHA256 of the whole file'
+              end
+      return Base64.strict_decode64(head.checksum_sha256).unpack1('H*') unless error
 
-      storage.delete(attachment.s3_key) if copied
-      attachment
+      storage.delete(attachment.s3_key)
+      raise Error, error
     end
 
-    # Shares an existing file with the same SHA256 and size, or copies the
-    # upload to files/<year>/<month>/<name>; the upload is deleted either way.
-    # Returns true if the upload was copied.
-    def place(attachment, key)
+    # Shares an existing file with the same SHA256 and size instead of the
+    # copy, as Redmine's reuse_existing_file_if_possible does.
+    def share_existing(attachment)
       existing = Attachment.where(digest: attachment.digest, filesize: attachment.filesize)
                            .where.not(disk_filename: [nil, '']).order(:id).last
-      copied = if existing&.readable?
-                 attachment.disk_directory = existing.disk_directory
-                 attachment.disk_filename = existing.disk_filename
-                 false
-               else
-                 attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
-                 attachment.disk_filename = DiskName.free(attachment.filename, attachment.disk_directory)
-                 storage.copy(key, attachment.s3_key)
-                 true
-               end
-      storage.delete(key)
-      copied
+      return unless existing&.readable?
+
+      storage.delete(attachment.s3_key)
+      attachment.disk_directory = existing.disk_directory
+      attachment.disk_filename = existing.disk_filename
     end
 
     def storage

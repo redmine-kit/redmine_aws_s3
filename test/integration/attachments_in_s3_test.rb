@@ -3,10 +3,10 @@
 require_relative '../test_helper'
 
 # Attachments in S3 reproduced by LocalStack or moto (S3_TEST_ENDPOINT, chosen
-# by bin/test). moto 5.2.5 neither checks x-amz-checksum-sha256 nor returns
-# ChecksumSHA256 from HeadObject, so on moto the upload tests compute that
-# HeadObject result from the stored bytes, as S3 does; S3 refusing a checksum
-# that does not match is tested on LocalStack only.
+# by bin/test). moto 5.2.5 does not return ChecksumSHA256 from HeadObject, so
+# on moto the upload tests compute that HeadObject result from the stored
+# bytes, as S3 does; S3 computing the SHA256 of a copy is tested on LocalStack
+# only.
 class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   include RedmineServerlessS3::TestHelper
 
@@ -30,19 +30,17 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
   end
 
   # The browser's PUT, sent to S3 as CloudFront does through OAC.
-  def put_upload(url, headers, data)
+  def put_upload(url, data)
     key = URI(url).path.delete_prefix('/')
-    RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: data,
-                                          checksum_sha256: headers['x-amz-checksum-sha256'])
+    RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: data)
     key
   end
 
   def upload_through_cloudfront(data, filename)
-    post '/s3_uploads/presign', params: { filename: filename, size: data.bytesize,
-                                          sha256: sha256_base64(data), content_type: 'text/plain' }
+    post '/s3_uploads/presign', params: { filename: filename, size: data.bytesize, content_type: 'text/plain' }
     assert_response :success
     presigned = response.parsed_body
-    key = put_upload(presigned['url'], presigned['headers'], data)
+    key = put_upload(presigned['url'], data)
     post '/s3_uploads/complete.js', params: { ticket: presigned['ticket'], attachment_id: 1 }, xhr: true
     assert_response :success
     [key, response.body[/val\('([^']+)'\)/, 1]]
@@ -86,9 +84,9 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
         log_user('jsmith', 'jsmith')
         data = 'scanned by GuardDuty'
         post '/s3_uploads/presign',
-             params: { filename: 'scanned.txt', size: data.bytesize, sha256: sha256_base64(data) }
+             params: { filename: 'scanned.txt', size: data.bytesize }
         presigned = response.parsed_body
-        key = put_upload(presigned['url'], presigned['headers'], data)
+        key = put_upload(presigned['url'], data)
         emulate_s3_checksums do
           post '/s3_uploads/complete.js', params: { ticket: presigned['ticket'], attachment_id: 1 }, xhr: true
           assert_response :accepted
@@ -114,9 +112,9 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
       with_malware_scan do
         log_user('jsmith', 'jsmith')
         data = 'not a real threat'
-        post '/s3_uploads/presign', params: { filename: 'bad.txt', size: data.bytesize, sha256: sha256_base64(data) }
+        post '/s3_uploads/presign', params: { filename: 'bad.txt', size: data.bytesize }
         presigned = response.parsed_body
-        key = put_upload(presigned['url'], presigned['headers'], data)
+        key = put_upload(presigned['url'], data)
         RedmineServerlessS3.client.put_object_tagging(
           bucket: RedmineServerlessS3.bucket, key: key,
           tagging: { tag_set: [{ key: RedmineServerlessS3::MalwareScan::TAG, value: 'THREATS_FOUND' }] }
@@ -135,27 +133,39 @@ class RedmineServerlessS3AttachmentsInS3Test < Redmine::IntegrationTest
     end
   end
 
-  def test_s3_refuses_a_put_whose_contents_do_not_match_the_checksum
-    skip "#{s3_test_backend} does not check the checksum (LocalStack does)" unless s3_test_backend == 'localstack'
-
-    with_test_s3 do
-      assert_raises(Aws::S3::Errors::ServiceError) do
-        RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'tmp/incoming/mismatch',
-                                              body: 'abc', checksum_sha256: sha256_base64('other'))
-      end
-      assert_nil object('tmp/incoming/mismatch')
-    end
-  end
-
-  def test_head_object_returns_the_full_object_checksum
+  def test_a_copy_gets_the_sha256_of_the_whole_object
     skip "#{s3_test_backend} does not return ChecksumSHA256 (LocalStack does)" unless s3_test_backend == 'localstack'
 
     with_test_s3 do
-      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'tmp/incoming/ok', body: 'abc',
-                                            checksum_sha256: sha256_base64('abc'))
-      head = RedmineServerlessS3.storage.head('tmp/incoming/ok', checksum: true)
+      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: 'tmp/incoming/ok', body: 'abc')
+      RedmineServerlessS3.storage.copy('tmp/incoming/ok', 'files/ok')
+      head = RedmineServerlessS3.storage.head('files/ok', checksum: true)
 
       assert_equal sha256_base64('abc'), head.checksum_sha256
+      assert_equal 'FULL_OBJECT', head.checksum_type
+    end
+  end
+
+  def test_a_copy_of_a_multipart_object_gets_the_sha256_of_the_whole_object
+    skip "#{s3_test_backend} does not return ChecksumSHA256 (LocalStack does)" unless s3_test_backend == 'localstack'
+
+    with_test_s3 do
+      client = RedmineServerlessS3.client
+      bucket = RedmineServerlessS3.bucket
+      parts = ['a' * 5.megabytes, 'b']
+      id = client.create_multipart_upload(bucket: bucket, key: 'tmp/incoming/parts').upload_id
+      etags = parts.each_with_index.map do |part, i|
+        client.upload_part(bucket: bucket, key: 'tmp/incoming/parts', upload_id: id, part_number: i + 1,
+                           body: part).etag
+      end
+      client.complete_multipart_upload(
+        bucket: bucket, key: 'tmp/incoming/parts', upload_id: id,
+        multipart_upload: { parts: etags.each_with_index.map { |etag, i| { etag: etag, part_number: i + 1 } } }
+      )
+      RedmineServerlessS3.storage.copy('tmp/incoming/parts', 'files/parts')
+      head = RedmineServerlessS3.storage.head('files/parts', checksum: true)
+
+      assert_equal sha256_base64(parts.join), head.checksum_sha256
       assert_equal 'FULL_OBJECT', head.checksum_type
     end
   end

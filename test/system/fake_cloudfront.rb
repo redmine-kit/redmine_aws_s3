@@ -4,13 +4,11 @@ module RedmineServerlessS3
   # CloudFront for the system tests, in front of Redmine on the test server:
   # the paths /files/, /tmp/thumbnails/, /tmp/bulk/ (GET) and /tmp/incoming/ (PUT) go
   # to the S3 of the tests, only with a valid signed URL (canned policy,
-  # checked with the public key). Uploads get the checksum from their key, as
-  # Lambda@Edge gives it to S3, and downloads get the headers that the
-  # distribution's function adds (docs/setup.md#the-cloudfront-distribution).
+  # checked with the public key). Downloads get the headers that the
+  # distribution adds (docs/setup.md#the-cloudfront-distribution).
   class FakeCloudFront
     PATHS = %r{\A/(?:files|tmp)/}
     CLOUDFRONT_PARAMS = /[?&]Expires=.*\z/
-    UPLOAD = %r{\Atmp/incoming/[0-9a-f-]{36}\.([0-9a-f]{64})\z}
 
     def initialize(app, public_key:)
       @app = app
@@ -41,14 +39,8 @@ module RedmineServerlessS3
     end
 
     def upload(request, key)
-      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: request.body.read,
-                                            checksum_sha256: checksum(key))
+      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: request.body.read)
       [200, {}, []]
-    end
-
-    def checksum(key)
-      hex = UPLOAD.match(key)&.[](1)
-      hex && [[hex].pack('H*')].pack('m0')
     end
 
     def download(request, key)

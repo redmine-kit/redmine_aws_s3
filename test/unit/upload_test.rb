@@ -19,8 +19,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
   end
 
   def presign(**)
-    upload.presign(filename: 'report.txt', size: CONTENT.bytesize, sha256: sha256_base64(CONTENT),
-                   content_type: 'text/plain', **)
+    upload.presign(filename: 'report.txt', size: CONTENT.bytesize, content_type: 'text/plain', **)
   end
 
   def head_of(content, checksum: sha256_base64(content), type: 'FULL_OBJECT')
@@ -32,10 +31,9 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       result = presign
       unsigned, expires = verify_signed_url(result[:url])
 
-      assert_match %r{\Ahttps://#{DOMAIN}/tmp/incoming/[0-9a-f-]{36}\.[0-9a-f]{64}\z}, unsigned
-      assert unsigned.end_with?(".#{Digest::SHA256.hexdigest(CONTENT)}"), 'the key ends with the SHA256'
+      assert_match %r{\Ahttps://#{DOMAIN}/tmp/incoming/[0-9a-f-]{36}\z}, unsigned
       assert_in_delta Time.now.to_i + 900, expires, 5
-      assert_equal({ 'x-amz-checksum-sha256' => sha256_base64(CONTENT) }, result[:headers])
+      assert_equal %i[url ticket], result.keys
       assert result[:ticket].present?
       assert_empty client.api_requests
     end
@@ -59,17 +57,15 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     end
   end
 
-  def test_presign_checks_the_sha256
+  def test_presign_checks_the_name_and_size
     with_s3(stub_client) do
-      assert_raises(RedmineServerlessS3::Upload::Error) { presign(sha256: 'abc') }
-      assert_raises(RedmineServerlessS3::Upload::Error) { presign(sha256: Digest::SHA256.hexdigest(CONTENT)) }
       assert_raises(RedmineServerlessS3::Upload::Error) { presign(size: '-1') }
       assert_raises(RedmineServerlessS3::Upload::Error) { presign(filename: '') }
     end
   end
 
   def test_complete_copies_the_upload_and_registers_the_attachment
-    with_s3(stub_client(head_object: [head_of(CONTENT), 'NotFound'])) do |client|
+    with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT)])) do |client|
       ticket = presign[:ticket]
       attachment = upload.complete(ticket)
       requests = client.api_requests.index_by { |request| request[:operation_name] }
@@ -83,7 +79,9 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       assert_match %r{\A\d{4}/\d{2}\z}, attachment.disk_directory
       assert_match(/\A\d{12}_report\.txt\z/, attachment.disk_filename)
       assert_equal attachment.s3_key, requests[:copy_object][:params][:key]
+      assert_equal 'SHA256', requests[:copy_object][:params][:checksum_algorithm]
       assert_match %r{\Aredmine-files/tmp/incoming/}, requests[:copy_object][:params][:copy_source]
+      assert_equal 'ENABLED', requests[:head_object][:params][:checksum_mode]
       assert_match %r{\Atmp/incoming/}, requests[:delete_objects][:params][:delete][:objects].first[:key]
     end
   end
@@ -92,48 +90,53 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     existing = Attachment.find(1)
     content = 'shared'
     existing.update_columns(digest: Digest::SHA256.hexdigest(content), filesize: content.bytesize)
-    with_s3(stub_client(head_object: head_of(content))) do |client|
-      ticket = upload.presign(filename: 'copy.gif', size: content.bytesize, sha256: sha256_base64(content))[:ticket]
+    with_s3(stub_client(head_object: ['NotFound', head_of(content), head_of(content)])) do |client|
+      ticket = upload.presign(filename: 'copy.gif', size: content.bytesize)[:ticket]
       attachment = upload.complete(ticket)
+      copied = client.api_requests.find { |request| request[:operation_name] == :copy_object }[:params][:key]
+      deleted = client.api_requests.select { |request| request[:operation_name] == :delete_objects }
+                      .flat_map { |request| request[:params][:delete][:objects].pluck(:key) }
 
+      assert attachment.persisted?
       assert_equal existing.disk_filename, attachment.disk_filename
       assert_equal existing.disk_directory, attachment.disk_directory
-      assert_not_includes client.api_requests.pluck(:operation_name), :copy_object
+      assert_equal Digest::SHA256.hexdigest(content), attachment.digest
+      assert_includes deleted, copied, 'the extra copy is deleted'
+      assert(deleted.any? { |key| key.start_with?('tmp/incoming/') }, 'the upload is deleted')
     end
   end
 
-  def test_a_checksum_that_does_not_match_deletes_the_upload
-    with_s3(stub_client(head_object: head_of('other contents', type: 'FULL_OBJECT'))) do |client|
-      ticket = presign[:ticket]
-
-      assert_no_difference 'Attachment.count' do
-        assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(ticket) }
-      end
-      deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
-
-      assert_match %r{\Atmp/incoming/}, deleted[:params][:delete][:objects].first[:key]
-    end
+  def deleted_keys(client)
+    client.api_requests.select { |request| request[:operation_name] == :delete_objects }
+          .flat_map { |request| request[:params][:delete][:objects].pluck(:key) }
   end
 
-  def test_a_size_that_does_not_match_deletes_the_upload
+  def test_a_size_that_does_not_match_deletes_the_upload_and_the_copy
     head = head_of(CONTENT).merge(content_length: CONTENT.bytesize + 1)
-    with_s3(stub_client(head_object: head)) do |client|
-      assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
-      assert_includes client.api_requests.pluck(:operation_name), :delete_objects
+    with_s3(stub_client(head_object: ['NotFound', head])) do |client|
+      assert_no_difference 'Attachment.count' do
+        error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+        assert_includes error.message, 'size'
+      end
+      deleted = deleted_keys(client)
+
+      assert(deleted.any? { |key| key.start_with?('tmp/incoming/') })
+      assert(deleted.any? { |key| key.start_with?('files/') })
     end
   end
 
-  def test_an_object_without_a_full_object_checksum_is_refused
-    with_s3(stub_client(head_object: head_of(CONTENT, type: 'COMPOSITE'))) do
+  def test_a_copy_without_a_full_object_sha256_is_refused
+    with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT, type: 'COMPOSITE')])) do |client|
       assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+      assert(deleted_keys(client).any? { |key| key.start_with?('files/') })
     end
-    with_s3(stub_client(head_object: head_of(CONTENT).merge(checksum_sha256: nil))) do
+    with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT).merge(checksum_sha256: nil)])) do
       assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
     end
   end
 
   def test_a_missing_upload_is_refused
-    with_s3(stub_client(head_object: 'NotFound')) do
+    with_s3(stub_client(head_object: 'NotFound', copy_object: 'NoSuchKey')) do
       error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
       assert_includes error.message, 'not in S3'
     end
@@ -160,7 +163,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
 
   def test_complete_waits_for_a_clean_scan
     tags = scan_tag('NO_THREATS_FOUND')
-    with_s3(stub_client(get_object_tagging: tags, head_object: [head_of(CONTENT), 'NotFound'])) do |client|
+    with_s3(stub_client(get_object_tagging: tags, head_object: ['NotFound', head_of(CONTENT)])) do |client|
       with_malware_scan do
         attachment = upload.complete(presign[:ticket])
 

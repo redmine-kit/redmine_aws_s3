@@ -11,7 +11,7 @@ class S3UploadsController < ApplicationController
 
   def presign
     result = RedmineServerlessS3::Upload.new(User.current).presign(
-      filename: params[:filename], size: params[:size], sha256: params[:sha256], content_type: params[:content_type]
+      filename: params[:filename], size: params[:size], content_type: params[:content_type]
     )
     render json: result
   rescue RedmineServerlessS3::Upload::Error => e

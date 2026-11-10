@@ -21,7 +21,7 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
   end
 
   def presign_params
-    { filename: 'note.txt', size: CONTENT.bytesize, sha256: sha256_base64(CONTENT), content_type: 'text/plain' }
+    { filename: 'note.txt', size: CONTENT.bytesize, content_type: 'text/plain' }
   end
 
   def test_presign
@@ -32,17 +32,17 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
       json = response.parsed_body
 
       assert json['url'].start_with?("https://#{DOMAIN}/tmp/incoming/")
-      assert_equal sha256_base64(CONTENT), json['headers']['x-amz-checksum-sha256']
+      assert_nil json['headers']
       assert json['ticket'].present?
     end
   end
 
   def test_presign_errors_are_json
     with_s3(stub_client) do
-      post :presign, params: presign_params.merge(sha256: 'x')
+      post :presign, params: presign_params.merge(size: 'x')
 
       assert_response :unprocessable_content
-      assert_equal ['sha256 is invalid'], response.parsed_body['errors']
+      assert_equal ['size is invalid'], response.parsed_body['errors']
     end
   end
 
@@ -65,7 +65,7 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
   end
 
   def test_complete_returns_the_script_of_redmines_upload
-    with_s3(stub_client(head_object: [head, 'NotFound'])) do
+    with_s3(stub_client(head_object: ['NotFound', head])) do
       post :presign, params: presign_params
       ticket = response.parsed_body['ticket']
 
@@ -93,7 +93,7 @@ class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
   def test_complete_through_the_api
     @request.session[:user_id] = nil
     with_settings rest_api_enabled: '1' do
-      with_s3(stub_client(head_object: [head, 'NotFound'])) do
+      with_s3(stub_client(head_object: ['NotFound', head])) do
         key = User.find(2).api_key
         post :presign, params: presign_params.merge(format: 'json', key: key)
 
