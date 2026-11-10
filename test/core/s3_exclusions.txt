@@ -22,6 +22,8 @@ Redmine::ApiTest::AttachmentsTest#test_GET_/attachments/thumbnail/:id_should_ret
 # The test makes generation fail, but the bucket keeps the thumbnail an
 # earlier test stored for the same digest, and the plugin serves that one.
 AttachmentsControllerTest#test_thumbnail_should_return_404_if_thumbnail_generation_failed  # thumbnail already in S3
+AttachmentTest#test_thumbnail_should_return_nil_if_generation_fails  # thumbnail already in S3; Attachment#thumbnail reads it
+AttachmentTest#test_thumbnail_should_timeout  # same
 #
 # "Download all" stores the zip in S3 and redirects to it under /tmp/bulk/.
 AttachmentsControllerTest#test_download_all_with_valid_container  # redirect, no zip in the response
