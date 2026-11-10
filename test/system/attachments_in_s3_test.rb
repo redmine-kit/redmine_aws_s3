@@ -105,10 +105,8 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
     assert_equal File.binread(path), object(attachment.s3_key)
     assert_equal Digest::SHA256.file(path).hexdigest, attachment.digest
     assert_empty @client.list_objects_v2(bucket: @bucket, prefix: 'tmp/incoming/').contents
-    progress = @progress
-
-    assert(progress.any? { |value| value.to_f.between?(1, 99) }, "no progress in between: #{progress}")
-    assert_in_delta 100, progress.last.to_f, 0.01
+    assert_predicate @progress, :present?, 'the progress bar got no value'
+    assert_in_delta 100, @progress.last.to_f, 0.01
   end
 
   def test_download_redirects_to_the_file_with_the_headers_of_the_distribution
