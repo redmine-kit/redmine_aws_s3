@@ -17,7 +17,7 @@ module RedmineServerlessS3
     end
 
     def self.install
-      Storage.prepend(self) unless Storage < self
+      Storage.prepend(self) unless Storage.ancestors.include?(self)
     end
   end
 end
