@@ -144,7 +144,7 @@ Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration t
 
 ### Replaced code, coverage and CI
 
-A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed.
+A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the JavaScript tests, `bin/test`, `bin/test core-s3` and `bin/test system`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed.
 
 ### What the tests check
 
@@ -165,7 +165,7 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | Code loading | Zeitwerk loads every file of `lib/redmine_aws/s3/` under the `RedmineAws` namespace of Redmine AWS (`bin/rails zeitwerk:check`), and both plugins start with their versions and the "S3" tab, in new processes | — |
 | Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's, or master's for the methods master has changed. On master, also `AvatarsController#update`, `#show`, `User#update_avatar` and `Attachment#set_content_type` | — |
 | Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown; on Redmine 7.1, an avatar over 1 MB goes through CloudFront, the form reaches Redmine with the ticket and without the file, and an upload error is shown above the form. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
-| Browser script | SHA-256 against known vectors and Node.js's crypto, fed in random pieces; `complete` sent again on `202` and given up after the last retry; the same for the avatar's `check` | Node.js |
+| Browser script | `complete` sent again on `202`, the script of a `200` answer run, the server's error passed on, and given up after the last retry; the same for the avatar's `check` | Node.js |
 
 ### Not checked against AWS
 

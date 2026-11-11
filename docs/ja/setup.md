@@ -144,7 +144,7 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 ## テスト
 
-Redmine の標準のプラグインのテスト (`bin/rails redmine:plugins:test NAME=redmine_aws_s3`) です。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine AWS は、隣のチェックアウト (`../redmine_aws`) か、`REDMINE_AWS_DIR` のディレクトリから使います。
+Redmine の標準のプラグインのテストです。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine AWS は、隣のチェックアウト (`../redmine_aws`) か、`REDMINE_AWS_DIR` のディレクトリから使います。
 
 ```sh
 bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
@@ -170,7 +170,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 ### 置き換えたコード、カバレッジ、CI
 
-置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、置き換えたコードのテストで、master が変更したメソッドがわかります。
+置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と Pull Request のたびに `bin/lint`、JavaScript のテスト、`bin/test`、`bin/test core-s3`、`bin/test system` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、置き換えたコードのテストで、master が変更したメソッドがわかります。
 
 <a id="what-the-tests-check"></a>
 
@@ -193,7 +193,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 | コードの読み込み | Zeitwerk が `lib/redmine_aws/s3/` のすべてのファイルを Redmine AWS の名前空間 `RedmineAws` の下に読み込み (`bin/rails zeitwerk:check`)、両方のプラグインがバージョンと「S3」のタブとともに起動する。新しいプロセスで確認する | — |
 | 置き換える Redmine のコード | 置き換えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい。master が変更したメソッドは master と等しくてもよい。master では `AvatarsController#update`、`#show`、`User#update_avatar`、`Attachment#set_content_type` も | — |
 | ブラウザー (システムのテスト) | ヘッドレスの Chromium (Selenium、別のコンテナー) で確認する。CloudFront を通したアップロードで、進み具合のバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。Redmine 7.1 では、1 MB を超えるアバターが CloudFront を通り、フォームがファイルを含めずにチケットを付けて Redmine に届き、アップロードのエラーがフォームの上に出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける (`test/system/fake_cloudfront.rb`) | LocalStack か moto |
-| ブラウザーのスクリプト | SHA-256 を既知の値と Node.js の crypto で、ばらばらの大きさに分けて確認する。`complete` は `202` のあいだ送り直し、最後に諦める。アバターの `check` も同じ | Node.js |
+| ブラウザーのスクリプト | `complete` は `202` のあいだ送り直し、`200` の応答のスクリプトを実行し、サーバーのエラーを返し、最後の再試行のあとに諦める。アバターの `check` も同じ | Node.js |
 
 <a id="not-checked-against-aws"></a>
 
