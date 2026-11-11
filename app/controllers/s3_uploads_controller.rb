@@ -10,9 +10,7 @@ class S3UploadsController < ApplicationController
   accept_api_auth :presign, :complete
 
   def presign
-    result = RedmineAws::S3::Upload.new(User.current).presign(
-      filename: params[:filename], size: params[:size], content_type: params[:content_type]
-    )
+    result = RedmineAws::S3::Upload.new(User.current).presign(**RedmineAws::S3::PresignParams.from(params))
     render json: result
   rescue RedmineAws::S3::Upload::Error => e
     render json: { errors: [e.message] }, status: :unprocessable_content

@@ -11,9 +11,7 @@ class S3AvatarUploadsController < ApplicationController
   before_action :require_login
 
   def presign
-    result = RedmineAws::S3::AvatarUpload.new(User.current).presign(
-      filename: params[:filename], size: params[:size], content_type: params[:content_type]
-    )
+    result = RedmineAws::S3::AvatarUpload.new(User.current).presign(**RedmineAws::S3::PresignParams.from(params))
     render json: result
   rescue RedmineAws::S3::Upload::Error => e
     render json: { errors: [e.message] }, status: :unprocessable_content

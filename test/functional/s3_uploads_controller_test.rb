@@ -66,6 +66,53 @@ module RedmineAws
         assert_response :not_found
       end
 
+      # Each action as a logged-in user who may upload nowhere, and as an
+      # anonymous user when the anonymous role may not upload either (403
+      # without the REST API, as Redmine answers).
+      def test_presign_and_complete_need_the_upload_permission
+        [Role.anonymous, Role.non_member].each { |role| role.update!(permissions: [:view_issues]) }
+        user = User.generate!
+        with_s3(stub_client) do |client|
+          [[user.id, :forbidden], [nil, :forbidden]].each do |user_id, status|
+            @request.session[:user_id] = user_id
+            post :presign, params: presign_params.merge(format: 'json')
+
+            assert_response status, "presign as #{user_id.inspect}"
+            post :complete, params: { ticket: 'bad', format: 'json' }
+
+            assert_response status, "complete as #{user_id.inspect}"
+          end
+          assert_empty client.api_requests
+        end
+      end
+
+      # A hash or an array in place of a string is refused, or for the
+      # content type ignored, instead of being turned into text.
+      def test_presign_refuses_parameters_that_are_not_strings
+        with_s3(stub_client) do
+          [{ filename: { name: 'note.txt' } }, { filename: ['note.txt'] }, { size: [CONTENT.bytesize] },
+           { size: { value: CONTENT.bytesize } }].each do |shape|
+            post :presign, params: presign_params.merge(shape)
+
+            assert_response :unprocessable_content, shape.inspect
+            assert_nil response.parsed_body['ticket'], shape.inspect
+          end
+        end
+      end
+
+      def test_a_content_type_that_is_not_a_string_is_ignored
+        with_s3(stub_client(head_object: ['NotFound', head])) do
+          post :presign, params: presign_params.merge(content_type: { type: 'text/html' })
+
+          assert_response :success
+          post :complete, params: { ticket: response.parsed_body['ticket'], attachment_id: 1, format: 'js' },
+                          xhr: true
+
+          assert_response :success
+          assert_equal 'text/plain', Attachment.last.content_type
+        end
+      end
+
       def test_complete_returns_the_script_of_redmines_upload
         with_s3(stub_client(head_object: ['NotFound', head])) do
           post :presign, params: presign_params
