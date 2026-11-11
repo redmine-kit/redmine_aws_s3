@@ -354,6 +354,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | `Attachment#delete_from_disk!` | S3 から消す | 削除 |
 | `Attachment#reuse_existing_file_if_possible` | digest とサイズで比べる | 同じ内容の共有 |
 | `Attachment#thumbnail` | ローカルにあればそれを、なければ S3 のものを使い、それもなければ作って置く (切り抜いたものは `_crop` の付いた別の名前) | サムネイル、[アバター](#showing-avatars) |
+| `Attachment#markdownized_preview_content` | ローカルのプレビューがあればそれを、なければ S3 のものを使い、それもなければ Redmine に作らせて S3 に置く | [Markdown のプレビュー](#the-tmp-cache) |
 | `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト (サムネイルは `Cache-Control` を付ける。Redmine 7.1 では、inline で表示する PDF 互換のファイルを `application/pdf` にする) | ダウンロード、サムネイル |
 | `AvatarsController#update` (Redmine 7.1) | ファイルの代わりにチケットがあれば、アップロードを S3 から読み、ファイルとして Redmine 自身の `update` に渡す。マルウェアスキャンが拒否した保存は、フォームのエラーにする | [アバター](#upload-of-avatars) |
 | `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付ファイルの一括ダウンロード |
@@ -364,7 +365,7 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | アバターのフォーム (Redmine 7.1) | 画像を CloudFront 署名付き URL に PUT し、チケットを付けてフォームを送信する | [アバター](#upload-of-avatars) |
 
 - **有効にする条件:** S3 のバケットの設定 (`REDMINE_S3_BUCKET`) があるときだけ、差し替えを有効にします。設定がなければ、Redmine の標準のままに動きます。Redmine 本体のテストを、そのまま通せるようにするためです ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。
-- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード (`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ) の SHA256 を、Redmine 7.0.3 のものと比べます ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。master が変更したメソッド (`Attachment#files_to_final_location`、`#thumbnail`、`AttachmentsController#download`、`#disposition`、`#upload`、`uploadBlob`) は、プラグインをそれに合わせて確認したうえで、Redmine の master ブランチ (7519645) のものとも比べます。master では、アバターが前提にする `AvatarsController#update`、`#show`、`User#update_avatar` と、CloudFront を経由するアップロードが同じ判定をする `Attachment#set_content_type` も比べます。
+- **Redmine の更新:** Redmine のバージョンアップのときは、差し替えた処理の元のコードが変わっていないかを確認します。差し替えの一覧は、この表を正とします。元のコードが変わったら、テストが失敗します。`test/unit/replaced_code_test.rb` が、この表のメソッドと、プラグインがコピーした Redmine のコード (`Attachment.create_diskfile`、`Attachment.archive_attachments`、`Attachment#thumbnail` のサムネイルの大きさ、`Attachment#markdownized_preview_cache_path` のパス) の SHA256 を、Redmine 7.0.3 のものと比べます ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#redmines-own-tests))。master が変更したメソッド (`Attachment#files_to_final_location`、`#thumbnail`、`#markdownized_preview_content`、`AttachmentsController#download`、`#disposition`、`#upload`、`uploadBlob`) は、プラグインをそれに合わせて確認したうえで、Redmine の master ブランチ (7519645) のものとも比べます。master では、アバターが前提にする `AvatarsController#update`、`#show`、`User#update_avatar` と、CloudFront を経由するアップロードが同じ判定をする `Attachment#set_content_type` も比べます。
 - **テスト:** 差し替えた処理ごとに、Redmine のテストの仕組みでテストを書きます ([setup.md](setup.md#what-the-tests-check))。
 
 <a id="permissions"></a>

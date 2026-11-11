@@ -19,6 +19,12 @@ module RedmineAws
         'Attachment#thumbnail' => %w[9f8cd48e6af280df350883d0b3890df7de4eb7958914409f1e2a8d8c791becd3
                                      b6c8fc72e7fc5097a23f619566c62b3f0760d6afb873416dac6542d9506a8792],
         'Attachment#thumbnail_path' => '0ed1c88fbcc36dcc590140c227c1a50e4fd17cf0c0513c25d11d3057761f8110',
+        # Master corrects a word of the log message only.
+        'Attachment#markdownized_preview_content' =>
+          %w[c793b8ac3b7a2ab10b4506021b228e7167d621bad928f2c61ac5345a38dd0a7c
+             c2cc7197e0eb0b21d753cb9a41ba51650108fc37e3e22541054b636e9a198d64],
+        'Attachment#markdownized_preview_cache_path' =>
+          'f29d48e6eaca79d995d5a1d6b8f659c3394a43c7798f8f67ff9e6002d250e5bc',
         'Attachment#reuse_existing_file_if_possible' =>
           '23dc82dbed448edfc47f17988e76a57b1a790a905fa2ed6e795c2d1f4ef210d5',
         'Attachment#delete_from_disk!' => '11dd94b8432905a5ff4f69a25e5b430bcc666eb8c8b39a3ab2b8a29a1774b833',
