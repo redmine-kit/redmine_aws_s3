@@ -220,6 +220,20 @@ module RedmineAws
         end
       end
 
+      # Redmine lets the files of an issue be renamed (Edit attachments); the
+      # zip then has the new names.
+      def test_download_all_after_a_rename_makes_a_new_zip
+        @request.session[:user_id] = 2
+        with_s3(stub_client(head_object: 'NotFound')) do
+          get :download_all, params: { object_type: 'issues', object_id: 3 }
+          before = signed_query(response.location).first
+          Issue.find(3).attachments.find(&:readable?).update!(filename: 'renamed.txt')
+          get :download_all, params: { object_type: 'issues', object_id: 3 }
+
+          assert_not_equal before, signed_query(response.location).first
+        end
+      end
+
       def test_download_all_reuses_a_stored_zip
         @request.session[:user_id] = 2
         with_s3(stub_client(head_object: { content_length: 1 })) do |client|

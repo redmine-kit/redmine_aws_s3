@@ -30,9 +30,10 @@ module RedmineAws
 
       private
 
-      # The same set of attachments (ids and digests) gives the same key.
+      # The same set of attachments (ids, digests and the names the zip gives
+      # them) gives the same key, so a renamed attachment gets a new zip.
       def signature
-        Digest::SHA256.hexdigest(@attachments.sort_by(&:id).map { |a| "#{a.id}:#{a.digest}" }.join(','))
+        Digest::SHA256.hexdigest(@attachments.sort_by(&:id).map { |a| [a.id, a.digest, a.filename] }.to_json)
       end
 
       # Redmine's Attachment.archive_attachments, written to a file instead of
