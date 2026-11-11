@@ -10,7 +10,9 @@ module RedmineAws
 
       module_function
 
-      # A name not used in S3 or by another attachment in the directory.
+      # A name not used in S3, by another attachment in the directory, or by a
+      # file in the directory on the local disk, which Redmine's
+      # create_diskfile also checks (the /tmp cache keeps S3 objects there).
       def free(filename, directory)
         timestamp = Time.zone.now.strftime('%y%m%d%H%M%S')
         loop do
@@ -30,7 +32,8 @@ module RedmineAws
       end
 
       def taken?(directory, name)
-        Attachment.exists?(disk_directory: directory, disk_filename: name) ||
+        File.exist?(File.join(::Attachment.storage_path, directory.to_s, name)) ||
+          Attachment.exists?(disk_directory: directory, disk_filename: name) ||
           RedmineAws::S3.storage.exists?(RedmineAws::S3.file_key(directory, name))
       end
     end
