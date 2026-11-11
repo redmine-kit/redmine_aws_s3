@@ -7,8 +7,6 @@ ja:
   label_aws_s3_enabled: 有効
   label_aws_s3_disabled: 無効
   label_aws_s3_checks: 接続テスト
-  label_aws_s3_ok: OK
-  label_aws_s3_failed: 失敗
   label_aws_s3_signed_url: 署名付き URL
   label_aws_s3_unsigned_url_denied: 署名なし URL 拒否
   label_aws_s3_delivery: 配信

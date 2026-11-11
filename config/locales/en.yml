@@ -7,8 +7,6 @@ en:
   label_aws_s3_enabled: Enabled
   label_aws_s3_disabled: Disabled
   label_aws_s3_checks: Connection tests
-  label_aws_s3_ok: OK
-  label_aws_s3_failed: Failed
   label_aws_s3_signed_url: Signed URL
   label_aws_s3_unsigned_url_denied: Unsigned URL denied
   label_aws_s3_delivery: Delivery
