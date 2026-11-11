@@ -4,8 +4,9 @@ module RedmineAws
   module S3
     # Loads the upload script on every page (attachments can be added in many
     # forms), and the avatar upload script on the avatar pages of Redmine 7.1.
-    # On the settings page adds a note on the upload limit
-    # (docs/admin.md#maximum-attachment-size).
+    # On the settings pages loads the script that adds a note on the upload
+    # limit (docs/admin.md#maximum-attachment-size). Each script says at its
+    # top why it is needed.
     class Hooks < Redmine::Hook::ViewListener
       def view_layouts_base_html_head(context = {})
         return '' unless RedmineAws::S3.enabled?
@@ -17,7 +18,7 @@ module RedmineAws
                                                                      format: 'js', only_path: true)),
           javascript_include_tag('s3_upload', plugin: 'redmine_aws_s3')
         ]
-        tags << max_size_note if context[:controller].is_a?(SettingsController)
+        tags.concat(max_size_note) if context[:controller].is_a?(SettingsController)
         tags.concat(avatar_upload) if avatar_page?(context[:controller])
         safe_join(tags, "\n")
       end
@@ -40,16 +41,8 @@ module RedmineAws
       end
 
       def max_size_note
-        javascript_tag(<<~JS)
-          document.addEventListener('DOMContentLoaded', function() {
-            var input = document.getElementById('settings_attachment_max_size');
-            if (!input || !input.parentNode) { return; }
-            var em = document.createElement('em');
-            em.className = 'info';
-            em.textContent = #{l(:text_aws_s3_max_size).to_json};
-            input.parentNode.appendChild(em);
-          });
-        JS
+        [tag.meta(name: 'redmine-s3-max-size-note', content: l(:text_aws_s3_max_size)),
+         javascript_include_tag('s3_settings', plugin: 'redmine_aws_s3')]
       end
     end
   end

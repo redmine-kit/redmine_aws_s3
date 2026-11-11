@@ -206,7 +206,10 @@ module RedmineAws
 
         assert_response :success
         assert_include 'settings_attachment_max_size', response.body
-        assert_include 'keep the CloudFront Function (/tmp/*) limit the same', response.body
+        assert_select 'meta[name=?][content^=?]', 'redmine-s3-max-size-note',
+                      'With S3, keep the CloudFront Function (/tmp/*) limit the same.'
+        assert_select 'script[src*=?]', 'plugin_assets/redmine_aws_s3/s3_settings'
+        assert_select 'script:not([src])', text: /redmine-s3|settings_attachment_max_size/, count: 0
         assert_select 'meta[name=?]', 'redmine-s3-presign-url'
       ensure
         ENV.delete(RedmineAws::S3::ENV_BUCKET)
