@@ -134,6 +134,7 @@ REDMINE_BRANCH=master bin/test   # on Redmine's master branch (7.1, with avatars
 REDMINE_AWS_DIR=<dir> bin/test   # Redmine AWS from <dir>
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
+bin/test-gem             # the gems of the plugin and Redmine AWS: built, installed, linked into plugins/, booted
 node test/javascripts/complete_test.mjs # the upload script's complete step
 node test/javascripts/avatar_check_test.mjs # the avatar script's check step
 ```

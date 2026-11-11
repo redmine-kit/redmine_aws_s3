@@ -156,6 +156,7 @@ REDMINE_BRANCH=master bin/test   # Redmine の master ブランチで (7.1、ア
 REDMINE_AWS_DIR=<dir> bin/test   # <dir> の Redmine AWS で
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
+bin/test-gem             # プラグインと Redmine AWS の gem をビルド・インストールし、plugins/ にリンクして起動する
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
 node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確認処理
 ```

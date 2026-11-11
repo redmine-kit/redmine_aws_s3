@@ -104,6 +104,27 @@ jobs:
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
 
+  # The plugin as a gem, with redmine_aws as a gem, built, installed, linked
+  # into plugins/ and booted with eager_load, as adopters install them
+  # (bin/test-gem).
+  gem:
+    needs: static
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: redmine-kit/redmine_aws
+          path: redmine_aws
+          persist-credentials: false
+      - run: bin/test-gem
+        env:
+          REDMINE_AWS_DIR: redmine_aws
+      - if: always()
+        run: bin/services --down
+
   # The tests against the latest release of redmine_aws (its newest v0.1.*
   # tag, the source of the published gem), as well as against its main
   # above: adapters install the release. Skipped until there is one.
