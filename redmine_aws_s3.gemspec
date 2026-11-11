@@ -11,7 +11,8 @@ Gem::Specification.new do |spec|
   spec.authors = ['Redmine Kit']
   spec.license = 'GPL-2.0-or-later'
   spec.homepage = 'https://github.com/redmine-kit/redmine_aws_s3'
-  spec.required_ruby_version = '>= 4.0'
+  # The Ruby versions of Redmine 7.0 (its Gemfile: ruby '>= 3.2.0', '< 4.1.0').
+  spec.required_ruby_version = '>= 3.2'
   spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib,help}/**/*']
   # aws-sdk-s3 1.178.0 (2025-01-15) added ChecksumType (FULL_OBJECT), which
   # the registration of uploads checks; the CloudFront URL signer is in every 1.x.
