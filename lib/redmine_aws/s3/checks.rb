@@ -6,7 +6,8 @@ require 'securerandom'
 module RedmineAws
   module S3
     # The connection tests of the "S3" tab (docs/admin.md). Each returns
-    # a list of [name, ok, detail].
+    # a list of [name, ok, detail]. A failed call has no detail: the screen
+    # never shows an exception message, and the log has its class.
     module Checks
       module_function
 
@@ -41,7 +42,7 @@ module RedmineAws
         url = RedmineAws::S3.url_signer.url_for(key, expires_in: 60)
         delivery_results(get(url), get(url.split('?').first))
       rescue StandardError => e
-        [[::I18n.t(:label_aws_s3_delivery), false, e.message]]
+        [failure(::I18n.t(:label_aws_s3_delivery), e)]
       ensure
         storage&.delete(key) if key
       end
@@ -61,7 +62,12 @@ module RedmineAws
         yield
         [name, true, '']
       rescue StandardError => e
-        [name, false, e.message]
+        failure(name, e)
+      end
+
+      def failure(name, error)
+        Rails.logger.warn("[redmine_aws_s3] connection test #{name} failed: #{error.class}")
+        [name, false, '']
       end
 
       def get(url)

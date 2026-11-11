@@ -44,12 +44,22 @@ module RedmineAws
         end
       end
 
+      # The screen never shows an exception message; the log has its class.
       def test_delivery_reports_errors
-        with_s3(stub_client(put_object: 'AccessDenied')) do
-          results = RedmineAws::S3::Checks.delivery
+        log = capture_log do
+          with_s3(stub_client(put_object: 'AccessDenied')) do
+            assert_equal [['Delivery', false, '']], RedmineAws::S3::Checks.delivery
+          end
+        end
 
-          assert_equal 'Delivery', results.first.first
-          assert_not results.first.second
+        assert_includes log, 'connection test Delivery failed: Aws::S3::Errors::AccessDenied'
+        assert_not_includes log, 'stubbed'
+      end
+
+      def test_read_write_reports_errors_without_their_messages
+        with_s3(stub_client(put_object: 'AccessDenied', get_object: 'NoSuchKey')) do
+          assert_equal [['PutObject', false, ''], ['GetObject', false, ''], ['DeleteObject', true, '']],
+                       RedmineAws::S3::Checks.read_write
         end
       end
     end

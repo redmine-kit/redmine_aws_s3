@@ -55,6 +55,18 @@ module RedmineAws
         with_env(ENV_MALWARE_SCAN => 'true', &)
       end
 
+      # The plugin's own lines ([redmine_aws_s3]) that the block writes to
+      # Rails' log, where controllers write too.
+      def capture_log
+        io = StringIO.new
+        logger = ActiveSupport::Logger.new(io)
+        Rails.logger.broadcast_to(logger)
+        yield
+        io.string.lines.grep(/\[redmine_aws_s3\]/).join
+      ensure
+        Rails.logger.stop_broadcasting_to(logger)
+      end
+
       def scan_tag(status)
         { tag_set: status ? [{ key: MalwareScan::TAG, value: status }] : [] }
       end

@@ -27,7 +27,9 @@ The results of the connection tests:
 | CSP sandbox | Delivery test | The response has a `Content-Security-Policy` with `sandbox` |
 | nosniff | Delivery test | The response has `X-Content-Type-Options: nosniff` |
 | Unsigned URL denied | Delivery test | The same URL without the signature returns 401 or 403 |
-| Delivery | Delivery test | Shown only when the test stops with an error, with the error message |
+| Delivery | Delivery test | Shown only when the test stops with an error |
+
+- **Failed calls:** A call that fails has an empty Details column; the screen does not show the error's message. Redmine's log has the test's name and the class of the error (for example `Aws::S3::Errors::AccessDenied`).
 
 - **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), the consistency check lets you check that nothing is missing.
 - **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
