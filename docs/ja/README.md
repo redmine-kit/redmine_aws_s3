@@ -15,7 +15,7 @@ Redmine AWS S3(`redmine_aws_s3`)は、添付ファイルを Amazon S3 に置く 
 | --- | --- | --- | --- |
 | S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト(ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアスキャンを待つこと(使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
 | アバター (Redmine 7.1) | アバターのフォームが画像を CloudFront 経由で S3 に送るので、数 MB の写真も使え、Redmine が自身のルールで登録する。切り抜いたサムネイルは S3 に置き、Redmine が返す | S3 のバケットを設定し、Redmine にアバターがある (7.1) とき。Redmine 7.0 では何も変わらない | [attachments.md](attachments.md#avatars) |
-| 管理画面 | [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) の「AWS」のメニューの「S3」のタブ。環境変数と設定、S3 の読み書きテストと CloudFront からの配信テスト、マルウェアスキャンでブロックしたファイル、データベースと S3 の整合性チェック | 管理者 | [admin.md](admin.md) |
+| 管理画面 | Redmine の管理メニューの「AWS」([Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu)) の下の「S3」のタブ。環境変数と設定、S3 の読み書きテストと CloudFront からの配信テスト、マルウェアスキャンでブロックしたファイル、データベースと S3 の整合性チェック | 管理者 | [admin.md](admin.md) |
 
 <a id="outside-lambda"></a>
 
