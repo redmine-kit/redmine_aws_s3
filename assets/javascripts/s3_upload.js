@@ -1,5 +1,5 @@
 /*
- * Redmine Serverless S3: uploads attachments from the browser through
+ * Redmine AWS S3: uploads attachments from the browser through
  * Redmine's CloudFront distribution to S3 (docs/attachments.md#upload).
  *
  * Replaces uploadBlob of Redmine's attachments.js:

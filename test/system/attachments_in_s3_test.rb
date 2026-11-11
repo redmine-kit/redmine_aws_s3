@@ -8,8 +8,8 @@ require_relative 'fake_cloudfront'
 # uploads through the fake CloudFront to the S3 of the tests (LocalStack or
 # moto), the 202 of the malware scan, downloads and thumbnails through signed
 # URLs. bin/test system runs them with Selenium in its own container.
-class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AttachmentsSystemTest < ApplicationSystemTestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :projects, :users, :email_addresses, :roles, :members, :member_roles, :trackers, :projects_trackers,
            :enabled_modules, :issue_statuses, :issues, :enumerations, :custom_fields, :custom_values,
@@ -22,9 +22,9 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
       super.sub(%r{\Ahttps://}, 'http://')
     end
   end
-  RedmineServerlessS3::UrlSigner.prepend(HttpUrls)
-  Capybara.app = RedmineServerlessS3::FakeCloudFront.new(
-    Rails.application, public_key: RedmineServerlessS3::TestHelper.private_key.public_key
+  RedmineAwsS3::UrlSigner.prepend(HttpUrls)
+  Capybara.app = RedmineAwsS3::FakeCloudFront.new(
+    Rails.application, public_key: RedmineAwsS3::TestHelper.private_key.public_key
   )
 
   def setup
@@ -34,9 +34,9 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
     @client.create_bucket(bucket: @bucket)
     @saved_env = s3_env.keys.index_with { |name| ENV.fetch(name, nil) }
     app = URI(Capybara.app_host)
-    s3_env(bucket: @bucket).merge(RedmineServerlessS3::ENV_DOMAIN => "#{app.host}:#{app.port}")
+    s3_env(bucket: @bucket).merge(RedmineAwsS3::ENV_DOMAIN => "#{app.host}:#{app.port}")
                            .each { |name, value| ENV[name] = value }
-    RedmineServerlessS3.client = @client
+    RedmineAwsS3.client = @client
     page.driver.browser.file_detector = ->(args) { args.first.to_s if File.exist?(args.first.to_s) }
     page.driver.browser.manage.timeouts.script_timeout = 60
   end
@@ -48,8 +48,8 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
 
   def teardown
     @saved_env&.each { |name, value| value.nil? ? ENV.delete(name) : ENV[name] = value }
-    ENV.delete(RedmineServerlessS3::ENV_MALWARE_SCAN)
-    RedmineServerlessS3.client = nil
+    ENV.delete(RedmineAwsS3::ENV_MALWARE_SCAN)
+    RedmineAwsS3.client = nil
   end
 
   def object(key)
@@ -128,7 +128,7 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
     assert_includes result['url'], "/#{attachment.s3_key}?"
     assert_equal 200, result['status']
     assert_equal File.read(Rails.root.join('test/fixtures/files/testfile.txt')), result['text']
-    assert_equal RedmineServerlessS3::ATTACHMENT_CSP, result['csp']
+    assert_equal RedmineAwsS3::ATTACHMENT_CSP, result['csp']
     assert_equal 'nosniff', result['nosniff']
     assert_match(/\Aattachment; filename="testfile.txt"/, result['disposition'])
   end
@@ -151,8 +151,8 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
   end
 
   def test_the_upload_waits_for_the_malware_scan
-    ENV[RedmineServerlessS3::ENV_MALWARE_SCAN] = 'true'
-    RedmineServerlessS3::MalwareScan.stubs(:wait_seconds).returns(0)
+    ENV[RedmineAwsS3::ENV_MALWARE_SCAN] = 'true'
+    RedmineAwsS3::MalwareScan.stubs(:wait_seconds).returns(0)
     answers = []
     subscriber = ActiveSupport::Notifications.subscribe('process_action.action_controller') do |*, payload|
       answers << payload[:status] if payload[:controller] == 'S3UploadsController' && payload[:action] == 'complete'
@@ -166,7 +166,7 @@ class RedmineServerlessS3AttachmentsSystemTest < ApplicationSystemTestCase
         sleep 0.5
       end
       sleep 2
-      tag = { key: RedmineServerlessS3::MalwareScan::TAG, value: 'NO_THREATS_FOUND' }
+      tag = { key: RedmineAwsS3::MalwareScan::TAG, value: 'NO_THREATS_FOUND' }
       @client.put_object_tagging(bucket: @bucket, key: key, tagging: { tag_set: [tag] })
     end
     issue = create_issue_with(Rails.root.join('test/fixtures/files/testfile.txt'))

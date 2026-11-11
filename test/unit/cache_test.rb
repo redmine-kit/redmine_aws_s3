@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3CacheTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3CacheTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   def setup
     @dir = Dir.mktmpdir
@@ -26,7 +26,7 @@ class RedmineServerlessS3CacheTest < ActiveSupport::TestCase
     oldest = write('2026/10/a', 400, 300)
     older = write('2026/11/b', 400, 200)
     newest = write('2026/11/c', 400, 100)
-    RedmineServerlessS3::Cache.prune(root: @dir, limit: 900)
+    RedmineAwsS3::Cache.prune(root: @dir, limit: 900)
 
     assert_not File.exist?(oldest)
     assert File.exist?(older)
@@ -36,7 +36,7 @@ class RedmineServerlessS3CacheTest < ActiveSupport::TestCase
   def test_prune_keeps_the_file_just_fetched
     kept = write('a', 800, 300)
     other = write('b', 400, 100)
-    RedmineServerlessS3::Cache.prune(keep: kept, root: @dir, limit: 900)
+    RedmineAwsS3::Cache.prune(keep: kept, root: @dir, limit: 900)
 
     assert File.exist?(kept)
     assert_not File.exist?(other)
@@ -46,7 +46,7 @@ class RedmineServerlessS3CacheTest < ActiveSupport::TestCase
     path = write('a', 10, 3600)
     client = stub_client
     with_s3(client) do
-      assert RedmineServerlessS3::Cache.fetch('files/a', path)
+      assert RedmineAwsS3::Cache.fetch('files/a', path)
     end
 
     assert_empty client.api_requests
@@ -58,7 +58,7 @@ class RedmineServerlessS3CacheTest < ActiveSupport::TestCase
     with_s3(stub_client(get_object: { body: 'abc' })) do
       Attachment.stubs(:storage_path).returns(@dir)
 
-      assert RedmineServerlessS3::Cache.fetch('files/2026/11/a', path)
+      assert RedmineAwsS3::Cache.fetch('files/2026/11/a', path)
     end
 
     assert_equal 'abc', File.read(path)

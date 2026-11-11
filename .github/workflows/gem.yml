@@ -28,11 +28,11 @@ jobs:
           persist-credentials: false
       - name: Check the version
         run: |
-          version=$(ruby -e 'print Gem::Specification.load("redmine_serverless_s3.gemspec").version')
+          version=$(ruby -e 'print Gem::Specification.load("redmine_aws_s3.gemspec").version')
           test "$GITHUB_REF_NAME" = "v$version" || { echo "the tag $GITHUB_REF_NAME is not v$version" >&2; exit 1; }
           if [ -f init.rb ]; then grep -q "version '$version'" init.rb || { echo "init.rb is not $version" >&2; exit 1; }; fi
           echo "version=$version" >> "$GITHUB_ENV"
-      - run: gem build redmine_serverless_s3.gemspec
+      - run: gem build redmine_aws_s3.gemspec
       - name: Push to GitHub Packages
         env:
           TOKEN: ${{ github.token }}
@@ -41,4 +41,4 @@ jobs:
           mkdir -p "$HOME/.gem"
           printf -- '---\n:github: Bearer %s\n' "$TOKEN" > "$HOME/.gem/credentials"
           chmod 0600 "$HOME/.gem/credentials"
-          gem push --key github --host https://rubygems.pkg.github.com/redmine-kit "redmine_serverless_s3-$version.gem"
+          gem push --key github --host https://rubygems.pkg.github.com/redmine-kit "redmine_aws_s3-$version.gem"

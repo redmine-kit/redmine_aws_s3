@@ -24,7 +24,7 @@ if ENV['REDMINE_S3_TEST_CORE'] == '1'
                                  region: 'us-east-1', credentials: Aws::Credentials.new('test', 'test'),
                                  http_idle_timeout: 0)
     create_bucket.call(client)
-    RedmineServerlessS3.client = client
+    RedmineAwsS3.client = client
   end
 
   # Each parallel worker has its own database and attachments directory; it
@@ -33,7 +33,7 @@ if ENV['REDMINE_S3_TEST_CORE'] == '1'
   ActiveSupport.on_load(:active_support_test_case) do
     parallelize_setup do |worker|
       ENV['REDMINE_S3_BUCKET'] = "#{ENV.fetch('REDMINE_S3_BUCKET')}-#{worker}"
-      create_bucket.call(RedmineServerlessS3.client)
+      create_bucket.call(RedmineAwsS3.client)
     end
   end
 end

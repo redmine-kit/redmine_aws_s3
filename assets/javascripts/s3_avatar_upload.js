@@ -1,5 +1,5 @@
 /*
- * Redmine Serverless S3: the avatar form of Redmine 7.1 (/my/avatar and
+ * Redmine AWS S3: the avatar form of Redmine 7.1 (/my/avatar and
  * /users/:id/avatar) sends the image through Redmine's CloudFront
  * distribution to S3 (docs/attachments.md#avatars), so that an image larger
  * than the 1 MB a request through CloudFront to Redmine can carry is

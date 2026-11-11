@@ -6,8 +6,8 @@ require_relative '../test_helper'
 # LocalStack or moto: the image sent through CloudFront and registered by
 # Redmine's own form, the cropped thumbnails kept in S3, and Redmine's own
 # rules for showing them. Skipped on Redmine 7.0, which has no avatars.
-class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AvatarsInS3Test < Redmine::IntegrationTest
+  include RedmineAwsS3::TestHelper
 
   fixtures :users, :email_addresses, :user_preferences, :roles, :members, :member_roles, :projects,
            :enabled_modules
@@ -16,7 +16,7 @@ class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
   OTHER_IMAGE = '2010/12/101223161450_testfile_2.png'
 
   def setup
-    skip 'Redmine has no avatars before 7.1' unless RedmineServerlessS3.avatars?
+    skip 'Redmine has no avatars before 7.1' unless RedmineAwsS3.avatars?
     skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
 
     set_tmp_attachments_directory
@@ -28,13 +28,13 @@ class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
   end
 
   def object(key)
-    RedmineServerlessS3.client.get_object(bucket: RedmineServerlessS3.bucket, key: key).body.read
+    RedmineAwsS3.client.get_object(bucket: RedmineAwsS3.bucket, key: key).body.read
   rescue Aws::S3::Errors::NoSuchKey
     nil
   end
 
   def keys(prefix)
-    RedmineServerlessS3.storage.keys(prefix)
+    RedmineAwsS3.storage.keys(prefix)
   end
 
   # The browser's side (s3_avatar_upload.js): presign, the PUT that
@@ -46,7 +46,7 @@ class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
     assert_response :success
     presigned = response.parsed_body
     key = URI(presigned['url']).path.delete_prefix('/')
-    RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: data)
+    RedmineAwsS3.client.put_object(bucket: RedmineAwsS3.bucket, key: key, body: data)
     post '/s3_uploads/avatar/check', params: { ticket: presigned['ticket'] }
     assert_response :success
     [key, presigned['ticket']]
@@ -293,15 +293,15 @@ class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
         post '/s3_uploads/avatar/presign', params: { filename: 'scanned.png', size: data.bytesize }
         presigned = response.parsed_body
         key = URI(presigned['url']).path.delete_prefix('/')
-        RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: data)
+        RedmineAwsS3.client.put_object(bucket: RedmineAwsS3.bucket, key: key, body: data)
         post '/s3_uploads/avatar/check', params: { ticket: presigned['ticket'] }
 
         assert_response :accepted
         assert_equal '2', response.headers['Retry-After']
 
-        RedmineServerlessS3.client.put_object_tagging(
-          bucket: RedmineServerlessS3.bucket, key: key,
-          tagging: { tag_set: [{ key: RedmineServerlessS3::MalwareScan::TAG, value: 'NO_THREATS_FOUND' }] }
+        RedmineAwsS3.client.put_object_tagging(
+          bucket: RedmineAwsS3.bucket, key: key,
+          tagging: { tag_set: [{ key: RedmineAwsS3::MalwareScan::TAG, value: 'NO_THREATS_FOUND' }] }
         )
         post '/s3_uploads/avatar/check', params: { ticket: presigned['ticket'] }
 
@@ -331,13 +331,13 @@ class RedmineServerlessS3AvatarsInS3Test < Redmine::IntegrationTest
 end
 
 # Redmine 7.0 has no avatar form: nothing of the avatar upload is there.
-class RedmineServerlessS3AvatarsBefore71Test < Redmine::IntegrationTest
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AvatarsBefore71Test < Redmine::IntegrationTest
+  include RedmineAwsS3::TestHelper
 
   fixtures :users, :email_addresses, :user_preferences
 
   def setup
-    skip 'Redmine has avatars (7.1)' if RedmineServerlessS3.avatars?
+    skip 'Redmine has avatars (7.1)' if RedmineAwsS3.avatars?
   end
 
   def test_no_avatar_upload

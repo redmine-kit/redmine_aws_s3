@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3UploadsControllerTest < Redmine::ControllerTest
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3UploadsControllerTest < Redmine::ControllerTest
+  include RedmineAwsS3::TestHelper
 
   tests S3UploadsController
 

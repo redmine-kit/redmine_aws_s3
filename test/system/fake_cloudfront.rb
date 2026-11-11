@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module RedmineServerlessS3
+module RedmineAwsS3
   # CloudFront for the system tests, in front of Redmine on the test server:
   # the paths /files/, /tmp/thumbnails/, /tmp/bulk/ (GET) and /tmp/incoming/ (PUT) go
   # to the S3 of the tests, only with a valid signed URL (canned policy,
@@ -27,7 +27,7 @@ module RedmineServerlessS3
     private
 
     def respond(request, key)
-      upload = key.start_with?(RedmineServerlessS3::INCOMING_PREFIX)
+      upload = key.start_with?(RedmineAwsS3::INCOMING_PREFIX)
       return upload(request, key) if request.put? && upload
       return download(request, key) if request.get? && !upload
 
@@ -39,16 +39,16 @@ module RedmineServerlessS3
     end
 
     def upload(request, key)
-      RedmineServerlessS3.client.put_object(bucket: RedmineServerlessS3.bucket, key: key, body: request.body.read)
+      RedmineAwsS3.client.put_object(bucket: RedmineAwsS3.bucket, key: key, body: request.body.read)
       [200, {}, []]
     end
 
     def download(request, key)
-      object = RedmineServerlessS3.client.get_object(bucket: RedmineServerlessS3.bucket, key: key)
+      object = RedmineAwsS3.client.get_object(bucket: RedmineAwsS3.bucket, key: key)
       headers = {
         'content-type' => request.params['response-content-type'] || object.content_type,
         'content-disposition' => request.params['response-content-disposition'],
-        'content-security-policy' => RedmineServerlessS3::ATTACHMENT_CSP,
+        'content-security-policy' => RedmineAwsS3::ATTACHMENT_CSP,
         'x-content-type-options' => 'nosniff'
       }.compact
       [200, headers, [object.body.read]]

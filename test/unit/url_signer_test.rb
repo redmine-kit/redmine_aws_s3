@@ -2,12 +2,12 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3UrlSignerTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3UrlSignerTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   def signer
-    RedmineServerlessS3::UrlSigner.new(domain: DOMAIN, key_pair_id: KEY_PAIR_ID,
-                                       private_key: RedmineServerlessS3::TestHelper.private_key.to_pem)
+    RedmineAwsS3::UrlSigner.new(domain: DOMAIN, key_pair_id: KEY_PAIR_ID,
+                                private_key: RedmineAwsS3::TestHelper.private_key.to_pem)
   end
 
   def test_signed_url_verifies_with_the_public_key
@@ -46,8 +46,8 @@ class RedmineServerlessS3UrlSignerTest < ActiveSupport::TestCase
   end
 
   def test_not_configured
-    signer = RedmineServerlessS3::UrlSigner.new(domain: DOMAIN, key_pair_id: nil, private_key: nil)
+    signer = RedmineAwsS3::UrlSigner.new(domain: DOMAIN, key_pair_id: nil, private_key: nil)
 
-    assert_raises(RedmineServerlessS3::UrlSigner::NotConfigured) { signer.url_for('files/a', expires_in: 1) }
+    assert_raises(RedmineAwsS3::UrlSigner::NotConfigured) { signer.url_for('files/a', expires_in: 1) }
   end
 end

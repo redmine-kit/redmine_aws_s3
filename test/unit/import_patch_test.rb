@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3ImportPatchTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3ImportPatchTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :users
 
@@ -75,17 +75,17 @@ class RedmineServerlessS3ImportPatchTest < ActiveSupport::TestCase
       end
     end
   ensure
-    Setting.plugin_redmine_serverless_s3 = {}
+    Setting.plugin_redmine_aws_s3 = {}
   end
 
   def test_off_without_the_bucket
     client = stub_client
-    RedmineServerlessS3.client = client
+    RedmineAwsS3.client = client
     import = new_import
     import.destroy
 
     assert_empty client.api_requests
   ensure
-    RedmineServerlessS3.client = nil
+    RedmineAwsS3.client = nil
   end
 end

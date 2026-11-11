@@ -2,3 +2,5 @@
 docs
 *.gem
 coverage
+# The checkout of redmine_aws in CI, which the build gets as its own context.
+redmine_aws

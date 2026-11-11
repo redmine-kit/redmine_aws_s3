@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3ChecksTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3ChecksTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   def response(klass, code, headers = {})
     res = klass.new('1.1', code, '')
@@ -12,13 +12,13 @@ class RedmineServerlessS3ChecksTest < ActiveSupport::TestCase
   end
 
   def test_delivery_with_the_headers_of_the_distribution
-    signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineServerlessS3::ATTACHMENT_CSP,
+    signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineAwsS3::ATTACHMENT_CSP,
                                           'X-Content-Type-Options' => 'nosniff')
     unsigned = response(Net::HTTPForbidden, '403')
     with_s3(stub_client) do |client|
       urls = []
-      RedmineServerlessS3::Checks.stubs(:get).with { |url| urls << url }.returns(signed, unsigned)
-      results = RedmineServerlessS3::Checks.delivery
+      RedmineAwsS3::Checks.stubs(:get).with { |url| urls << url }.returns(signed, unsigned)
+      results = RedmineAwsS3::Checks.delivery
       put = client.api_requests.find { |request| request[:operation_name] == :put_object }
       deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
 
@@ -32,8 +32,8 @@ class RedmineServerlessS3ChecksTest < ActiveSupport::TestCase
 
   def test_delivery_without_the_csp
     with_s3(stub_client) do
-      RedmineServerlessS3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
-      results = RedmineServerlessS3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
+      RedmineAwsS3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
+      results = RedmineAwsS3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
 
       assert results['Signed URL']
       assert_not results['CSP sandbox']
@@ -44,7 +44,7 @@ class RedmineServerlessS3ChecksTest < ActiveSupport::TestCase
 
   def test_delivery_reports_errors
     with_s3(stub_client(put_object: 'AccessDenied')) do
-      results = RedmineServerlessS3::Checks.delivery
+      results = RedmineAwsS3::Checks.delivery
 
       assert_equal 'Delivery', results.first.first
       assert_not results.first.second

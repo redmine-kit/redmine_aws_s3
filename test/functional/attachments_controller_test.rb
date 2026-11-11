@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AttachmentsControllerTest < Redmine::ControllerTest
+  include RedmineAwsS3::TestHelper
 
   tests AttachmentsController
 
@@ -46,7 +46,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
   def test_download_of_a_pdf_is_inline
     a = Attachment.find(4)
     a.update_columns(filename: '報告.pdf', content_type: 'application/pdf')
-    params = RedmineServerlessS3.pdf_previewable? ? { id: 4, disposition: 'inline' } : { id: 4 }
+    params = RedmineAwsS3.pdf_previewable? ? { id: 4, disposition: 'inline' } : { id: 4 }
     with_s3(stub_client) do
       get :download, params: params
       _, query, = signed_query(response.location)
@@ -58,7 +58,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
   end
 
   def test_download_of_a_pdf_without_disposition_inline_is_an_attachment
-    skip 'Redmine 7.0 sends every PDF inline' unless RedmineServerlessS3.pdf_previewable?
+    skip 'Redmine 7.0 sends every PDF inline' unless RedmineAwsS3.pdf_previewable?
 
     Attachment.find(4).update_columns(filename: 'report.pdf', content_type: 'application/pdf')
     with_s3(stub_client) do
@@ -72,7 +72,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
   # Redmine 7.1: a PDF compatible file (Illustrator) is sent as PDF only
   # inline; a file that is not a PDF is never inline.
   def test_download_of_a_pdf_compatible_file_is_pdf_only_inline
-    skip 'Redmine 7.0 has no PDF compatible files' unless RedmineServerlessS3.pdf_previewable?
+    skip 'Redmine 7.0 has no PDF compatible files' unless RedmineAwsS3.pdf_previewable?
 
     Attachment.find(4).update_columns(filename: 'logo.ai', content_type: 'application/illustrator')
     with_s3(stub_client) do
@@ -91,7 +91,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
   end
 
   def test_download_of_a_file_that_is_not_a_pdf_is_never_inline
-    skip 'Redmine 7.0 decides by the name' unless RedmineServerlessS3.pdf_previewable?
+    skip 'Redmine 7.0 decides by the name' unless RedmineAwsS3.pdf_previewable?
 
     Attachment.find(4).update_columns(filename: 'fake.pdf', content_type: 'text/html')
     with_s3(stub_client) do
@@ -155,7 +155,7 @@ class RedmineServerlessS3AttachmentsControllerTest < Redmine::ControllerTest
     get :download, params: { id: 4 }
 
     assert_response :success
-    assert_equal RedmineServerlessS3::ATTACHMENT_CSP, response.headers['Content-Security-Policy']
+    assert_equal RedmineAwsS3::ATTACHMENT_CSP, response.headers['Content-Security-Policy']
   end
 
   def test_thumbnail_redirects_to_the_stored_thumbnail

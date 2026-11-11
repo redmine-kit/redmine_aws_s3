@@ -8,8 +8,8 @@ require_relative 'fake_cloudfront'
 # (assets/javascripts/s3_avatar_upload.js): the image goes through the fake
 # CloudFront to the S3 of the tests, and the form reaches Redmine with the
 # ticket instead of the file. Skipped on Redmine 7.0, which has no avatars.
-class RedmineServerlessS3AvatarsSystemTest < ApplicationSystemTestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AvatarsSystemTest < ApplicationSystemTestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :projects, :users, :email_addresses, :user_preferences, :roles, :members, :member_roles,
            :enabled_modules
@@ -21,13 +21,13 @@ class RedmineServerlessS3AvatarsSystemTest < ApplicationSystemTestCase
       super.sub(%r{\Ahttps://}, 'http://')
     end
   end
-  RedmineServerlessS3::UrlSigner.prepend(HttpUrls)
-  Capybara.app = RedmineServerlessS3::FakeCloudFront.new(
-    Rails.application, public_key: RedmineServerlessS3::TestHelper.private_key.public_key
+  RedmineAwsS3::UrlSigner.prepend(HttpUrls)
+  Capybara.app = RedmineAwsS3::FakeCloudFront.new(
+    Rails.application, public_key: RedmineAwsS3::TestHelper.private_key.public_key
   )
 
   def setup
-    skip 'Redmine has no avatars before 7.1' unless RedmineServerlessS3.avatars?
+    skip 'Redmine has no avatars before 7.1' unless RedmineAwsS3.avatars?
     skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
 
     set_tmp_attachments_directory
@@ -36,9 +36,9 @@ class RedmineServerlessS3AvatarsSystemTest < ApplicationSystemTestCase
     @client.create_bucket(bucket: @bucket)
     @saved_env = s3_env.keys.index_with { |name| ENV.fetch(name, nil) }
     app = URI(Capybara.app_host)
-    s3_env(bucket: @bucket).merge(RedmineServerlessS3::ENV_DOMAIN => "#{app.host}:#{app.port}")
+    s3_env(bucket: @bucket).merge(RedmineAwsS3::ENV_DOMAIN => "#{app.host}:#{app.port}")
                            .each { |name, value| ENV[name] = value }
-    RedmineServerlessS3.client = @client
+    RedmineAwsS3.client = @client
     page.driver.browser.file_detector = ->(args) { args.first.to_s if File.exist?(args.first.to_s) }
     @updates = []
     @subscriber = ActiveSupport::Notifications.subscribe('process_action.action_controller') do |*, payload|
@@ -49,7 +49,7 @@ class RedmineServerlessS3AvatarsSystemTest < ApplicationSystemTestCase
   def teardown
     ActiveSupport::Notifications.unsubscribe(@subscriber) if @subscriber
     @saved_env&.each { |name, value| value.nil? ? ENV.delete(name) : ENV[name] = value }
-    RedmineServerlessS3.client = nil
+    RedmineAwsS3.client = nil
   end
 
   def large_image

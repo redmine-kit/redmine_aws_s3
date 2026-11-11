@@ -1,50 +1,49 @@
 en:
-  label_serverless_admin: Serverless
-  label_redmine_serverless_s3_admin: S3
-  label_redmine_serverless_s3_check: S3
-  label_redmine_serverless_s3_environment: Environment variables
-  label_redmine_serverless_s3_set: Set
-  label_redmine_serverless_s3_not_set: Not set
-  label_redmine_serverless_s3_enabled: Enabled
-  label_redmine_serverless_s3_disabled: Disabled
-  label_redmine_serverless_s3_checks: Connection tests
-  label_redmine_serverless_s3_ok: OK
-  label_redmine_serverless_s3_failed: Failed
-  label_redmine_serverless_s3_signed_url: Signed URL
-  label_redmine_serverless_s3_unsigned_url_denied: Unsigned URL denied
-  label_redmine_serverless_s3_delivery: Delivery
-  label_redmine_serverless_s3_reconciliation: Consistency check
-  label_redmine_serverless_s3_running: Running
-  label_redmine_serverless_s3_malware_findings: Files blocked by malware scan
-  label_redmine_serverless_s3_time: Time
-  label_redmine_serverless_s3_scan_result: Scan result
-  label_redmine_serverless_s3_scan_result_threats_found: Threats found
-  label_redmine_serverless_s3_scan_result_unsupported: Unsupported
-  label_redmine_serverless_s3_scan_result_access_denied: Access denied
-  label_redmine_serverless_s3_scan_result_failed: Failed
-  field_redmine_serverless_s3_malware_scan: GuardDuty malware scan
-  error_redmine_serverless_s3_malware_found: The malware scan found threats, so the file was blocked.
-  error_redmine_serverless_s3_malware_not_scanned: "The malware scan did not complete, so the file was blocked (%{status})."
-  button_redmine_serverless_s3_read_write: Read/write test
-  button_redmine_serverless_s3_delivery: Delivery test
-  button_redmine_serverless_s3_reconcile: Run consistency check
-  field_redmine_serverless_s3_bucket: Bucket
-  field_redmine_serverless_s3_region: Region
-  field_redmine_serverless_s3_domain: CloudFront domain
-  field_redmine_serverless_s3_key_pair_id: CloudFront key pair ID
-  field_redmine_serverless_s3_private_key: CloudFront private key
-  field_redmine_serverless_s3_storage_path: Local cache
-  field_redmine_serverless_s3_download_url_expiry: Download URL expiry
-  field_redmine_serverless_s3_upload_url_expiry: Upload URL expiry
-  field_redmine_serverless_s3_cache_size_mb: Local cache size limit
-  label_redmine_serverless_s3_seconds: seconds
-  field_redmine_serverless_s3_started_at: Started at
-  field_redmine_serverless_s3_finished_at: Last run
-  field_redmine_serverless_s3_attachments: Attachments
-  field_redmine_serverless_s3_objects: S3 objects
-  field_redmine_serverless_s3_missing: Files missing in S3
-  field_redmine_serverless_s3_unused: Unused objects
-  notice_redmine_serverless_s3_reconciliation_started: Consistency check started.
-  error_redmine_serverless_s3_invalid_settings: "Enter a positive whole number: %{names}"
-  text_redmine_serverless_s3_off: "%{name} is not set, so attachments are stored on the local disk."
-  text_redmine_serverless_s3_max_size: With S3, keep the CloudFront Function (/tmp/*) limit the same. On Lambda, POST /uploads.json is limited to 1 MB
+  label_aws_s3_admin: S3
+  label_aws_s3_check: S3
+  label_aws_s3_environment: Environment variables
+  label_aws_s3_set: Set
+  label_aws_s3_not_set: Not set
+  label_aws_s3_enabled: Enabled
+  label_aws_s3_disabled: Disabled
+  label_aws_s3_checks: Connection tests
+  label_aws_s3_ok: OK
+  label_aws_s3_failed: Failed
+  label_aws_s3_signed_url: Signed URL
+  label_aws_s3_unsigned_url_denied: Unsigned URL denied
+  label_aws_s3_delivery: Delivery
+  label_aws_s3_reconciliation: Consistency check
+  label_aws_s3_running: Running
+  label_aws_s3_malware_findings: Files blocked by malware scan
+  label_aws_s3_time: Time
+  label_aws_s3_scan_result: Scan result
+  label_aws_s3_scan_result_threats_found: Threats found
+  label_aws_s3_scan_result_unsupported: Unsupported
+  label_aws_s3_scan_result_access_denied: Access denied
+  label_aws_s3_scan_result_failed: Failed
+  field_aws_s3_malware_scan: GuardDuty malware scan
+  error_aws_s3_malware_found: The malware scan found threats, so the file was blocked.
+  error_aws_s3_malware_not_scanned: "The malware scan did not complete, so the file was blocked (%{status})."
+  button_aws_s3_read_write: Read/write test
+  button_aws_s3_delivery: Delivery test
+  button_aws_s3_reconcile: Run consistency check
+  field_aws_s3_bucket: Bucket
+  field_aws_s3_region: Region
+  field_aws_s3_domain: CloudFront domain
+  field_aws_s3_key_pair_id: CloudFront key pair ID
+  field_aws_s3_private_key: CloudFront private key
+  field_aws_s3_storage_path: Local cache
+  field_aws_s3_download_url_expiry: Download URL expiry
+  field_aws_s3_upload_url_expiry: Upload URL expiry
+  field_aws_s3_cache_size_mb: Local cache size limit
+  label_aws_s3_seconds: seconds
+  field_aws_s3_started_at: Started at
+  field_aws_s3_finished_at: Last run
+  field_aws_s3_attachments: Attachments
+  field_aws_s3_objects: S3 objects
+  field_aws_s3_missing: Files missing in S3
+  field_aws_s3_unused: Unused objects
+  notice_aws_s3_reconciliation_started: Consistency check started.
+  error_aws_s3_invalid_settings: "Enter a positive whole number: %{names}"
+  text_aws_s3_off: "%{name} is not set, so attachments are stored on the local disk."
+  text_aws_s3_max_size: With S3, keep the CloudFront Function (/tmp/*) limit the same. On Lambda, POST /uploads.json is limited to 1 MB

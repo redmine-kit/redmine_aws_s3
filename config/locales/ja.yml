@@ -1,50 +1,49 @@
 ja:
-  label_serverless_admin: Serverless
-  label_redmine_serverless_s3_admin: S3
-  label_redmine_serverless_s3_check: S3
-  label_redmine_serverless_s3_environment: 環境変数
-  label_redmine_serverless_s3_set: 設定済み
-  label_redmine_serverless_s3_not_set: 未設定
-  label_redmine_serverless_s3_enabled: 有効
-  label_redmine_serverless_s3_disabled: 無効
-  label_redmine_serverless_s3_checks: 接続テスト
-  label_redmine_serverless_s3_ok: OK
-  label_redmine_serverless_s3_failed: 失敗
-  label_redmine_serverless_s3_signed_url: 署名付き URL
-  label_redmine_serverless_s3_unsigned_url_denied: 署名なし URL 拒否
-  label_redmine_serverless_s3_delivery: 配信
-  label_redmine_serverless_s3_reconciliation: 整合性チェック
-  label_redmine_serverless_s3_running: 実行中
-  label_redmine_serverless_s3_malware_findings: マルウェアスキャンでブロックしたファイル
-  label_redmine_serverless_s3_time: 日時
-  label_redmine_serverless_s3_scan_result: スキャン結果
-  label_redmine_serverless_s3_scan_result_threats_found: 脅威を検出
-  label_redmine_serverless_s3_scan_result_unsupported: サポート対象外
-  label_redmine_serverless_s3_scan_result_access_denied: アクセス拒否
-  label_redmine_serverless_s3_scan_result_failed: 失敗
-  field_redmine_serverless_s3_malware_scan: GuardDuty マルウェアスキャン
-  error_redmine_serverless_s3_malware_found: マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。
-  error_redmine_serverless_s3_malware_not_scanned: "マルウェアスキャンが完了しなかったため、ファイルをブロックしました (%{status})。"
-  button_redmine_serverless_s3_read_write: 読み書きテスト
-  button_redmine_serverless_s3_delivery: 配信テスト
-  button_redmine_serverless_s3_reconcile: 整合性チェックを実行
-  field_redmine_serverless_s3_bucket: バケット
-  field_redmine_serverless_s3_region: リージョン
-  field_redmine_serverless_s3_domain: CloudFront ドメイン
-  field_redmine_serverless_s3_key_pair_id: CloudFront キーペア ID
-  field_redmine_serverless_s3_private_key: CloudFront 秘密鍵
-  field_redmine_serverless_s3_storage_path: ローカルキャッシュ
-  field_redmine_serverless_s3_download_url_expiry: ダウンロード URL の有効期限
-  field_redmine_serverless_s3_upload_url_expiry: アップロード URL の有効期限
-  field_redmine_serverless_s3_cache_size_mb: ローカルキャッシュサイズの上限
-  label_redmine_serverless_s3_seconds: 秒
-  field_redmine_serverless_s3_started_at: 開始日時
-  field_redmine_serverless_s3_finished_at: 最終実行
-  field_redmine_serverless_s3_attachments: 添付ファイル数
-  field_redmine_serverless_s3_objects: S3 オブジェクト数
-  field_redmine_serverless_s3_missing: S3 にないファイル
-  field_redmine_serverless_s3_unused: 未使用のオブジェクト
-  notice_redmine_serverless_s3_reconciliation_started: 整合性チェックを開始しました。
-  error_redmine_serverless_s3_invalid_settings: "正の整数を入力してください: %{names}"
-  text_redmine_serverless_s3_off: "%{name} が未設定のため、添付ファイルはローカルディスクに保存します。"
-  text_redmine_serverless_s3_max_size: S3 では CloudFront Function (/tmp/*) の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで
+  label_aws_s3_admin: S3
+  label_aws_s3_check: S3
+  label_aws_s3_environment: 環境変数
+  label_aws_s3_set: 設定済み
+  label_aws_s3_not_set: 未設定
+  label_aws_s3_enabled: 有効
+  label_aws_s3_disabled: 無効
+  label_aws_s3_checks: 接続テスト
+  label_aws_s3_ok: OK
+  label_aws_s3_failed: 失敗
+  label_aws_s3_signed_url: 署名付き URL
+  label_aws_s3_unsigned_url_denied: 署名なし URL 拒否
+  label_aws_s3_delivery: 配信
+  label_aws_s3_reconciliation: 整合性チェック
+  label_aws_s3_running: 実行中
+  label_aws_s3_malware_findings: マルウェアスキャンでブロックしたファイル
+  label_aws_s3_time: 日時
+  label_aws_s3_scan_result: スキャン結果
+  label_aws_s3_scan_result_threats_found: 脅威を検出
+  label_aws_s3_scan_result_unsupported: サポート対象外
+  label_aws_s3_scan_result_access_denied: アクセス拒否
+  label_aws_s3_scan_result_failed: 失敗
+  field_aws_s3_malware_scan: GuardDuty マルウェアスキャン
+  error_aws_s3_malware_found: マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。
+  error_aws_s3_malware_not_scanned: "マルウェアスキャンが完了しなかったため、ファイルをブロックしました (%{status})。"
+  button_aws_s3_read_write: 読み書きテスト
+  button_aws_s3_delivery: 配信テスト
+  button_aws_s3_reconcile: 整合性チェックを実行
+  field_aws_s3_bucket: バケット
+  field_aws_s3_region: リージョン
+  field_aws_s3_domain: CloudFront ドメイン
+  field_aws_s3_key_pair_id: CloudFront キーペア ID
+  field_aws_s3_private_key: CloudFront 秘密鍵
+  field_aws_s3_storage_path: ローカルキャッシュ
+  field_aws_s3_download_url_expiry: ダウンロード URL の有効期限
+  field_aws_s3_upload_url_expiry: アップロード URL の有効期限
+  field_aws_s3_cache_size_mb: ローカルキャッシュサイズの上限
+  label_aws_s3_seconds: 秒
+  field_aws_s3_started_at: 開始日時
+  field_aws_s3_finished_at: 最終実行
+  field_aws_s3_attachments: 添付ファイル数
+  field_aws_s3_objects: S3 オブジェクト数
+  field_aws_s3_missing: S3 にないファイル
+  field_aws_s3_unused: 未使用のオブジェクト
+  notice_aws_s3_reconciliation_started: 整合性チェックを開始しました。
+  error_aws_s3_invalid_settings: "正の整数を入力してください: %{names}"
+  text_aws_s3_off: "%{name} が未設定のため、添付ファイルはローカルディスクに保存します。"
+  text_aws_s3_max_size: S3 では CloudFront Function (/tmp/*) の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require File.expand_path('../../../test/test_helper', __dir__)
+require File.join(Redmine::Plugin.find(:redmine_aws).directory, 'test/support/redmine_aws/test_helper')
 
 # Coverage of the plugin's own files. Redmine's test helper starts SimpleCov
 # before Rails boots when COVERAGE is set (bin/test sets it); the report goes
@@ -16,11 +17,13 @@ if ENV['COVERAGE'] && defined?(SimpleCov)
   SimpleCov.formatters = [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::HTMLFormatter]
 end
 
-module RedmineServerlessS3
+module RedmineAwsS3
   # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
   # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
   # CloudFront key pair made for the test.
   module TestHelper
+    include RedmineAws::TestHelper
+
     DOMAIN = 'redmine.example.test'
     KEY_PAIR_ID = 'KTESTKEYPAIR'
 
@@ -35,34 +38,28 @@ module RedmineServerlessS3
 
     # Runs the block with the plugin on and the given S3 client.
     def with_s3(client, bucket: 'redmine-files')
-      saved_env = s3_env.keys.index_with { |name| ENV.fetch(name, nil) }
-      saved_client = RedmineServerlessS3.instance_variable_get(:@client)
-      s3_env(bucket: bucket).each { |name, value| ENV[name] = value }
-      RedmineServerlessS3.client = client
-      yield client
+      saved_client = RedmineAwsS3.instance_variable_get(:@client)
+      with_env(s3_env(bucket: bucket)) do
+        RedmineAwsS3.client = client
+        yield client
+      end
     ensure
-      saved_env.each { |name, value| value.nil? ? ENV.delete(name) : ENV[name] = value }
-      RedmineServerlessS3.client = saved_client
+      RedmineAwsS3.client = saved_client
     end
 
     # Runs the block with REDMINE_S3_MALWARE_SCAN=true, without waiting
     # between the requests for the scan tag.
-    def with_malware_scan
-      saved = ENV.fetch(ENV_MALWARE_SCAN, nil)
-      ENV[ENV_MALWARE_SCAN] = 'true'
+    def with_malware_scan(&)
       MalwareScan.stubs(:wait_seconds).returns(0)
-      yield
-    ensure
-      saved.nil? ? ENV.delete(ENV_MALWARE_SCAN) : ENV[ENV_MALWARE_SCAN] = saved
+      with_env(ENV_MALWARE_SCAN => 'true', &)
     end
 
     def scan_tag(status)
       { tag_set: status ? [{ key: MalwareScan::TAG, value: status }] : [] }
     end
 
-    def stub_client(**stubs)
-      Aws::S3::Client.new(stub_responses: stubs.presence || true, region: 'us-east-1',
-                          credentials: Aws::Credentials.new('test', 'test'))
+    def stub_client(**)
+      stub_aws_client(Aws::S3::Client, **)
     end
 
     # LocalStack or moto (S3_TEST_BACKEND, chosen by bin/test).
@@ -80,8 +77,9 @@ module RedmineServerlessS3
     # A client of the S3 of the tests; skips the test without it.
     def s3_test_client
       skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
-      Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true, region: 'us-east-1',
-                          credentials: Aws::Credentials.new('test', 'test'), **LOCALSTACK_CONNECTIONS)
+      Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true,
+                          region: RedmineAws::TestHelper::TEST_REGION, credentials: RedmineAws::TestHelper.credentials,
+                          **LOCALSTACK_CONNECTIONS)
     end
 
     def with_test_s3(&)

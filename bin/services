@@ -5,7 +5,7 @@
 #   bin/services --down   # stop them
 set -euo pipefail
 cd "$(dirname "$0")/.."
-compose=(docker compose -f test/compose.yml -p redmine-serverless-s3-test)
+compose=(docker compose -f test/compose.yml -p redmine-aws-s3-test)
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   compose+=(--profile localstack)
 fi

@@ -10,19 +10,25 @@
 #   bin/test <files...>       # some of the plugin's tests
 #   PARALLEL_WORKERS=1 bin/test
 #   REDMINE_BRANCH=master bin/test   # on Redmine's master branch
+#   REDMINE_AWS_DIR=<dir> bin/test   # redmine_aws from <dir> (default ../redmine_aws)
 # Commands that run inside containers are in single quotes on purpose.
 # shellcheck disable=SC2016
 set -euo pipefail
 cd "$(dirname "$0")/.."
-image=redmine-serverless-s3-test${REDMINE_BRANCH:+-$REDMINE_BRANCH}
-network=redmine-serverless-s3-test_default
+image=redmine-aws-s3-test${REDMINE_BRANCH:+-$REDMINE_BRANCH}
+network=redmine-aws-s3-test_default
 
 if [[ "${1:-}" == "system" ]]; then
   bin/services --system >/dev/null
 else
   bin/services >/dev/null
 fi
-docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" -f test/Dockerfile . >/dev/null
+# redmine_aws, which the plugin requires: a checkout next to this one, or
+# REDMINE_AWS_DIR.
+aws_dir=${REDMINE_AWS_DIR:-../redmine_aws}
+[[ -f "$aws_dir/init.rb" ]] || { echo "redmine_aws is not in $aws_dir; set REDMINE_AWS_DIR" >&2; exit 1; }
+docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" \
+  --build-context redmine_aws="$aws_dir" -f test/Dockerfile . >/dev/null
 workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   backend=localstack endpoint=http://localstack:4566
@@ -45,7 +51,7 @@ if [[ "${1:-}" == "system" ]]; then
   extra=(--network-alias redmine-test -e SELENIUM_REMOTE_URL=http://chrome:4444
     -e CAPYBARA_SERVER_HOST=0.0.0.0 -e CAPYBARA_SERVER_PORT=3001 -e CAPYBARA_APP_HOST=http://redmine-test:3001)
   workers=1
-  run bin/rails test plugins/redmine_serverless_s3/test/system "$@"
+  run bin/rails test plugins/redmine_aws_s3/test/system "$@"
 elif [[ "${1:-}" == "core-s3" ]]; then
   shift
   # The tests whose names are in s3_exclusions.txt assume Redmine's local
@@ -70,6 +76,6 @@ else
   # it when COVERAGE is set).
   rm -rf coverage && mkdir coverage
   workers=1
-  extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_serverless_s3/coverage")
-  run bin/rails test plugins/redmine_serverless_s3/test/{unit,functional,integration}
+  extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_aws_s3/coverage")
+  run bin/rails test plugins/redmine_aws_s3/test/{unit,functional,integration}
 fi

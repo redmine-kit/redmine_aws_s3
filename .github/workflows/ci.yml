@@ -46,9 +46,18 @@ jobs:
       id-token: write # Codecov with OIDC, no token stored
     env:
       REDMINE_BRANCH: ${{ matrix.redmine == 'master' && 'master' || '' }}
+      # The checkout of redmine_aws below.
+      REDMINE_AWS_DIR: redmine_aws
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          persist-credentials: false
+      # redmine_aws, which the plugin requires, until the tests install its
+      # gem. The plugin's .dockerignore keeps it out of the plugin's image.
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: redmine-kit/redmine_aws
+          path: redmine_aws
           persist-credentials: false
       # LocalStack when the organization's token is available, moto otherwise
       # (pull requests from forks); bin/test prints which one ran.

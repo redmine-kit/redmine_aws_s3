@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3AttachmentPatchTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :users, :projects, :issues, :trackers, :issue_statuses, :enumerations, :attachments
 
@@ -18,17 +18,17 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
 
   def test_off_without_the_bucket
     client = stub_client
-    RedmineServerlessS3.client = client
+    RedmineAwsS3.client = client
     a = Attachment.create!(container: Issue.find(1), author: User.find(1),
                            file: mock_file(filename: 'off.txt', content: 'off'))
 
-    assert_not RedmineServerlessS3.enabled?
+    assert_not RedmineAwsS3.enabled?
     assert File.exist?(a.diskfile)
     assert a.readable?
     a.destroy
     assert_empty client.api_requests
   ensure
-    RedmineServerlessS3.client = nil
+    RedmineAwsS3.client = nil
   end
 
   def test_files_to_final_location_puts_the_file
@@ -79,13 +79,13 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
       end
     end
   ensure
-    Setting.plugin_redmine_serverless_s3 = {}
+    Setting.plugin_redmine_aws_s3 = {}
   end
 
   def test_attachments_of_received_mail_are_not_waited_for
     with_s3(stub_client) do |client|
       with_malware_scan do
-        RedmineServerlessS3::MalwareScan.skip do
+        RedmineAwsS3::MalwareScan.skip do
           Attachment.create!(container: Issue.find(1), author: User.find(1),
                              file: mock_file(filename: 'mail.txt', content: 'mail'))
         end
@@ -253,7 +253,7 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
   def test_cropped_thumbnail_key
     with_s3(stub_client(head_object: { content_length: 1 })) do
       a = Attachment.find(16)
-      suffix = RedmineServerlessS3.thumbnail_crop? ? '100_crop' : '100'
+      suffix = RedmineAwsS3.thumbnail_crop? ? '100_crop' : '100'
 
       assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_#{suffix}.thumb", a.s3_thumbnail(size: 100, crop: true)
       assert_equal "tmp/thumbnails/#{a.digest}_#{a.filesize}_100.thumb", a.s3_thumbnail(size: 100)
@@ -262,7 +262,7 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
 
   def test_cropped_thumbnail_is_stored_under_its_own_key
     skip 'ImageMagick is not available' unless Redmine::Thumbnail.convert_available?
-    skip 'Redmine crops from 7.1' unless RedmineServerlessS3.thumbnail_crop?
+    skip 'Redmine crops from 7.1' unless RedmineAwsS3.thumbnail_crop?
 
     Attachment.clear_thumbnails
     set_fixtures_attachments_directory
@@ -282,10 +282,10 @@ class RedmineServerlessS3AttachmentPatchTest < ActiveSupport::TestCase
   private
 
   def with_plugin_settings(values)
-    saved = Setting.plugin_redmine_serverless_s3
-    Setting.plugin_redmine_serverless_s3 = (saved.is_a?(Hash) ? saved : {}).merge(values)
+    saved = Setting.plugin_redmine_aws_s3
+    Setting.plugin_redmine_aws_s3 = (saved.is_a?(Hash) ? saved : {}).merge(values)
     yield
   ensure
-    Setting.plugin_redmine_serverless_s3 = saved
+    Setting.plugin_redmine_aws_s3 = saved
   end
 end

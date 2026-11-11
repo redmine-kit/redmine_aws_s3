@@ -2,12 +2,12 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3DiskNameTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3DiskNameTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :attachments
 
-  Name = RedmineServerlessS3::DiskName
+  Name = RedmineAwsS3::DiskName
 
   def test_ascii_names_are_kept
     assert_equal 'report-1.txt', Name.ascii('report-1.txt')

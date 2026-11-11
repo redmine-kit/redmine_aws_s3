@@ -7,7 +7,7 @@ require_relative '../test_helper'
 # test fails: check the plugin against the new code, then update the SHA256.
 # A method with two values has been checked on Redmine's master branch too
 # (7519645, 2026-11-10).
-class RedmineServerlessS3ReplacedCodeTest < ActiveSupport::TestCase
+class RedmineAwsS3ReplacedCodeTest < ActiveSupport::TestCase
   METHODS = {
     'Attachment#files_to_final_location' => %w[35b195687039465548e4b2822521dfb436af2c8202196562687b9f6f2cc412a2
                                                b5da3dce052cf6dbbd1e67ec45e4a7f48d8ffa66b0d09c60cc0365fb5b32062e],
@@ -65,7 +65,7 @@ class RedmineServerlessS3ReplacedCodeTest < ActiveSupport::TestCase
 
   REDMINE_71_METHODS.each do |target, sha256|
     define_method("test_#{target.tr('#.?!=', '__pbs')}") do
-      skip 'Redmine 7.0 does not have this code' unless RedmineServerlessS3.avatars?
+      skip 'Redmine 7.0 does not have this code' unless RedmineAwsS3.avatars?
 
       assert_equal sha256, Digest::SHA256.hexdigest(source_of(original_method(target))),
                    "#{target} of Redmine changed"

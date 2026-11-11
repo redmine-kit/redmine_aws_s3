@@ -1,6 +1,6 @@
 # The sidebar section of this plugin's help, read by redmine_help
 # (https://github.com/redmine-kit/redmine_help, docs/extending.md).
 sections:
-  - id: serverless-s3
-    title: Redmine Serverless S3
-    topics: [serverless-s3/attachments]
+  - id: aws-s3
+    title: Redmine AWS S3
+    topics: [aws-s3/attachments]

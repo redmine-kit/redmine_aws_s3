@@ -2,8 +2,8 @@
 
 require_relative '../test_helper'
 
-class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
-  include RedmineServerlessS3::TestHelper
+class RedmineAwsS3UploadTest < ActiveSupport::TestCase
+  include RedmineAwsS3::TestHelper
 
   fixtures :users, :attachments
 
@@ -15,7 +15,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
   end
 
   def upload
-    RedmineServerlessS3::Upload.new(@user)
+    RedmineAwsS3::Upload.new(@user)
   end
 
   def presign(**)
@@ -42,7 +42,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
   def test_presign_checks_the_extension
     with_s3(stub_client) do
       with_settings attachment_extensions_denied: 'exe' do
-        error = assert_raises(RedmineServerlessS3::Upload::Error) { presign(filename: 'tool.exe') }
+        error = assert_raises(RedmineAwsS3::Upload::Error) { presign(filename: 'tool.exe') }
         assert_includes error.message, '.exe'
       end
     end
@@ -51,7 +51,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
   def test_presign_checks_the_size
     with_s3(stub_client) do
       with_settings attachment_max_size: '1' do
-        assert_raises(RedmineServerlessS3::Upload::Error) { presign(size: 1025) }
+        assert_raises(RedmineAwsS3::Upload::Error) { presign(size: 1025) }
         assert presign(size: 1024)
       end
     end
@@ -59,8 +59,8 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
 
   def test_presign_checks_the_name_and_size
     with_s3(stub_client) do
-      assert_raises(RedmineServerlessS3::Upload::Error) { presign(size: '-1') }
-      assert_raises(RedmineServerlessS3::Upload::Error) { presign(filename: '') }
+      assert_raises(RedmineAwsS3::Upload::Error) { presign(size: '-1') }
+      assert_raises(RedmineAwsS3::Upload::Error) { presign(filename: '') }
     end
   end
 
@@ -96,7 +96,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       attachment = upload.complete(ticket)
       read = client.api_requests.find { |request| request[:operation_name] == :get_object }
 
-      if RedmineServerlessS3.detects_content_type?
+      if RedmineAwsS3.detects_content_type?
         assert_equal 'application/pdf', attachment.content_type
         assert_equal attachment.s3_key, read[:params][:key]
         assert_equal 'bytes=0-65535', read[:params][:range]
@@ -136,7 +136,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     head = head_of(CONTENT).merge(content_length: CONTENT.bytesize + 1)
     with_s3(stub_client(head_object: ['NotFound', head])) do |client|
       assert_no_difference 'Attachment.count' do
-        error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+        error = assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(presign[:ticket]) }
         assert_includes error.message, 'size'
       end
       deleted = deleted_keys(client)
@@ -148,17 +148,17 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
 
   def test_a_copy_without_a_full_object_sha256_is_refused
     with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT, type: 'COMPOSITE')])) do |client|
-      assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+      assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(presign[:ticket]) }
       assert(deleted_keys(client).any? { |key| key.start_with?('files/') })
     end
     with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT).merge(checksum_sha256: nil)])) do
-      assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+      assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(presign[:ticket]) }
     end
   end
 
   def test_a_missing_upload_is_refused
     with_s3(stub_client(head_object: 'NotFound', copy_object: 'NoSuchKey')) do
-      error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+      error = assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(presign[:ticket]) }
       assert_includes error.message, 'not in S3'
     end
   end
@@ -167,8 +167,8 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     with_s3(stub_client(head_object: head_of(CONTENT))) do |client|
       ticket = presign[:ticket]
 
-      assert_raises(RedmineServerlessS3::Upload::Error) { RedmineServerlessS3::Upload.new(User.find(3)).complete(ticket) }
-      assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete("#{ticket}x") }
+      assert_raises(RedmineAwsS3::Upload::Error) { RedmineAwsS3::Upload.new(User.find(3)).complete(ticket) }
+      assert_raises(RedmineAwsS3::Upload::Error) { upload.complete("#{ticket}x") }
       assert_empty client.api_requests
     end
   end
@@ -177,7 +177,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     with_s3(stub_client(head_object: head_of(CONTENT))) do
       ticket = presign[:ticket]
       travel 901.seconds do
-        assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(ticket) }
+        assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(ticket) }
       end
     end
   end
@@ -199,7 +199,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       with_malware_scan do
         ticket = presign[:ticket]
 
-        assert_raises(RedmineServerlessS3::Upload::Pending) { upload.complete(ticket) }
+        assert_raises(RedmineAwsS3::Upload::Pending) { upload.complete(ticket) }
         assert_equal [:get_object_tagging], client.api_requests.pluck(:operation_name)
       end
     end
@@ -209,7 +209,7 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
     with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do |client|
       with_malware_scan do
         assert_no_difference 'Attachment.count' do
-          error = assert_raises(RedmineServerlessS3::Upload::Error) { upload.complete(presign[:ticket]) }
+          error = assert_raises(RedmineAwsS3::Upload::Error) { upload.complete(presign[:ticket]) }
           assert_includes error.message, 'threat'
         end
         assert_includes client.api_requests.pluck(:operation_name), :delete_objects
@@ -217,6 +217,6 @@ class RedmineServerlessS3UploadTest < ActiveSupport::TestCase
       end
     end
   ensure
-    Setting.plugin_redmine_serverless_s3 = {}
+    Setting.plugin_redmine_aws_s3 = {}
   end
 end
