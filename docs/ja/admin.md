@@ -1,6 +1,6 @@
 # 管理画面
 
-Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます (`require_admin`)。画面は、[Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、すべての Redmine AWS のプラグインが共有する、Redmine の管理メニューの「AWS」の下の「S3」のタブです。
+Redmine AWS S3 の管理画面です。システム管理者だけが開けます (`require_admin`)。画面は、[Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、すべての Redmine AWS のプラグインが共有する、Redmine の管理メニューの「AWS」の下の「S3」のタブです。
 
 <a id="attachments-in-s3"></a>
 
@@ -35,7 +35,7 @@ Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます
 - **「ステータス」のタブ:** バケットがあるときは、Redmine AWS の「ステータス」のタブの「接続テスト」に「S3」の行が加わります。添付ファイルのバケットの `HeadBucket` を呼び、バケットの名前を出します。
 - **秘密の値は出さない:** AWS の認証情報と CloudFront の秘密鍵は画面に出しません。AWS の API は、リンクを押したときに限り呼びます。
 - **バケットがないとき:** タブは開き、「REDMINE_S3_BUCKET が未設定のため、添付ファイルはローカルディスクに保存します。」と出します。環境変数と設定は出し、接続テスト、ブロックしたファイル、整合性チェックは出しません。
-- **操作の記録:** 設定の変更 (値ではなく設定の名前)、接続テスト、整合性チェックは、管理者のログイン名とともに Redmine のログに書きます。
+- **操作の記録:** 設定の変更 (値ではなく設定の名前)、接続テスト、整合性チェックは、システム管理者のログイン名とともに Redmine のログに書きます。
 
 <a id="the-aws-menu"></a>
 

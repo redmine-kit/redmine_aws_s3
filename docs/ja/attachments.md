@@ -253,9 +253,9 @@ Redmine 7.1 では、Gravatar の代わりに、ユーザーが Redmine にア�
 
 Redmine 7.1 のアバターの扱いは次のとおりです。
 
-- **アップロード:** 自分の画面 (「アバター変更」、`/my/avatar`) と、管理者がほかのユーザーのために使う画面 (`/users/<id>/avatar`) は、フォームで画像を Rails に送ります (`AvatarsController#update`)。`User#update_avatar` は、ユーザーをコンテナにした添付ファイルを作り、内容から判定した AVIF、GIF、JPEG、PNG、WebP (`User::AVATAR_CONTENT_TYPES`) で、ImageMagick がサムネイルを作れる画像だけを受け付けます。今のアバターを置き換える前に 100 px の切り抜いたサムネイルを作り、作れなければ画像を拒否します。古いアバターは削除します。サイズの上限は `attachment_max_size` です。
+- **アップロード:** 自分の画面 (「アバター変更」、`/my/avatar`) と、システム管理者がほかのユーザーのために使う画面 (`/users/<id>/avatar`) は、フォームで画像を Rails に送ります (`AvatarsController#update`)。`User#update_avatar` は、ユーザーをコンテナにした添付ファイルを作り、内容から判定した AVIF、GIF、JPEG、PNG、WebP (`User::AVATAR_CONTENT_TYPES`) で、ImageMagick がサムネイルを作れる画像だけを受け付けます。今のアバターを置き換える前に 100 px の切り抜いたサムネイルを作り、作れなければ画像を拒否します。古いアバターは削除します。サイズの上限は `attachment_max_size` です。
 - **表示:** 表示するのは切り抜いたサムネイルだけで、画像そのものは返しません。写真には撮影場所などのメタデータが含まれることがあるからです (`AvatarsController#show`、`/users/<id>/avatar/<avatar_key>/<サイズ>`)。`avatar_key` は添付ファイルの ID の HMAC なので、ID を順に試してアバターを探すことはできません。レスポンスには `Cache-Control: max-age=86400` を付け、ログインが必須でなければ `public` にします。
-- **画像そのもの:** ダウンロードできるのは本人と管理者だけで (`User#attachments_visible?`)、アバターの画面のリンクから取得します。
+- **画像そのもの:** ダウンロードできるのは本人とシステム管理者だけで (`User#attachments_visible?`)、アバターの画面のリンクから取得します。
 
 スマートフォンの写真は数 MB になることが多く、CloudFront を経由して Redmine に届くリクエストの上限の 1 MB を超えます ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。そこでプラグインは、添付ファイルと同じ方法で画像を S3 に送り、Redmine 自身のフォームで登録させます。
 
@@ -290,7 +290,7 @@ sequenceDiagram
 2. **署名付き URL を受け取る:** `POST /s3_uploads/avatar/presign` は、拡張子と `attachment_max_size` を確認し、`/tmp/incoming/<UUID>` 用の署名付き URL とチケットを返します。添付ファイルの `/s3_uploads/presign` と同じです ([アップロード](#upload))。Redmine ではどのユーザーも自分のアバターを変更できるので、添付ファイルのアップロードの権限ではなく、ログインだけを必要とします。
 3. **CloudFront 経由で PUT する:** 添付ファイルと同じビヘイビア `/tmp/*`、CloudFront Functions によるサイズの確認、マルウェアスキャンを使います。
 4. **スキャンを待つ:** `POST /s3_uploads/avatar/check` は、アップロードを使えるときは `200` を、マルウェアスキャンの結果がまだないときは `202` を返します。スクリプトは、1、2、4、8、15、30 秒後に問い合わせ直します。
-5. **Redmine のフォームを送信する:** スクリプトは、Redmine 自身のフォームにチケット (`s3_ticket`) を追加し、ファイルを含めずに送信します。誰がどのアバターを変更できるかは、通常どおり Redmine の `AvatarsController` が判断します。ユーザーは自分のアバターを、管理者はすべてのユーザーのアバターを変更できます。差し替えた `update` は、チケットが現在のユーザーのものかを確認し、アップロードを S3 から一時ファイルに読み込んで、フォームのファイルとして Redmine 自身の `update` に渡します。そのあとは `User#update_avatar` がそのまま動きます。コンテンツタイプ、サムネイルの可否、100 px の切り抜いたサムネイル、古いアバターの置き換えと削除、メッセージは、どれも Redmine のとおりです。画像は Lambda を通るアップロードとして保存します ([下記](#uploads-through-lambda))。`tmp/incoming/` でスキャン済みなので、マルウェアスキャンはもう一度は行いません。`tmp/incoming/` のアップロードは削除します。
+5. **Redmine のフォームを送信する:** スクリプトは、Redmine 自身のフォームにチケット (`s3_ticket`) を追加し、ファイルを含めずに送信します。誰がどのアバターを変更できるかは、通常どおり Redmine の `AvatarsController` が判断します。ユーザーは自分のアバターを、システム管理者はすべてのユーザーのアバターを変更できます。差し替えた `update` は、チケットが現在のユーザーのものかを確認し、アップロードを S3 から一時ファイルに読み込んで、フォームのファイルとして Redmine 自身の `update` に渡します。そのあとは `User#update_avatar` がそのまま動きます。コンテンツタイプ、サムネイルの可否、100 px の切り抜いたサムネイル、古いアバターの置き換えと削除、メッセージは、どれも Redmine のとおりです。画像は Lambda を通るアップロードとして保存します ([下記](#uploads-through-lambda))。`tmp/incoming/` でスキャン済みなので、マルウェアスキャンはもう一度は行いません。`tmp/incoming/` のアップロードは削除します。
 6. **エラー:** 手順 2 から 4 のエラー (大きすぎる、許可されていない拡張子、ブロックされたファイル) は、Redmine の `error_messages_for` と同じマークアップでフォームの上に表示します。手順 5 のエラーは Redmine 自身のものです。
 
 - **Redmine が画像を読む理由:** 添付ファイルと違い、Redmine はアバターの画像を必ず読みます。内容から種類を判定し、ImageMagick でサムネイルを作るからです。どのみち画像を Lambda に読み込むので、Redmine 自身の `update` で登録し、Redmine のルールをすべてそのまま使います。画像はリクエストに含まれないので、1 MB と 6 MB の上限は関係ありません。画像は `/tmp` (512 MB) に書きます。
@@ -312,7 +312,7 @@ Redmine 自身の `AvatarsController#show` は差し替えません。キーの�
 
 ### ファビコン
 
-Redmine 7.1 では、管理者がファビコンも設定できます (管理 › 設定 › 表示 の「カスタムファビコン」、PNG または ICO で 32 KB まで)。Redmine はこれを添付ファイルではなく設定のテーブルに保存するので、このプラグインは何もしません。Serverless が CloudFront でキャッシュします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-favicon))。
+Redmine 7.1 では、システム管理者がファビコンも設定できます (管理 › 設定 › 表示 の「カスタムファビコン」、PNG または ICO で 32 KB まで)。Redmine はこれを添付ファイルではなく設定のテーブルに保存するので、このプラグインは何もしません。Serverless が CloudFront でキャッシュします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-favicon))。
 
 <a id="the-tmp-cache"></a>
 
