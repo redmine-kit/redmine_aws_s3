@@ -29,7 +29,7 @@ The results of the connection tests:
 | Unsigned URL denied | Delivery test | The same URL without the signature returns 401 or 403 |
 | Delivery | Delivery test | Shown only when the test stops with an error |
 
-- **Failed calls:** A call that fails has an empty Details column; the screen does not show the error's message. Redmine's log has the test's name and the class of the error (for example `Aws::S3::Errors::AccessDenied`).
+- **Failed calls:** A call that fails shows only the class of the error in the Details column (for example `Aws::S3::Errors::AccessDenied`), as the "Status" tab of Redmine AWS does. The error's message, which may name hosts, accounts or resources, is not shown on the page; Redmine's log has the test's name with the class and the message (`[redmine_aws_s3] connection test PutObject failed: …`).
 
 - **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), the consistency check lets you check that nothing is missing.
 - **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.

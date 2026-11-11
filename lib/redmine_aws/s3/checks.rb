@@ -6,8 +6,10 @@ require 'securerandom'
 module RedmineAws
   module S3
     # The connection tests of the "S3" tab (docs/admin.md). Each returns
-    # a list of [name, ok, detail]. A failed call has no detail: the screen
-    # never shows an exception message, and the log has its class.
+    # a list of [name, ok, detail]. A failed call shows the class of the
+    # error, as the Status tab of redmine_aws does, never its message, which
+    # comes from the service and may name hosts, accounts or resources; the
+    # message goes to the log.
     module Checks
       module_function
 
@@ -66,8 +68,8 @@ module RedmineAws
       end
 
       def failure(name, error)
-        Rails.logger.warn("[redmine_aws_s3] connection test #{name} failed: #{error.class}")
-        [name, false, '']
+        Rails.logger.warn("[redmine_aws_s3] connection test #{name} failed: #{error.class}: #{error.message}")
+        [name, false, error.class.name]
       end
 
       def get(url)
