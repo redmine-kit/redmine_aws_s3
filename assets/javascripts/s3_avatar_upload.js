@@ -1,9 +1,16 @@
 /*
  * Redmine AWS S3: the avatar form of Redmine 7.1 (/my/avatar and
  * /users/:id/avatar) sends the image through Redmine's CloudFront
- * distribution to S3 (docs/attachments.md#avatars), so that an image larger
- * than the 1 MB a request through CloudFront to Redmine can carry is
- * accepted. When the form is submitted with a file:
+ * distribution to S3 (docs/attachments.md#avatars).
+ *
+ * Why a script: the form sends the image in its body, and a request through
+ * CloudFront to Redmine on Lambda carries at most 1 MB, less than a photo
+ * from a phone. Only the browser can send the image to S3 with a signed PUT
+ * before the form is submitted.
+ *
+ * Works with Redmine's avatar form (app/views/avatars/, no script of its
+ * own), rails-ujs, which disables its submit button, and s3_upload.js, whose
+ * PUT and error handling it uses. When the form is submitted with a file:
  *   1. POST /s3_uploads/avatar/presign -> a CloudFront signed URL and a ticket
  *   2. PUT the image to the URL
  *   3. POST /s3_uploads/avatar/check   -> 202 while GuardDuty's malware scan

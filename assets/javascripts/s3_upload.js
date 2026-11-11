@@ -2,7 +2,16 @@
  * Redmine AWS S3: uploads attachments from the browser through
  * Redmine's CloudFront distribution to S3 (docs/attachments.md#upload).
  *
- * Replaces uploadBlob of Redmine's attachments.js:
+ * Why a script: Redmine's attachments.js sends each file in the body of
+ * POST /uploads.js, and a request through CloudFront to Redmine on Lambda
+ * carries at most 1 MB. The file has to go from the browser to S3 with a
+ * signed PUT, which no markup or server-side code of the plugin can make the
+ * browser send.
+ *
+ * Works with Redmine's attachments.js (app/assets/javascripts/attachments.js):
+ * only its uploadBlob is replaced, so that its queue, progress bar, token
+ * handling and error display stay Redmine's. When the plugin's <meta> tags
+ * are missing, Redmine's own uploadBlob runs.
  *   1. POST /s3_uploads/presign  -> a CloudFront signed URL and a ticket
  *   2. PUT the file to the URL
  *   3. POST /s3_uploads/complete -> the same script as POST /uploads.js;
