@@ -21,31 +21,52 @@ concurrency:
 
 jobs:
   static:
+    name: static (Ruby ${{ matrix.ruby }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The Rubies of Redmine 7.0 (3.2 to 4.0). The scripts' own Ruby is 4.0.
+        include:
+          - ruby: "3.2"
+            image: ruby:3.2@sha256:d3bcbd845d26ae1efafcc987f641aa9ac796267b9b857e0f196a2b05070c8330
+          - ruby: "4.0"
+    env:
+      RUBY_IMAGE: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - run: bin/lint
-      - run: for test in test/javascripts/*_test.mjs; do node "$test"; done
+      # The scripts don't depend on Ruby; once is enough.
+      - if: matrix.ruby == '4.0'
+        run: for test in test/javascripts/*_test.mjs; do node "$test"; done
 
-  # Redmine's release, and master before the next release (7.1, which adds
-  # the avatars the plugin sends through S3). master is not pinned and does
-  # not fail the run.
+  # Redmine's release on the Rubies of Redmine 7.0 (3.2 to 4.0), and master
+  # before the next release (7.1, which adds the avatars the plugin sends
+  # through S3) on Ruby 4.0. master is not pinned and does not fail the run.
   test:
     needs: static
-    name: test (Redmine ${{ matrix.redmine }})
+    name: test (Redmine ${{ matrix.redmine }}, Ruby ${{ matrix.ruby }})
     runs-on: ubuntu-24.04-arm
     strategy:
       fail-fast: false
       matrix:
-        redmine: ["7.0.3", master]
+        include:
+          - redmine: "7.0.3"
+            ruby: "3.2"
+            image: ruby:3.2@sha256:d3bcbd845d26ae1efafcc987f641aa9ac796267b9b857e0f196a2b05070c8330
+          - redmine: "7.0.3"
+            ruby: "4.0"
+          - redmine: master
+            ruby: "4.0"
     continue-on-error: ${{ matrix.redmine == 'master' }}
     permissions:
       contents: read
       id-token: write # Codecov with OIDC, no token stored
     env:
       REDMINE_BRANCH: ${{ matrix.redmine == 'master' && 'master' || '' }}
+      RUBY_IMAGE: ${{ matrix.image }}
       # The checkout of redmine_aws below.
       REDMINE_AWS_DIR: redmine_aws
     steps:
@@ -75,7 +96,7 @@ jobs:
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
       # Not failing the run while the Codecov GitHub App is not installed.
-      - if: matrix.redmine != 'master'
+      - if: matrix.redmine != 'master' && matrix.ruby == '4.0'
         uses: codecov/codecov-action@v7.1.1
         with:
           files: coverage/coverage.xml

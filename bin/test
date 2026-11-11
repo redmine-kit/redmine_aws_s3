@@ -27,8 +27,17 @@ fi
 # REDMINE_AWS_DIR.
 aws_dir=${REDMINE_AWS_DIR:-../redmine_aws}
 [[ -f "$aws_dir/init.rb" ]] || { echo "redmine_aws is not in $aws_dir; set REDMINE_AWS_DIR" >&2; exit 1; }
-docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" \
-  --build-context redmine_aws="$aws_dir" -f test/Dockerfile . >/dev/null
+# test/Dockerfile on its Ruby (4.0), or on RUBY_IMAGE in place of its FROM
+# ruby line (CI also runs Ruby 3.2).
+dockerfile() {
+  if [[ -n "${RUBY_IMAGE:-}" ]]; then
+    sed "s|^FROM ruby:[^ ]*|FROM $RUBY_IMAGE|" test/Dockerfile
+  else
+    cat test/Dockerfile
+  fi
+}
+dockerfile | docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" \
+  --build-context redmine_aws="$aws_dir" -f - . >/dev/null
 workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   backend=localstack endpoint=http://localstack:4566
