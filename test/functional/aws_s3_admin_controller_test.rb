@@ -57,21 +57,41 @@ module RedmineAws
 
       def test_update_merges_the_settings
         RedmineAws::S3.update_settings('reconciliation' => { 'finished_at' => 'x' })
-        patch :update, params: { settings: { download_url_expiry: '120', cache_size_mb: '64', other: '1' } }
+        log = capture_log do
+          patch :update, params: { settings: { download_url_expiry: '120', cache_size_mb: '64', other: '1' } }
+        end
 
         assert_redirected_to '/admin/aws/s3'
+        assert_includes log, 'admin changed the settings download_url_expiry, cache_size_mb'
+        assert_not_includes log, '120', 'the log names the settings, not their values'
         assert_equal 120, RedmineAws::S3.download_url_expiry
         assert_equal 64.megabytes, RedmineAws::S3.cache_size
         assert_equal({ 'finished_at' => 'x' }, RedmineAws::S3::Reconciliation.result)
         assert_not Setting.plugin_redmine_aws_s3.key?('other')
       end
 
+      # The form is shown again with the values entered and the error in
+      # Redmine's error box, and nothing is saved.
       def test_update_refuses_values_that_are_not_positive_numbers
-        patch :update, params: { settings: { download_url_expiry: '0' } }
+        ['0', '-5', '1.5', 'x', '', '12345678'].each do |value|
+          patch :update, params: { settings: { download_url_expiry: value, upload_url_expiry: '600' } }
+
+          assert_response :unprocessable_content, value
+          assert_select '#errorExplanation li', text: 'Enter a positive whole number: Download URL expiry'
+          assert_select 'input[name=?][value=?]', 'settings[download_url_expiry]', value
+          assert_select 'input[name=?][value=?]', 'settings[upload_url_expiry]', '600'
+          assert_nil flash[:error]
+          assert_equal 300, RedmineAws::S3.download_url_expiry
+          assert_equal 900, RedmineAws::S3.upload_url_expiry
+        end
+      end
+
+      def test_update_ignores_settings_that_are_not_strings
+        patch :update, params: { settings: { download_url_expiry: ['120'], upload_url_expiry: { a: '1' } } }
 
         assert_redirected_to '/admin/aws/s3'
         assert_equal 300, RedmineAws::S3.download_url_expiry
-        assert_equal 'Enter a positive whole number: Download URL expiry', flash[:error]
+        assert_equal 900, RedmineAws::S3.upload_url_expiry
       end
 
       def test_read_write_check

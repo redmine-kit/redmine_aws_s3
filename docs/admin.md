@@ -14,7 +14,7 @@ This is the administration page of Redmine AWS S3. Only Redmine administrators c
 | Connection tests | "Read/write test" puts a test object (`tmp/healthcheck/<UUID>`), reads it and deletes it. "Delivery test" puts a test object, makes a signed URL for it under `/tmp/bulk/`, and requests it through CloudFront, with and without the signature. The results are shown in a table with the columns Name, Status and Details ([below](#connection-tests)) | Text links. The delivery test deletes its object afterwards |
 | Files blocked by malware scan | The last 20 files that the malware scan blocked, with the columns "Time", "Scan result", "File" and "User" (a link to the Redmine user). Shown when "GuardDuty malware scan" is "Enabled" or a blocked file is recorded | Kept in the plugin settings ([attachments.md](attachments.md#malware-scan)) |
 | Consistency check | "Run consistency check" starts the job `AwsS3ReconcileJob`, which lists `files/` and compares it with the attachments in the database. While it runs, the box shows "Status: Running" and "Started at". When it is done, it shows "Last run", "Attachments", "S3 objects" (under `files/`), "Files missing in S3" and "Unused objects", then the lists under those two names (the first 100 of each) | A text link. The result is kept in the plugin settings, so every environment shows the latest one |
-| Settings | "Download URL expiry" and "Upload URL expiry" (seconds), "Local cache size limit" (MB) | Plugin settings, changed on the page. Positive whole numbers only; invalid input shows an error that lists the labels of the wrong fields |
+| Settings | "Download URL expiry" and "Upload URL expiry" (seconds), "Local cache size limit" (MB) | Plugin settings, changed on the page. Positive whole numbers only; invalid input is not saved and stays in the form, under an error at the top of the tab that lists the labels of the wrong fields |
 
 <a id="connection-tests"></a>
 
@@ -35,7 +35,7 @@ The results of the connection tests:
 - **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
 - **No secrets shown:** AWS credentials and the CloudFront private key are not shown. AWS APIs are called only when a link is clicked.
 - **Without the bucket:** The tab still opens and shows the warning "REDMINE_S3_BUCKET is not set, so attachments are stored on the local disk." It shows the environment variables and the settings; the connection tests, the blocked files and the consistency check are not shown.
-- **Operations are logged:** Changing the settings, the connection tests and the consistency check are written to Redmine's log with the administrator's login.
+- **Operations are logged:** Changing the settings (the names of the settings, not their values), the connection tests and the consistency check are written to Redmine's log with the administrator's login.
 
 <a id="the-aws-menu"></a>
 

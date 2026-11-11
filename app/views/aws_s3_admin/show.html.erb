@@ -1,4 +1,5 @@
 <%= render partial: 'aws_admin/tabs', locals: { selected: 's3' } %>
+<%= render_error_messages(@errors) %>
 
 <% unless RedmineAws::S3.enabled? %>
 <p class="warning"><%= l(:text_aws_s3_off, name: RedmineAws::S3::ENV_BUCKET) %></p>

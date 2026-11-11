@@ -12,18 +12,23 @@ class AwsS3AdminController < ApplicationController
     @reconciliation = RedmineAws::S3::Reconciliation.result
   end
 
+  # Invalid values are shown again in the form, with the error at the top
+  # of the tab, as the tabs of Redmine's project settings show theirs.
   def update
     values = params.fetch(:settings, {}).permit(*RedmineAws::S3::DEFAULT_SETTINGS.keys).to_h
     invalid = values.reject { |_, value| value.to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
     if invalid.any?
       names = invalid.keys.map { |name| l(:"field_aws_s3_#{name}") }
-      flash[:error] = l(:error_aws_s3_invalid_settings, names: names.join(', '))
+      @errors = [l(:error_aws_s3_invalid_settings, names: names.join(', '))]
+      show
+      @settings.merge!(values)
+      render :show, status: :unprocessable_content
     else
       RedmineAws::S3.update_settings(values)
-      log("changed the settings #{values.to_json}")
+      log("changed the settings #{values.keys.join(', ')}")
       flash[:notice] = l(:notice_successful_update)
+      redirect_to aws_s3_admin_path
     end
-    redirect_to aws_s3_admin_path
   end
 
   def read_write
