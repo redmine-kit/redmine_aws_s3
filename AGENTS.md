@@ -12,6 +12,7 @@ Redmine AWS S3 (`redmine_aws_s3`) is a Redmine plugin that stores attachments in
 - **Off without its settings:** without the S3 bucket settings, Redmine behaves as standard.
 - **Replaced code:** when Redmine code is replaced, update the table of [replaced code](docs/attachments.md#replaced-code). When Redmine is upgraded, check that the original code in that table has not changed.
 - **Shared parts in redmine_aws:** the administration menu, the connection check of the Status tab and the test support come from redmine_aws ([its API](https://github.com/redmine-kit/redmine_aws/blob/main/docs/api.md)). What every AWS plugin needs goes there, not here.
+- **Code layout:** `lib/redmine_aws/s3.rb` and `lib/redmine_aws/s3/` hold `RedmineAws::S3`, in the namespace that redmine_aws defines (Redmine autoloads them with Zeitwerk; `test/unit/namespace_test.rb` runs `bin/rails zeitwerk:check`). Inside it, the AWS SDK is written `::Aws::S3`, `::Aws::CloudFront`. `init.rb` calls `RedmineAws::S3.setup`.
 - **Tests:** replaced and added code has tests, run with Redmine's own mechanism (`rake redmine:plugins:test`; `bin/test` runs them in Docker with redmine_aws from `../redmine_aws` or `REDMINE_AWS_DIR`). The test plan is in Serverless ([setup.md](docs/setup.md#what-the-tests-check)).
 - **Keep digests SHA256:** attachment tokens, ETags, thumbnails and the sharing of identical content rely on them.
 - **No secrets in the repository.**
