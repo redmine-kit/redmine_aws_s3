@@ -20,9 +20,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gem:
+  # The Ruby 4.0 image, pinned in test/ruby-4.0.Dockerfile (Dependabot
+  # updates it there), for the container of the gem job.
+  image:
     runs-on: ubuntu-24.04
-    container: ruby:4.0@sha256:a69f361db050bb2c65ec66ef75411bfc4ce2e1d993ba1179fac4e4ba6ecfe91f
+    outputs:
+      ruby: ${{ steps.ruby.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - id: ruby
+        run: echo "image=$(sed -n 's/^FROM //p' test/ruby-4.0.Dockerfile)" >> "$GITHUB_OUTPUT"
+
+  gem:
+    needs: image
+    runs-on: ubuntu-24.04
+    container: ${{ needs.image.outputs.ruby }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:

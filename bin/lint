@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Static checks: the newest RuboCop published at least 3 days ago, in Docker.
 # No lock is committed; bundle update resolves the gems again on every run.
-#   bin/lint                     # on Ruby 4.0
-#   RUBY_IMAGE=<image> bin/lint  # on another Ruby (CI also runs Ruby 3.2)
+#   bin/lint                # on Ruby 4.0
+#   TEST_RUBY=3.2 bin/lint  # on Ruby 3.2, as the CI also does
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ruby=${RUBY_IMAGE:-ruby:4.0@sha256:a69f361db050bb2c65ec66ef75411bfc4ce2e1d993ba1179fac4e4ba6ecfe91f}
-# A bundle volume per Ruby version (ruby:3.2@sha256:... -> 3.2).
-version=${ruby#ruby:}
-version=${version%%@*}
+# The Ruby image, pinned in test/ruby-<version>.Dockerfile (Dependabot
+# updates it), with a bundle volume per Ruby version.
+version=${TEST_RUBY:-4.0}
+ruby=$(sed -n 's/^FROM //p' "test/ruby-$version.Dockerfile")
 # Bundler 4 for --cooldown: Ruby 3.2 comes with Bundler 2.4.
 docker run --rm -v "$PWD:/work" -w /work -v "redmine-aws-s3-bundle-$version:/usr/local/bundle" \
   -e BUNDLE_GEMFILE=Gemfile.lint -e BUNDLER_VERSION=4.0.20 "$ruby" \

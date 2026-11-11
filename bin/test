@@ -27,14 +27,11 @@ fi
 # REDMINE_AWS_DIR.
 aws_dir=${REDMINE_AWS_DIR:-../redmine_aws}
 [[ -f "$aws_dir/init.rb" ]] || { echo "redmine_aws is not in $aws_dir; set REDMINE_AWS_DIR" >&2; exit 1; }
-# test/Dockerfile on its Ruby (4.0), or on RUBY_IMAGE in place of its FROM
-# ruby line (CI also runs Ruby 3.2).
+# test/Dockerfile on the Ruby of TEST_RUBY (default 4.0), whose image is
+# pinned in test/ruby-<version>.Dockerfile, in place of its FROM ruby line.
+ruby=$(sed -n 's/^FROM //p' "test/ruby-${TEST_RUBY:-4.0}.Dockerfile")
 dockerfile() {
-  if [[ -n "${RUBY_IMAGE:-}" ]]; then
-    sed "s|^FROM ruby:[^ ]*|FROM $RUBY_IMAGE|" test/Dockerfile
-  else
-    cat test/Dockerfile
-  fi
+  sed "s|^FROM ruby:[^ ]*|FROM $ruby|" test/Dockerfile
 }
 dockerfile | docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" \
   --build-context redmine_aws="$aws_dir" -f - . >/dev/null

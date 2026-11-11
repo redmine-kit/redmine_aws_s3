@@ -26,13 +26,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The Rubies of Redmine 7.0 (3.2 to 4.0). The scripts' own Ruby is 4.0.
-        include:
-          - ruby: "3.2"
-            image: ruby:3.2@sha256:d3bcbd845d26ae1efafcc987f641aa9ac796267b9b857e0f196a2b05070c8330
-          - ruby: "4.0"
+        # The Rubies of Redmine 7.0 (3.2 to 4.0), pinned in
+        # test/ruby-<version>.Dockerfile.
+        ruby: ["3.2", "4.0"]
     env:
-      RUBY_IMAGE: ${{ matrix.image }}
+      TEST_RUBY: ${{ matrix.ruby }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -55,7 +53,6 @@ jobs:
         include:
           - redmine: "7.0.3"
             ruby: "3.2"
-            image: ruby:3.2@sha256:d3bcbd845d26ae1efafcc987f641aa9ac796267b9b857e0f196a2b05070c8330
           - redmine: "7.0.3"
             ruby: "4.0"
           - redmine: master
@@ -66,7 +63,7 @@ jobs:
       id-token: write # Codecov with OIDC, no token stored
     env:
       REDMINE_BRANCH: ${{ matrix.redmine == 'master' && 'master' || '' }}
-      RUBY_IMAGE: ${{ matrix.image }}
+      TEST_RUBY: ${{ matrix.ruby }}
       # The checkout of redmine_aws below.
       REDMINE_AWS_DIR: redmine_aws
     steps:

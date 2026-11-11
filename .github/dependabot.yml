@@ -24,3 +24,8 @@ updates:
     cooldown:
       default-days: 7
       semver-patch-days: 3
+    # The Rubies of Redmine 7.0 (test/ruby-3.2.Dockerfile, test/ruby-4.0.Dockerfile,
+    # test/Dockerfile): new digests only, not ruby:3.3 or ruby:4.1.
+    ignore:
+      - dependency-name: ruby
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

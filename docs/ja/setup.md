@@ -170,7 +170,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 ### 差し替えた処理、カバレッジ、CI
 
-差し替えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と Pull Request のたびに `bin/lint`、JavaScript のテスト、`bin/test`、`bin/test core-s3`、`bin/test system` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、差し替えた処理のテストで、master が変更したメソッドがわかります。CI は、静的チェックとテストを Ruby 3.2 と 4.0 で実行します。ローカルでは、`RUBY_IMAGE=ruby:3.2 bin/test` (または `bin/lint`) で Ruby 3.2 で実行します。
+差し替えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と Pull Request のたびに `bin/lint`、JavaScript のテスト、`bin/test`、`bin/test core-s3`、`bin/test system` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、差し替えた処理のテストで、master が変更したメソッドがわかります。CI は、静的チェックとテストを Ruby 3.2 と 4.0 で実行します。ローカルでは、`TEST_RUBY=3.2 bin/test` (または `bin/lint`) で Ruby 3.2 で実行します。
 
 <a id="what-the-tests-check"></a>
 
