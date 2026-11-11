@@ -45,6 +45,7 @@ module RedmineAws
       # Called from init.rb, on every code reload.
       def setup
         prepend_patches
+        LogFilter.install
         # Loaded here so that the listener registers itself in every environment.
         Hooks.name
         RedmineAws::Admin.register_tab(:s3, label: :label_aws_s3_admin,
@@ -65,9 +66,7 @@ module RedmineAws
         patches.each { |target, patch| target.prepend(patch) unless target < patch }
       end
 
-      def enabled?
-        bucket.present?
-      end
+      def enabled? = bucket.present?
 
       # The S3 key of a thumbnail at path under Redmine's tmp/thumbnails.
       def thumbnail_key(path)
