@@ -138,20 +138,20 @@ module RedmineAws
       end
 
       # Merges values into the plugin settings, keeping the other keys (such
-      # as the reconciliation result).
+      # as the reconciliation result). Merged into the row read again under a
+      # lock, not into Setting's cache, which a process without requests (the
+      # job worker) never refreshes: an administrator's newer change stays.
       def update_settings(values)
-        settings = Setting.plugin_redmine_aws_s3
-        settings = settings.is_a?(Hash) ? settings.to_h.stringify_keys : {}
-        Setting.plugin_redmine_aws_s3 = settings.merge(values.to_h.stringify_keys)
+        Setting.transaction do
+          settings = Setting.where(name: 'plugin_redmine_aws_s3').lock.first&.value
+          settings = settings.is_a?(Hash) ? settings.to_h.stringify_keys : {}
+          Setting.plugin_redmine_aws_s3 = settings.merge(values.to_h.stringify_keys)
+        end
       end
 
-      def download_url_expiry
-        setting('download_url_expiry').to_i.clamp(1, 7.days.to_i)
-      end
+      def download_url_expiry = setting('download_url_expiry').to_i.clamp(1, 7.days.to_i)
 
-      def upload_url_expiry
-        setting('upload_url_expiry').to_i.clamp(1, 7.days.to_i)
-      end
+      def upload_url_expiry = setting('upload_url_expiry').to_i.clamp(1, 7.days.to_i)
 
       def cache_size
         setting('cache_size_mb').to_i.clamp(1, 10_240).megabytes
