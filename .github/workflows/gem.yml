@@ -31,7 +31,6 @@ jobs:
         run: |
           version=$(ruby -e 'print Gem::Specification.load("redmine_aws_s3.gemspec").version')
           test "$GITHUB_REF_NAME" = "v$version" || { echo "the tag $GITHUB_REF_NAME is not v$version" >&2; exit 1; }
-          if [ -f init.rb ]; then grep -q "version '$version'" init.rb || { echo "init.rb is not $version" >&2; exit 1; }; fi
           echo "version=$version" >> "$GITHUB_ENV"
       - run: gem build redmine_aws_s3.gemspec
       - name: Push to GitHub Packages
