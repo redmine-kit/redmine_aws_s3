@@ -70,7 +70,7 @@
 <% user = User.find_by_login(finding['user'].to_s) if finding['user'].present? %>
 <tr>
     <td><%= finding['time'].present? ? format_time(Time.iso8601(finding['time'])) : '' %></td>
-    <td><%= l(:"label_aws_s3_scan_result_#{finding['status'].to_s.downcase}", default: finding['status'].to_s) %></td>
+    <td><%= RedmineAws::S3::MalwareScan.status_label(finding['status']) %></td>
     <td class="name"><%= finding['filename'] %></td>
     <td class="name"><%= user ? link_to_user(user) : finding['user'] %></td>
 </tr>
