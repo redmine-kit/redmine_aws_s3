@@ -1,6 +1,6 @@
 # Setup
 
-What a Redmine needs to use Redmine AWS S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against moto, and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
+What a Redmine server needs to use Redmine AWS S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against moto, and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
 
 ## Requirements
 
