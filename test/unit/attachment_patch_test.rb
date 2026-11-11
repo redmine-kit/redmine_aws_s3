@@ -77,6 +77,17 @@ module RedmineAws
         end
       end
 
+      # Both attachments are locked while the file is shared, as Redmine's
+      # reuse_existing_file_if_possible locks them, so that the existing one is
+      # not deleted meanwhile.
+      def test_sharing_locks_the_existing_attachment
+        with_s3(stub_client) do
+          create_issue_attachment('first.txt', 'abcd')
+          Attachment.any_instance.expects(:lock!).twice
+          create_issue_attachment('second.txt', 'abcd')
+        end
+      end
+
       def test_same_content_is_shared_by_digest_and_size
         with_s3(stub_client) do |client|
           a1 = create_issue_attachment('first.txt', 'abcd')

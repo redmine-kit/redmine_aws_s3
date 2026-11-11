@@ -125,16 +125,21 @@ module RedmineAws
       end
 
       # Points this attachment at the file of the newest other attachment with
-      # the same SHA256 and size. Returns that attachment, or nil.
+      # the same SHA256 and size, locked as Redmine locks it, so that it is not
+      # deleted meanwhile. Returns that attachment, or nil. The only place
+      # that shares files: uploads through CloudFront are shared here too,
+      # after they are saved.
       def share_existing_file(original_filename)
         return nil unless digest.to_s.size == 64
 
         existing = Attachment.where(digest: digest, filesize: filesize)
                              .where.not(disk_filename: original_filename).order(:id).last
-        return nil unless existing&.readable?
+        existing&.with_lock do
+          next nil unless existing.readable?
 
-        update_columns(disk_directory: existing.disk_directory, disk_filename: existing.disk_filename)
-        existing
+          update_columns(disk_directory: existing.disk_directory, disk_filename: existing.disk_filename)
+          existing
+        end
       end
 
       # Deletes the file, its thumbnails and its Markdown preview in S3, then

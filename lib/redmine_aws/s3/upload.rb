@@ -46,7 +46,6 @@ module RedmineAws
         scan!(data['key'], data)
         attachment = copied_attachment(data)
         copied = attachment.s3_key
-        share_existing(attachment)
         return attachment if attachment.save
 
         storage.delete(copied) if attachment.s3_key == copied
@@ -136,18 +135,6 @@ module RedmineAws
 
         head = storage.read_start(attachment.s3_key, 64.kilobytes) if attachment.filesize.to_i.positive?
         Marcel::MimeType.for(StringIO.new(head.to_s), name: attachment.filename)
-      end
-
-      # Shares an existing file with the same SHA256 and size instead of the
-      # copy, as Redmine's reuse_existing_file_if_possible does.
-      def share_existing(attachment)
-        existing = Attachment.where(digest: attachment.digest, filesize: attachment.filesize)
-                             .where.not(disk_filename: [nil, '']).order(:id).last
-        return unless existing&.readable?
-
-        storage.delete(attachment.s3_key)
-        attachment.disk_directory = existing.disk_directory
-        attachment.disk_filename = existing.disk_filename
       end
 
       def storage
