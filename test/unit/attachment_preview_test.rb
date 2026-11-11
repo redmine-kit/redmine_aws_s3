@@ -44,6 +44,18 @@ module RedmineAws
         end
       end
 
+      # The preview in S3 is enough: Redmine's own code, which reads the whole
+      # original first, does not run.
+      def test_a_preview_in_s3_does_not_read_the_original
+        Redmine::Markdownizer.expects(:convert).never
+
+        with_s3(stub_client(head_object: {}, get_object: { body: '# Preview' })) do |client|
+          assert_equal '# Preview', @attachment.markdownized_preview_content
+          read = client.api_requests.select { |r| r[:operation_name] == :get_object }
+          assert_equal [preview_key], read.pluck(:params).pluck(:key)
+        end
+      end
+
       def test_markdownized_preview_is_reused_from_s3
         Redmine::Markdownizer.stubs(:convert).returns(@target)
 

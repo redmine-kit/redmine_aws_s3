@@ -13,20 +13,22 @@ module RedmineAws
         "#{PREVIEWS_PREFIX}#{File.basename(attachment.markdownized_preview_cache_path)}"
       end
 
-      # Runs Redmine's own code (the block) with the preview fetched from S3
-      # when this environment does not have it, and stores the one it made.
+      # The preview of this environment or of S3, without running Redmine's
+      # own code (the block), which would fetch the whole original first. The
+      # block makes it only when there is none; the one it made is stored.
       def around(attachment)
         target = attachment.markdownized_preview_cache_path
-        fetch(key(attachment), target) unless File.exist?(target)
-        made_here = !File.exist?(target)
+        return File.read(target, mode: 'rb') if File.exist?(target) || fetch(key(attachment), target)
+
         content = yield
-        RedmineAws::S3.storage.put_file(key(attachment), target) if content && made_here && File.exist?(target)
+        RedmineAws::S3.storage.put_file(key(attachment), target) if content && File.exist?(target)
         content
       end
 
+      # Whether the preview was fetched from S3.
       def fetch(key, target)
         storage = RedmineAws::S3.storage
-        return unless storage.exists?(key)
+        return false unless storage.exists?(key)
 
         FileUtils.mkdir_p(File.dirname(target))
         storage.download(key, target)
