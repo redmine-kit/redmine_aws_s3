@@ -1,6 +1,11 @@
-.git
-docs
-*.gem
-coverage
-# The checkout of redmine_aws in CI, which the build gets as its own context.
-redmine_aws
+*
+!init.rb
+!Gemfile
+!redmine_aws_s3.gemspec
+!LICENSE
+!app/
+!assets/
+!config/
+!lib/
+!help/
+!test/
