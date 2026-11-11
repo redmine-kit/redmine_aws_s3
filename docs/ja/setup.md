@@ -7,6 +7,7 @@ Redmine AWS S3 を使う Redmine に要るもの (インストール、設定、
 ## 動作環境
 
 - Redmine 7.0 以降。
+- [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_aws`) 0.1 以降。「AWS」の管理メニューがあります (gem の依存です。チェックアウトでは、これもクローンします)。
 - AWS の認証情報で S3 に届くプロセス (Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロール)。Redmine にアクセスキーは置きません。
 - Redmine を CloudFront のディストリビューションで配っていること。ブラウザーは、ファイルのアップロードとダウンロードも、これを通して行い、S3 のドメインには触れません ([attachments.md](attachments.md#upload))。
 
@@ -29,7 +30,7 @@ Redmine AWS S3 を使う Redmine に要るもの (インストール、設定、
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は gem の `redmine_aws` に依存するので、Bundler が同じソースからインストールします。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -49,7 +50,7 @@ ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
 
 ### gem を使わないとき
 
-リポジトリを `plugins/redmine_aws` と `plugins/redmine_aws_s3` にクローンし、gem をインストールします。
+リポジトリを `plugins/redmine_aws` と `plugins/redmine_aws_s3` にクローンし、gem をインストールします。Rails の起動前に読み込むものがないので、`Gemfile.local` に行を追加する必要はありません。
 
 ```sh
 git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws

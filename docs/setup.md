@@ -5,6 +5,7 @@ What a Redmine needs to use Redmine AWS S3: installation, configuration, the buc
 ## Requirements
 
 - Redmine 7.0 or later.
+- [Redmine AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_aws`) 0.1 or later, which has the "AWS" administration menu (a dependency of the gem; with a checkout, it is cloned too).
 - A process that can reach S3 with AWS credentials (an execution role on Lambda, an instance profile or a task role elsewhere). No access keys are stored in Redmine.
 - Redmine is served through a CloudFront distribution. Browsers upload and download files through it, never through the S3 domain ([attachments.md](attachments.md#upload)).
 
@@ -23,7 +24,7 @@ What a Redmine needs to use Redmine AWS S3: installation, configuration, the buc
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_aws`, so Bundler installs it from the same source. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
 
 ```ruby
 # Redmine's Gemfile.local
@@ -41,7 +42,7 @@ ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
 
 ### Without the gem
 
-Clone the repositories into `plugins/redmine_aws` and `plugins/redmine_aws_s3` and install the gems:
+Clone the repositories into `plugins/redmine_aws` and `plugins/redmine_aws_s3` and install the gems. Nothing of the plugin has to load before Rails starts, so it needs no line in `Gemfile.local`:
 
 ```sh
 git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws
