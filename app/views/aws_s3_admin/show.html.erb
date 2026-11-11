@@ -7,19 +7,7 @@
 
 <h3><%= l(:label_aws_s3_environment) %></h3>
 
-<div class="box tabular settings">
-  <% [[:bucket, RedmineAws::S3::ENV_BUCKET, RedmineAws::S3.bucket],
-      [:region, RedmineAws::S3::ENV_REGION, RedmineAws::S3.region],
-      [:domain, RedmineAws::S3::ENV_DOMAIN, RedmineAws::S3.cloudfront_domain],
-      [:key_pair_id, RedmineAws::S3::ENV_KEY_PAIR_ID, RedmineAws::S3.key_pair_id],
-      [:private_key, RedmineAws::S3::ENV_PRIVATE_KEY,
-       l(RedmineAws::S3.private_key? ? :label_aws_s3_set : :label_aws_s3_not_set)],
-      [:malware_scan, RedmineAws::S3::ENV_MALWARE_SCAN,
-       l(RedmineAws::S3.malware_scan? ? :label_aws_s3_enabled : :label_aws_s3_disabled)]].each do |name, env, value| %>
-  <p><label><%= l(:"field_aws_s3_#{name}") %></label><%= value || '-' %> <em class="info"><%= env %></em></p>
-  <% end %>
-  <p><label><%= l(:field_aws_s3_storage_path) %></label><%= Attachment.storage_path %> <em class="info">attachments_storage_path</em></p>
-</div>
+<%= render partial: 'aws_admin/values', locals: { rows: aws_s3_environment_rows, css: 'environment' } %>
 
 <% if RedmineAws::S3.enabled? %>
 <h3><%= l(:label_aws_s3_checks) %></h3>
@@ -30,28 +18,7 @@
 </p>
 
 <% if (results = flash[:aws_s3_checks]).present? %>
-<div class="autoscroll">
-<table class="list checks" id="aws-s3-checks"><thead>
-<tr>
-    <th><%= l(:field_name) %></th>
-    <th><%= l(:field_status) %></th>
-    <th><%= l(:label_details) %></th>
-</tr></thead>
-<tbody>
-<% results.each do |name, ok, detail| %>
-<tr class="<%= ok ? 'ok' : 'failed' %>">
-    <td class="name"><%= name %></td>
-    <td class="tick">
-      <span class="icon-only icon-<%= ok ? 'ok' : 'error' %>">
-        <%= ok ? sprite_icon('checked', l(:label_aws_ok)) : sprite_icon('warning', l(:label_aws_failed)) %>
-      </span>
-    </td>
-    <td class="description"><%= detail %></td>
-</tr>
-<% end %>
-</tbody>
-</table>
-</div>
+<%= render partial: 'aws_admin/values', locals: { rows: aws_s3_check_rows(results), css: 'checks' } %>
 <% end %>
 
 <% if RedmineAws::S3.malware_scan? || @findings.any? %>
@@ -90,19 +57,8 @@
 
 <% if @reconciliation.blank? %>
 <p class="nodata"><%= l(:label_no_data) %></p>
-<% elsif @reconciliation['finished_at'].blank? %>
-<div class="box tabular settings" id="aws-s3-reconciliation">
-  <p><label><%= l(:field_status) %></label><%= l(:label_aws_s3_running) %></p>
-  <p><label><%= l(:field_aws_s3_started_at) %></label><%= format_time(Time.iso8601(@reconciliation['started_at'])) %></p>
-</div>
 <% else %>
-<div class="box tabular settings" id="aws-s3-reconciliation">
-  <p><label><%= l(:field_aws_s3_finished_at) %></label><%= format_time(Time.iso8601(@reconciliation['finished_at'])) %></p>
-  <p><label><%= l(:field_aws_s3_attachments) %></label><%= number_with_delimiter(@reconciliation['attachments']) %></p>
-  <p><label><%= l(:field_aws_s3_objects) %></label><%= number_with_delimiter(@reconciliation['objects']) %> <em class="info">files/</em></p>
-  <p><label><%= l(:field_aws_s3_missing) %></label><%= number_with_delimiter(@reconciliation['missing_count']) %></p>
-  <p><label><%= l(:field_aws_s3_unused) %></label><%= number_with_delimiter(@reconciliation['unused_count']) %></p>
-</div>
+<%= render partial: 'aws_admin/values', locals: { rows: aws_s3_reconciliation_rows(@reconciliation), css: 'reconciliation' } %>
 <% %w[missing unused].each do |kind| %>
 <% if Array(@reconciliation[kind]).any? %>
 <h4><%= l(:"field_aws_s3_#{kind}") %></h4>

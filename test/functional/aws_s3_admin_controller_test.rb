@@ -25,11 +25,11 @@ module RedmineAws
           get :show
 
           assert_response :success
-          assert_select 'div.box.tabular p', text: /redmine-files/
-          assert_select 'div.box.tabular p', text: /#{Regexp.escape(DOMAIN)}/
-          assert_select 'div.box.tabular p', text: /Set\s*REDMINE_CLOUDFRONT_PRIVATE_KEY/
+          assert_select 'table.list.values.environment tr', text: /redmine-files/
+          assert_select 'table.list.values.environment tr', text: /#{Regexp.escape(DOMAIN)}/
+          assert_select 'table.list.values.environment tr', text: /Set\s*REDMINE_CLOUDFRONT_PRIVATE_KEY/
           assert_not_includes response.body, 'PRIVATE KEY'
-          assert_select 'div.box.tabular p', text: /GuardDuty malware scan\s*Disabled/
+          assert_select 'table.list.values.environment tr', text: /GuardDuty malware scan\s*Disabled/
         end
       end
 

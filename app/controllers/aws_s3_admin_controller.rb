@@ -5,6 +5,8 @@
 class AwsS3AdminController < ApplicationController
   include RedmineAws::AdminTab
 
+  helper :aws_s3_admin
+
   before_action :require_s3, except: %i[show update]
 
   def show

@@ -47,16 +47,16 @@ module RedmineAws
       def test_shows_the_counts_of_the_reconciliation
         show_reconciliation
 
-        assert_select '#aws-s3-reconciliation p', text: /Attachments\s*1,200/
-        assert_select '#aws-s3-reconciliation p', text: %r{S3 objects\s*1,201\s*files/}
-        assert_select '#aws-s3-reconciliation p', text: /Files missing in S3\s*1/
-        assert_select '#aws-s3-reconciliation p', text: /Unused objects\s*2/
+        assert_select 'table.list.values.reconciliation tr', text: /Attachments\s*1,200/
+        assert_select 'table.list.values.reconciliation tr', text: %r{S3 objects\s*1,201\s*files/}
+        assert_select 'table.list.values.reconciliation tr', text: /Files missing in S3\s*1/
+        assert_select 'table.list.values.reconciliation tr', text: /Unused objects\s*2/
       end
 
       def test_shows_the_time_and_the_keys_of_the_reconciliation
         show_reconciliation
 
-        assert_select '#aws-s3-reconciliation p', text: /Last run\s*2026-11-06 \d\d:44/
+        assert_select 'table.list.values.reconciliation tr', text: /Last run\s*2026-11-06 \d\d:44/
         assert_not_includes response.body, '2026-11-06T22:44:01Z'
         assert_select 'li code', text: 'files/2026/11/a'
       end
@@ -66,8 +66,8 @@ module RedmineAws
         with_s3(stub_client) do
           with_settings(date_format: '%Y-%m-%d', time_format: '%H:%M') { get :show }
 
-          assert_select '#aws-s3-reconciliation p', text: /Status\s*Running/
-          assert_select '#aws-s3-reconciliation p', text: /Started at\s*2026-11-06 \d\d:40/
+          assert_select 'table.list.values.reconciliation tr', text: /Status\s*Running/
+          assert_select 'table.list.values.reconciliation tr', text: /Started at\s*2026-11-06 \d\d:40/
         end
       end
 

@@ -58,7 +58,7 @@ module RedmineAws
         each_language do |language|
           visit '/admin/aws/s3'
           click_link I18n.t(:button_aws_s3_read_write, locale: language)
-          assert_selector '#aws-s3-checks'
+          assert_selector 'table.list.values.checks'
           shoot 's3-admin', language
         end
       end
