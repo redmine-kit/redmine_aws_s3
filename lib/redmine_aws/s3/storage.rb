@@ -34,9 +34,12 @@ module RedmineAws
         FileUtils.rm_f(temp) if temp
       end
 
-      # Writes the object into io. Returns false if the object does not exist.
-      def read(key, io)
-        client.get_object(bucket: bucket, key: key, response_target: io)
+      # Writes the object into io, or only its first bytes when bytes is
+      # given. Returns false if the object does not exist.
+      def read(key, io, bytes: nil)
+        params = { bucket: bucket, key: key, response_target: io }
+        params[:range] = "bytes=0-#{bytes - 1}" if bytes
+        client.get_object(params)
         true
       rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound
         false

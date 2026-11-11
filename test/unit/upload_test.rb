@@ -221,6 +221,46 @@ module RedmineAws
       ensure
         Setting.plugin_redmine_aws_s3 = {}
       end
+
+      def avatar_upload
+        RedmineAws::S3::AvatarUpload.new(@user)
+      end
+
+      def get_object_params(client)
+        client.api_requests.find { |request| request[:operation_name] == :get_object }[:params]
+      end
+
+      # A signed URL does not limit what is PUT to it: an avatar upload larger
+      # than declared is read only up to one byte over its size.
+      def test_an_avatar_upload_is_read_up_to_one_byte_over_its_size
+        with_s3(stub_client(get_object: { body: "#{CONTENT}x" })) do |client|
+          ticket = avatar_upload.presign(filename: 'a.png', size: CONTENT.bytesize)[:ticket]
+          error = assert_raises(RedmineAws::S3::Upload::Error) { avatar_upload.open(ticket) { flunk } }
+
+          assert_equal 'the uploaded file does not match its size', error.message
+          assert_equal "bytes=0-#{CONTENT.bytesize}", get_object_params(client)[:range]
+          assert_includes client.api_requests.pluck(:operation_name), :delete_objects
+        end
+      end
+
+      def test_an_avatar_upload_of_the_declared_size
+        with_s3(stub_client(get_object: { body: CONTENT })) do |client|
+          ticket = avatar_upload.presign(filename: 'a.png', size: CONTENT.bytesize, content_type: 'image/png')[:ticket]
+          read = avatar_upload.open(ticket) { |file| [file.original_filename, file.content_type, file.read] }
+
+          assert_equal ['a.png', 'image/png', CONTENT], read
+          assert_equal "bytes=0-#{CONTENT.bytesize}", get_object_params(client)[:range]
+        end
+      end
+
+      def test_an_empty_avatar_upload_is_not_read
+        with_s3(stub_client) do |client|
+          ticket = avatar_upload.presign(filename: 'a.png', size: 0)[:ticket]
+
+          assert_equal 0, avatar_upload.open(ticket, &:size)
+          assert_not_includes client.api_requests.pluck(:operation_name), :get_object
+        end
+      end
     end
   end
 end

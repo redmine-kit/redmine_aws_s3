@@ -16,14 +16,16 @@ module RedmineAws
       end
 
       # Yields the upload as a file sent in a form. The upload is deleted
-      # afterwards, in every case but Pending.
+      # afterwards, in every case but Pending. At most one byte more than the
+      # declared size is read: a signed URL cannot limit what is PUT to it,
+      # and a larger object would otherwise fill /tmp before the size check.
       def open(ticket)
         data = verify!(ticket)
         key = data['key']
         scan!(key, data)
         begin
           Tempfile.create(['redmine-s3-upload', File.extname(data['filename'].to_s)], binmode: true) do |file|
-            raise Error, 'the upload is not in S3' unless storage.read(key, file)
+            raise Error, 'the upload is not in S3' unless read(key, file, data['size'])
             raise Error, 'the uploaded file does not match its size' unless file.size == data['size']
 
             file.rewind
@@ -33,6 +35,14 @@ module RedmineAws
         ensure
           storage.delete(key)
         end
+      end
+
+      private
+
+      # An empty upload has nothing to read (S3 refuses a range of an empty
+      # object); Redmine refuses it as an image.
+      def read(key, file, size)
+        size.zero? || storage.read(key, file, bytes: size + 1)
       end
     end
   end
