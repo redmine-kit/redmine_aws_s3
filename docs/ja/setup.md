@@ -1,6 +1,6 @@
 # 導入
 
-Redmine Serverless S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。本物の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
+Redmine AWS S3 を使う Redmine に要るもの(インストール、設定、バケット、CloudFront のディストリビューション、IAM の権限、ネットワーク)です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。本物の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
 
 <a id="requirements"></a>
 
@@ -14,7 +14,7 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ## インストール
 
-1. プラグインを `plugins/redmine_serverless_s3` に置きます。gem をインストールするか([gem](#gem))、リポジトリをクローンします([gem を使わないとき](#without-the-gem))。
+1. プラグインを `plugins/redmine_aws_s3` に、これが必要とする [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_aws` に置きます。gem をインストールするか([gem](#gem))、リポジトリをクローンします([gem を使わないとき](#without-the-gem))。Redmine はプラグインをアルファベット順に読み込むので、`redmine_aws` が先になります。
 2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム(`ChecksumType`)を持つ 1.178 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 3. migration は要りません。
 4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配るために、アセットを作ります(Redmine のいつものアセットの手順でもかまいません)。
@@ -29,29 +29,31 @@ Redmine Serverless S3 を使う Redmine に要るもの(インストール、設
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.2.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages(`https://rubygems.pkg.github.com/redmine-kit`)に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は gem の `redmine_aws` に依存するので、Bundler が同じソースからインストールします。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
 
 ```ruby
 # Redmine の Gemfile.local
 source 'https://rubygems.pkg.github.com/redmine-kit' do
-  gem 'redmine_serverless_s3'
+  gem 'redmine_aws_s3'
 end
 ```
 
 ```sh
 bundle config set --global rubygems.pkg.github.com <ユーザー>:<トークン>   # か、変数 BUNDLE_RUBYGEMS__PKG__GITHUB__COM
 bundle install
-ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s3
+ln -s "$(bundle info --path redmine_aws)" plugins/redmine_aws
+ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
 ```
 
 <a id="without-the-gem"></a>
 
 ### gem を使わないとき
 
-リポジトリを `plugins/redmine_serverless_s3` にクローンし、gem をインストールします。
+リポジトリを `plugins/redmine_aws` と `plugins/redmine_aws_s3` にクローンし、gem をインストールします。
 
 ```sh
-git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3
+git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws
+git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_aws_s3
 bundle install
 ```
 
@@ -75,9 +77,9 @@ bundle install
 | `attachments_storage_path` | 手元のキャッシュのディレクトリ。Lambda では `/tmp` の下(例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルの最大の大きさ | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
-Serverless では、[Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロールです。プラグインが自分でアクセスキーを読むことはありません。
+Serverless では、[Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクのロールです。プラグインが自分でアクセスキーを読むことはありません。
 
-管理画面の整合性チェックは、Active Job の `ServerlessS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー([Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/ja/) など)を通すときは、このクラスを一覧に追加します。
+管理画面の整合性チェックは、Active Job の `AwsS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー([Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/ja/) など)を通すときは、このクラスを一覧に追加します。
 
 <a id="aws-resources"></a>
 
@@ -141,7 +143,7 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 ## テスト
 
-Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_serverless_s3`)です。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。
+Redmine の標準のプラグインのテスト(`bin/rails redmine:plugins:test NAME=redmine_aws_s3`)です。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine AWS は、隣のチェックアウト (`../redmine_aws`) か、`REDMINE_AWS_DIR` のディレクトリから使います。
 
 ```sh
 bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
@@ -150,6 +152,7 @@ bin/test core-s3         # プラグインを有効にして、Redmine の添付
 bin/test system          # システムのテスト。ヘッドレスの Chromium で
 bin/test <ファイル...>    # プラグインのテストの一部
 REDMINE_BRANCH=master bin/test   # Redmine の master ブランチで (7.1、アバターあり)
+REDMINE_AWS_DIR=<dir> bin/test   # <dir> の Redmine AWS で
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
@@ -166,7 +169,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 ### 置き換えたコード、カバレッジ、CI
 
-置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、置き換えたコードのテストで、master が変更したメソッドがわかります。
+置き換えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov(Redmine の `COVERAGE`)でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml`(Cobertura)と HTML のレポートを書きます。GitHub Actions は、push と pull request のたびに `bin/lint`、SHA-256 のテスト、`bin/test` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、置き換えたコードのテストで、master が変更したメソッドがわかります。
 
 <a id="what-the-tests-check"></a>
 

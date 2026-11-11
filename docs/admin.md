@@ -1,6 +1,6 @@
 # Administration page
 
-This is the administration page of Redmine Serverless S3. Only Redmine administrators can open it (`require_admin`). The page is the "S3" tab under the "Serverless" item of Redmine's administration menu, which all the Redmine Serverless plugins share, whether or not [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu) is installed.
+This is the administration page of Redmine AWS S3. Only Redmine administrators can open it (`require_admin`). The page is the "S3" tab under the "AWS" item of Redmine's administration menu, which [Redmine AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds and all the Redmine AWS plugins share.
 
 <a id="attachments-in-s3"></a>
 
@@ -13,7 +13,7 @@ This is the administration page of Redmine Serverless S3. Only Redmine administr
 | Environment variables | "Bucket", "Region", "CloudFront domain", "CloudFront key pair ID", "CloudFront private key" ("Set" or "Not set"), "GuardDuty malware scan" ("Enabled" or "Disabled") and "Local cache". Each value has the name of its environment variable next to it, and "Local cache" has `attachments_storage_path` | Environment variables ([setup.md](setup.md#configuration)) and `config/configuration.yml`, display only. The private key itself is not shown |
 | Connection tests | "Read/write test" puts a test object (`tmp/healthcheck/<UUID>`), reads it and deletes it. "Delivery test" puts a test object, makes a signed URL for it under `/tmp/bulk/`, and requests it through CloudFront, with and without the signature. The results are shown in a table with the columns Name, Status and Details ([below](#connection-tests)) | Text links. The delivery test deletes its object afterwards |
 | Files blocked by malware scan | The last 20 files that the malware scan blocked, with the columns "Time", "Scan result", "File" and "User" (a link to the Redmine user). Shown when "GuardDuty malware scan" is "Enabled" or a blocked file is recorded | Kept in the plugin settings ([attachments.md](attachments.md#malware-scan)) |
-| Consistency check | "Run consistency check" starts the job `ServerlessS3ReconcileJob`, which lists `files/` and compares it with the attachments in the database. While it runs, the box shows "Status: Running" and "Started at". When it is done, it shows "Last run", "Attachments", "S3 objects" (under `files/`), "Files missing in S3" and "Unused objects", then the lists under those two names (the first 100 of each) | A text link. The result is kept in the plugin settings, so every environment shows the latest one |
+| Consistency check | "Run consistency check" starts the job `AwsS3ReconcileJob`, which lists `files/` and compares it with the attachments in the database. While it runs, the box shows "Status: Running" and "Started at". When it is done, it shows "Last run", "Attachments", "S3 objects" (under `files/`), "Files missing in S3" and "Unused objects", then the lists under those two names (the first 100 of each) | A text link. The result is kept in the plugin settings, so every environment shows the latest one |
 | Settings | "Download URL expiry" and "Upload URL expiry" (seconds), "Local cache size limit" (MB) | Plugin settings, changed on the page. Positive whole numbers only; invalid input shows an error that lists the labels of the wrong fields |
 
 <a id="connection-tests"></a>
@@ -30,14 +30,16 @@ The results of the connection tests:
 | Delivery | Delivery test | Shown only when the test stops with an error, with the error message |
 
 - **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), the consistency check lets you check that nothing is missing.
-- **Status tab:** When Redmine Serverless is installed, its "Connection test" on the "Status" tab has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
+- **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
 - **No secrets shown:** AWS credentials and the CloudFront private key are not shown. AWS APIs are called only when a link is clicked.
 - **Without the bucket:** The tab still opens and shows the warning "REDMINE_S3_BUCKET is not set, so attachments are stored on the local disk." It shows the environment variables and the settings; the connection tests, the blocked files and the consistency check are not shown.
 - **Operations are logged:** Changing the settings, the connection tests and the consistency check are written to Redmine's log with the administrator's login.
 
-## The Serverless menu
+<a id="the-aws-menu"></a>
 
-Every Redmine Serverless plugin ships the same small shared part: `lib/redmine_serverless_admin.rb` (`RedmineServerlessAdmin`), `ServerlessAdminController` (`/admin/serverless`, which opens the first tab) and the view `serverless_admin/_tabs`. Rails loads the first copy and ignores the others, so the "Serverless" item of Redmine's administration menu is added once, whichever plugins are installed. This plugin registers its tab, "S3", at position 50 (the last), and, when the bucket is set, the "S3" row (`HeadBucket`) for the "Connection test" of [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/admin.html#the-serverless-menu).
+## The AWS menu
+
+[Redmine AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds the "AWS" item of Redmine's administration menu (`/admin/aws`, which opens the first tab), and each Redmine AWS plugin registers its tab there (`RedmineAws::Admin`). This plugin registers its tab, "S3", at position 50, and, when the bucket is set, the "S3" row (`HeadBucket`) for the "Connection test" of the "Status" tab.
 
 - **Configure:** "Configure" of the plugin in Redmine's plugin list opens the "S3" tab.
 

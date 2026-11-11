@@ -1,6 +1,6 @@
 # Setup
 
-What a Redmine needs to use Redmine Serverless S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against moto, and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
+What a Redmine needs to use Redmine AWS S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against moto, and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
 
 ## Requirements
 
@@ -10,7 +10,7 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ## Installation
 
-1. Put the plugin in `plugins/redmine_serverless_s3`: install the gem ([Gem](#gem)) or clone the repository ([Without the gem](#without-the-gem)).
+1. Put the plugin in `plugins/redmine_aws_s3`, and [Redmine AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). Redmine loads plugins in alphabetical order, so `redmine_aws` comes first.
 2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.178 or later (which has the full-object checksums, `ChecksumType`) and `aws-sdk-cloudfront` 1.x.
 3. No migrations are needed.
 4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
@@ -23,27 +23,29 @@ What a Redmine needs to use Redmine Serverless S3: installation, configuration, 
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.2.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. Redmine loads plugins only from `plugins/`, so the installed gem is linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_aws`, so Bundler installs it from the same source. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
 
 ```ruby
 # Redmine's Gemfile.local
 source 'https://rubygems.pkg.github.com/redmine-kit' do
-  gem 'redmine_serverless_s3'
+  gem 'redmine_aws_s3'
 end
 ```
 
 ```sh
 bundle config set --global rubygems.pkg.github.com <user>:<token>   # or the variable BUNDLE_RUBYGEMS__PKG__GITHUB__COM
 bundle install
-ln -s "$(bundle info --path redmine_serverless_s3)" plugins/redmine_serverless_s3
+ln -s "$(bundle info --path redmine_aws)" plugins/redmine_aws
+ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
 ```
 
 ### Without the gem
 
-Clone the repository into `plugins/redmine_serverless_s3` and install its gems:
+Clone the repositories into `plugins/redmine_aws` and `plugins/redmine_aws_s3` and install the gems:
 
 ```sh
-git clone https://github.com/redmine-kit/redmine_serverless_s3.git plugins/redmine_serverless_s3
+git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws
+git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_aws_s3
 bundle install
 ```
 
@@ -65,9 +67,9 @@ bundle install
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
 | Maximum attachment size | Can still be changed; the CloudFront Function on `/tmp/*` must use the same limit for uploads ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 
-On Serverless, [Redmine Serverless SSM](https://redmine-kit.github.io/redmine_serverless_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
+On Serverless, [Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
 
-The consistency check on the administration page runs as the Active Job `ServerlessS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine Serverless SQS](https://redmine-kit.github.io/redmine_serverless_sqs/), add this class to the list.
+The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/), add this class to the list.
 
 ## AWS resources
 
@@ -119,7 +121,7 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 
 ## Tests
 
-Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which):
+Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_aws`) or from the directory in `REDMINE_AWS_DIR`:
 
 ```sh
 bin/test                 # the plugin's tests, with coverage in coverage/
@@ -128,6 +130,7 @@ bin/test core-s3         # Redmine's attachment tests with the plugin on
 bin/test system          # the system tests, in headless Chromium
 bin/test <files...>      # some of the plugin's tests
 REDMINE_BRANCH=master bin/test   # on Redmine's master branch (7.1, with avatars)
+REDMINE_AWS_DIR=<dir> bin/test   # Redmine AWS from <dir>
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
 node test/javascripts/complete_test.mjs # the upload script's complete step
@@ -140,7 +143,7 @@ Unit and functional tests stub S3 with the SDK's `stub_responses`. Integration t
 
 ### Replaced code, coverage and CI
 
-A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_serverless_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed.
+A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the SHA-256 test and `bin/test`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed.
 
 ### What the tests check
 

@@ -1,6 +1,6 @@
-# Redmine Serverless S3
+# Redmine AWS S3
 
-Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores attachments in Amazon S3. Uploads are PUT from the browser through Redmine's CloudFront distribution to S3, and downloads redirect to CloudFront signed URLs on Redmine's domain, so file contents do not pass through Redmine. It does not modify Redmine's own files and uses only Redmine's standard extension mechanisms. The plugin is in early development.
+Redmine AWS S3 (`redmine_aws_s3`) is a Redmine plugin that stores attachments in Amazon S3. Uploads are PUT from the browser through Redmine's CloudFront distribution to S3, and downloads redirect to CloudFront signed URLs on Redmine's domain, so file contents do not pass through Redmine. It does not modify Redmine's own files and uses only Redmine's standard extension mechanisms. The plugin is in early development.
 
 - [Setup](setup.md): requirements, installation, configuration, AWS resources (the bucket, the CloudFront distribution), network, tests
 - [IAM permissions](iam.md): permissions, example policy, resource-based policies
@@ -13,15 +13,15 @@ Redmine Serverless S3 (`redmine_serverless_s3`) is a Redmine plugin that stores 
 | --- | --- | --- | --- |
 | S3 attachments | Storing and deleting, uploads through CloudFront to S3 (S3 computes the SHA256), redirects to CloudFront signed URLs with the sandbox CSP (downloads and thumbnails), the `/tmp` cache, CSV import files, zip files for downloading all attachments, an optional wait for GuardDuty's malware scan | `REDMINE_S3_BUCKET` is set, with the CloudFront settings ([setup.md](setup.md#configuration)). Without it, Redmine behaves as standard | [attachments.md](attachments.md) |
 | Avatars (Redmine 7.1) | The avatar form sends the image through CloudFront to S3, so photos of several MB can be used, and Redmine registers it with its own rules; the cropped thumbnails are kept in S3 and shown by Redmine | The S3 bucket is set and Redmine has avatars (7.1). On Redmine 7.0 nothing changes | [attachments.md](attachments.md#avatars) |
-| Administration page | The "S3" tab under the shared "Serverless" menu: environment variables and settings, the read/write test of S3 and the delivery test through CloudFront, files blocked by the malware scan, the consistency check between the database and S3 | Administrators | [admin.md](admin.md) |
+| Administration page | The "S3" tab under the "AWS" menu of [Redmine AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu): environment variables and settings, the read/write test of S3 and the delivery test through CloudFront, files blocked by the malware scan, the consistency check between the database and S3 | Administrators | [admin.md](admin.md) |
 
 ## Outside Lambda
 
-The plugin works in any Redmine that can reach S3 and is served through CloudFront. On AWS Lambda there is no writable disk and a request can carry at most 6 MB, so [Serverless](https://redmine-kit.github.io/serverless/) installs it together with [Redmine Serverless](https://redmine-kit.github.io/redmine_serverless/).
+The plugin works in any Redmine that can reach S3 and is served through CloudFront. On AWS Lambda there is no writable disk and a request can carry at most 6 MB, so [Serverless](https://redmine-kit.github.io/serverless/) installs it together with [Redmine AWS Lambda](https://redmine-kit.github.io/redmine_aws_lambda/).
 
 ## Gems and database
 
-The plugin depends on `aws-sdk-s3` and `aws-sdk-cloudfront`. They are listed in the plugin's `Gemfile` and in the gem's dependencies, and Redmine's `Gemfile` also loads `plugins/*/Gemfile`. The plugin adds no database tables, so there are no migrations to run.
+The plugin depends on `aws-sdk-s3` and `aws-sdk-cloudfront`. They are listed in the plugin's `Gemfile` and in the gem's dependencies, and Redmine's `Gemfile` also loads `plugins/*/Gemfile`. It also requires the plugin [Redmine AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_aws`), which holds the "AWS" administration menu: the gem depends on it, and `init.rb` checks that it is installed (`requires_redmine_plugin`). The plugin adds no database tables, so there are no migrations to run.
 
 ## Tests
 
@@ -33,4 +33,4 @@ Each piece of replaced code has tests written with Redmine's standard mechanism 
 
 ## License
 
-Redmine Serverless S3 is released under the GNU General Public License, version 2 or (at your option) any later version. See [LICENSE](../LICENSE). An unofficial Redmine plugin.
+Redmine AWS S3 is released under the GNU General Public License, version 2 or (at your option) any later version. See [LICENSE](../LICENSE). An unofficial Redmine plugin.
