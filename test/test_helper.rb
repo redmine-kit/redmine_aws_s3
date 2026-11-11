@@ -17,136 +17,138 @@ if ENV['COVERAGE'] && defined?(SimpleCov)
   SimpleCov.formatters = [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::HTMLFormatter]
 end
 
-module RedmineAwsS3
-  # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
-  # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
-  # CloudFront key pair made for the test.
-  module TestHelper
-    include RedmineAws::TestHelper
+module RedmineAws
+  module S3
+    # Turns the plugin on for a test, with S3 stubbed by the SDK (stub_responses)
+    # or reproduced by LocalStack or moto (S3_TEST_ENDPOINT, set by bin/test), and a
+    # CloudFront key pair made for the test.
+    module TestHelper
+      include RedmineAws::TestHelper
 
-    DOMAIN = 'redmine.example.test'
-    KEY_PAIR_ID = 'KTESTKEYPAIR'
+      DOMAIN = 'redmine.example.test'
+      KEY_PAIR_ID = 'KTESTKEYPAIR'
 
-    def self.private_key
-      @private_key ||= OpenSSL::PKey::RSA.new(2048)
-    end
-
-    def s3_env(bucket: 'redmine-files')
-      { ENV_BUCKET => bucket, ENV_REGION => 'us-east-1', ENV_DOMAIN => DOMAIN, ENV_KEY_PAIR_ID => KEY_PAIR_ID,
-        ENV_PRIVATE_KEY => TestHelper.private_key.to_pem }
-    end
-
-    # Runs the block with the plugin on and the given S3 client.
-    def with_s3(client, bucket: 'redmine-files')
-      saved_client = RedmineAwsS3.instance_variable_get(:@client)
-      with_env(s3_env(bucket: bucket)) do
-        RedmineAwsS3.client = client
-        yield client
-      end
-    ensure
-      RedmineAwsS3.client = saved_client
-    end
-
-    # Runs the block with REDMINE_S3_MALWARE_SCAN=true, without waiting
-    # between the requests for the scan tag.
-    def with_malware_scan(&)
-      MalwareScan.stubs(:wait_seconds).returns(0)
-      with_env(ENV_MALWARE_SCAN => 'true', &)
-    end
-
-    def scan_tag(status)
-      { tag_set: status ? [{ key: MalwareScan::TAG, value: status }] : [] }
-    end
-
-    def stub_client(**)
-      stub_aws_client(Aws::S3::Client, **)
-    end
-
-    # LocalStack or moto (S3_TEST_BACKEND, chosen by bin/test).
-    def s3_test_backend
-      ENV.fetch('S3_TEST_BACKEND', 'moto')
-    end
-
-    # LocalStack 2026.10.6 sometimes answers 400 with no body to a request on
-    # a reused connection when several test processes send at once (about 1
-    # in 1,000 PutObject with 4 processes, none with new connections;
-    # reproduced on 2026-11-11). S3 does not, so the tests' client does not
-    # keep idle connections. Also used by test/core/additional_environment.rb.
-    LOCALSTACK_CONNECTIONS = { http_idle_timeout: 0 }.freeze
-
-    # A client of the S3 of the tests; skips the test without it.
-    def s3_test_client
-      skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
-      Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true,
-                          region: RedmineAws::TestHelper::TEST_REGION, credentials: RedmineAws::TestHelper.credentials,
-                          **LOCALSTACK_CONNECTIONS)
-    end
-
-    def with_test_s3(&)
-      client = s3_test_client
-      bucket = "redmine-test-#{SecureRandom.hex(6)}"
-      client.create_bucket(bucket: bucket)
-      with_s3(client, bucket: bucket, &)
-    ensure
-      if client && bucket
-        keys = client.list_objects_v2(bucket: bucket).contents.map { |object| { key: object.key } }
-        client.delete_objects(bucket: bucket, delete: { objects: keys }) if keys.any?
-        client.delete_bucket(bucket: bucket)
-      end
-    end
-
-    # HeadObject as S3 answers it for an object uploaded with a SHA256
-    # checksum, where the backend does not return the checksum or its type
-    # (moto 5.2.5 returns the SHA256 of a copy without ChecksumType with
-    # aws-sdk-s3 1.240, checked on 2026-11-10). On only inside
-    # emulate_s3_checksums, from any thread (the system tests' server runs in
-    # its own).
-    module EmulatedChecksums
-      class << self
-        attr_accessor :enabled
+      def self.private_key
+        @private_key ||= OpenSSL::PKey::RSA.new(2048)
       end
 
-      def head(key, checksum: false)
-        result = super
-        return result unless EmulatedChecksums.enabled && result && checksum
-        return result unless result.checksum_sha256.nil? || result.checksum_type.nil?
-
-        data = client.get_object(bucket: bucket, key: key).body.read
-        Struct.new(:content_length, :checksum_sha256, :checksum_type)
-              .new(result.content_length, Digest::SHA256.base64digest(data), 'FULL_OBJECT')
+      def s3_env(bucket: 'redmine-files')
+        { ENV_BUCKET => bucket, ENV_REGION => 'us-east-1', ENV_DOMAIN => DOMAIN, ENV_KEY_PAIR_ID => KEY_PAIR_ID,
+          ENV_PRIVATE_KEY => TestHelper.private_key.to_pem }
       end
-    end
 
-    def emulate_s3_checksums
-      Storage.prepend(EmulatedChecksums) unless Storage < EmulatedChecksums
-      EmulatedChecksums.enabled = true
-      yield
-    ensure
-      EmulatedChecksums.enabled = false
-    end
+      # Runs the block with the plugin on and the given S3 client.
+      def with_s3(client, bucket: 'redmine-files')
+        saved_client = RedmineAws::S3.instance_variable_get(:@client)
+        with_env(s3_env(bucket: bucket)) do
+          RedmineAws::S3.client = client
+          yield client
+        end
+      ensure
+        RedmineAws::S3.client = saved_client
+      end
 
-    def sha256_base64(data)
-      Digest::SHA256.base64digest(data)
-    end
+      # Runs the block with REDMINE_S3_MALWARE_SCAN=true, without waiting
+      # between the requests for the scan tag.
+      def with_malware_scan(&)
+        MalwareScan.stubs(:wait_seconds).returns(0)
+        with_env(ENV_MALWARE_SCAN => 'true', &)
+      end
 
-    # Checks a CloudFront signed URL (canned policy) with the public key and
-    # returns the URL without the signature parameters and the expiry.
-    def verify_signed_url(url)
-      uri = URI(url)
-      params = URI.decode_www_form(uri.query).to_h
-      signature = params['Signature']
-      expires = params['Expires']
-      assert_equal KEY_PAIR_ID, params['Key-Pair-Id']
-      assert signature && expires, 'the URL has no canned policy signature'
-      rest = params.except('Signature', 'Expires', 'Key-Pair-Id')
-      unsigned = "#{uri.scheme}://#{uri.host}#{uri.path}#{"?#{URI.encode_www_form(rest)}" if rest.any?}"
-      # The SDK signs the URL as it was given, before its own parameters.
-      resource = url.split(/[?&]Expires=/).first
-      policy = %({"Statement":[{"Resource":"#{resource}","Condition":{"DateLessThan":{"AWS:EpochTime":#{expires}}}}]})
-      raw = Base64.decode64(signature.tr('-_~', '+=/'))
-      assert TestHelper.private_key.public_key.verify(OpenSSL::Digest.new('SHA1'), raw, policy),
-             'the signature does not verify with the public key'
-      [unsigned, expires.to_i]
+      def scan_tag(status)
+        { tag_set: status ? [{ key: MalwareScan::TAG, value: status }] : [] }
+      end
+
+      def stub_client(**)
+        stub_aws_client(::Aws::S3::Client, **)
+      end
+
+      # LocalStack or moto (S3_TEST_BACKEND, chosen by bin/test).
+      def s3_test_backend
+        ENV.fetch('S3_TEST_BACKEND', 'moto')
+      end
+
+      # LocalStack 2026.10.6 sometimes answers 400 with no body to a request on
+      # a reused connection when several test processes send at once (about 1
+      # in 1,000 PutObject with 4 processes, none with new connections;
+      # reproduced on 2026-11-11). S3 does not, so the tests' client does not
+      # keep idle connections. Also used by test/core/additional_environment.rb.
+      LOCALSTACK_CONNECTIONS = { http_idle_timeout: 0 }.freeze
+
+      # A client of the S3 of the tests; skips the test without it.
+      def s3_test_client
+        skip 'S3_TEST_ENDPOINT is not set (bin/test sets it)' unless ENV['S3_TEST_ENDPOINT']
+        ::Aws::S3::Client.new(endpoint: ENV.fetch('S3_TEST_ENDPOINT'), force_path_style: true,
+                              region: TEST_REGION, credentials: RedmineAws::TestHelper.credentials,
+                              **LOCALSTACK_CONNECTIONS)
+      end
+
+      def with_test_s3(&)
+        client = s3_test_client
+        bucket = "redmine-test-#{SecureRandom.hex(6)}"
+        client.create_bucket(bucket: bucket)
+        with_s3(client, bucket: bucket, &)
+      ensure
+        if client && bucket
+          keys = client.list_objects_v2(bucket: bucket).contents.map { |object| { key: object.key } }
+          client.delete_objects(bucket: bucket, delete: { objects: keys }) if keys.any?
+          client.delete_bucket(bucket: bucket)
+        end
+      end
+
+      # HeadObject as S3 answers it for an object uploaded with a SHA256
+      # checksum, where the backend does not return the checksum or its type
+      # (moto 5.2.5 returns the SHA256 of a copy without ChecksumType with
+      # aws-sdk-s3 1.240, checked on 2026-11-10). On only inside
+      # emulate_s3_checksums, from any thread (the system tests' server runs in
+      # its own).
+      module EmulatedChecksums
+        class << self
+          attr_accessor :enabled
+        end
+
+        def head(key, checksum: false)
+          result = super
+          return result unless EmulatedChecksums.enabled && result && checksum
+          return result unless result.checksum_sha256.nil? || result.checksum_type.nil?
+
+          data = client.get_object(bucket: bucket, key: key).body.read
+          Struct.new(:content_length, :checksum_sha256, :checksum_type)
+                .new(result.content_length, Digest::SHA256.base64digest(data), 'FULL_OBJECT')
+        end
+      end
+
+      def emulate_s3_checksums
+        Storage.prepend(EmulatedChecksums) unless Storage < EmulatedChecksums
+        EmulatedChecksums.enabled = true
+        yield
+      ensure
+        EmulatedChecksums.enabled = false
+      end
+
+      def sha256_base64(data)
+        Digest::SHA256.base64digest(data)
+      end
+
+      # Checks a CloudFront signed URL (canned policy) with the public key and
+      # returns the URL without the signature parameters and the expiry.
+      def verify_signed_url(url)
+        uri = URI(url)
+        params = URI.decode_www_form(uri.query).to_h
+        signature = params['Signature']
+        expires = params['Expires']
+        assert_equal KEY_PAIR_ID, params['Key-Pair-Id']
+        assert signature && expires, 'the URL has no canned policy signature'
+        rest = params.except('Signature', 'Expires', 'Key-Pair-Id')
+        unsigned = "#{uri.scheme}://#{uri.host}#{uri.path}#{"?#{URI.encode_www_form(rest)}" if rest.any?}"
+        # The SDK signs the URL as it was given, before its own parameters.
+        resource = url.split(/[?&]Expires=/).first
+        policy = %({"Statement":[{"Resource":"#{resource}","Condition":{"DateLessThan":{"AWS:EpochTime":#{expires}}}}]})
+        raw = Base64.decode64(signature.tr('-_~', '+=/'))
+        assert TestHelper.private_key.public_key.verify(OpenSSL::Digest.new('SHA1'), raw, policy),
+               'the signature does not verify with the public key'
+        [unsigned, expires.to_i]
+      end
     end
   end
 end

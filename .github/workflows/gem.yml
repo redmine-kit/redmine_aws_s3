@@ -1,6 +1,7 @@
 # Publishes the plugin as a gem to GitHub Packages
 # (https://rubygems.pkg.github.com/redmine-kit) when a version tag v* is
-# pushed. The tag must equal the version in the gemspec and init.rb.
+# pushed. The tag must equal the version in lib/redmine_aws/s3.rb,
+# which the gemspec and init.rb read.
 # Installing from GitHub Packages needs a token with read:packages, even for
 # a public package (docs/setup.md#installation).
 name: Gem

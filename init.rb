@@ -7,12 +7,12 @@ Redmine::Plugin.register :redmine_aws_s3 do
   name 'Redmine AWS S3'
   author 'Redmine Kit'
   description 'Stores attachments in Amazon S3, uploaded and downloaded through CloudFront'
-  version '0.1.0'
+  version RedmineAws::S3::VERSION
   url 'https://github.com/redmine-kit/redmine_aws_s3'
   author_url 'https://github.com/redmine-kit'
   requires_redmine version_or_higher: '7.0.0'
   requires_redmine_plugin :redmine_aws, version_or_higher: '0.1.0'
-  settings default: RedmineAwsS3::DEFAULT_SETTINGS, partial: 'settings/redmine_aws_s3'
+  settings default: RedmineAws::S3::DEFAULT_SETTINGS, partial: 'settings/redmine_aws_s3'
 end
 
-RedmineAwsS3.setup
+RedmineAws::S3.setup

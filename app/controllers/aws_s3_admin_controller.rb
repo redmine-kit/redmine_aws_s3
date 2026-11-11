@@ -8,18 +8,18 @@ class AwsS3AdminController < ApplicationController
   before_action :require_s3, except: %i[show update]
 
   def show
-    @settings = RedmineAwsS3::DEFAULT_SETTINGS.keys.index_with { |name| RedmineAwsS3.setting(name) }
-    @reconciliation = RedmineAwsS3::Reconciliation.result
+    @settings = RedmineAws::S3::DEFAULT_SETTINGS.keys.index_with { |name| RedmineAws::S3.setting(name) }
+    @reconciliation = RedmineAws::S3::Reconciliation.result
   end
 
   def update
-    values = params.fetch(:settings, {}).permit(*RedmineAwsS3::DEFAULT_SETTINGS.keys).to_h
+    values = params.fetch(:settings, {}).permit(*RedmineAws::S3::DEFAULT_SETTINGS.keys).to_h
     invalid = values.reject { |_, value| value.to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
     if invalid.any?
       names = invalid.keys.map { |name| l(:"field_aws_s3_#{name}") }
       flash[:error] = l(:error_aws_s3_invalid_settings, names: names.join(', '))
     else
-      RedmineAwsS3.update_settings(values)
+      RedmineAws::S3.update_settings(values)
       log("changed the settings #{values.to_json}")
       flash[:notice] = l(:notice_successful_update)
     end
@@ -28,19 +28,19 @@ class AwsS3AdminController < ApplicationController
 
   def read_write
     log('ran the read/write check')
-    flash[:aws_s3_checks] = RedmineAwsS3::Checks.read_write
+    flash[:aws_s3_checks] = RedmineAws::S3::Checks.read_write
     redirect_to aws_s3_admin_path
   end
 
   def delivery
     log('ran the delivery check')
-    flash[:aws_s3_checks] = RedmineAwsS3::Checks.delivery
+    flash[:aws_s3_checks] = RedmineAws::S3::Checks.delivery
     redirect_to aws_s3_admin_path
   end
 
   def reconcile
     log('started the reconciliation')
-    RedmineAwsS3::Reconciliation.started
+    RedmineAws::S3::Reconciliation.started
     AwsS3ReconcileJob.perform_later
     flash[:notice] = l(:notice_aws_s3_reconciliation_started)
     redirect_to aws_s3_admin_path
@@ -49,7 +49,7 @@ class AwsS3AdminController < ApplicationController
   private
 
   def require_s3
-    render_404 unless RedmineAwsS3.enabled?
+    render_404 unless RedmineAws::S3.enabled?
   end
 
   def log(message)

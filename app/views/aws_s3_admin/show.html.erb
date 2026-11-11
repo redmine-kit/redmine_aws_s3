@@ -1,26 +1,26 @@
 <%= render partial: 'aws_admin/tabs', locals: { selected: 's3' } %>
 
-<% unless RedmineAwsS3.enabled? %>
-<p class="warning"><%= l(:text_aws_s3_off, name: RedmineAwsS3::ENV_BUCKET) %></p>
+<% unless RedmineAws::S3.enabled? %>
+<p class="warning"><%= l(:text_aws_s3_off, name: RedmineAws::S3::ENV_BUCKET) %></p>
 <% end %>
 
 <h3><%= l(:label_aws_s3_environment) %></h3>
 
 <div class="box tabular settings">
-  <% [[:bucket, RedmineAwsS3::ENV_BUCKET, RedmineAwsS3.bucket],
-      [:region, RedmineAwsS3::ENV_REGION, RedmineAwsS3.region],
-      [:domain, RedmineAwsS3::ENV_DOMAIN, RedmineAwsS3.cloudfront_domain],
-      [:key_pair_id, RedmineAwsS3::ENV_KEY_PAIR_ID, RedmineAwsS3.key_pair_id],
-      [:private_key, RedmineAwsS3::ENV_PRIVATE_KEY,
-       l(RedmineAwsS3.private_key? ? :label_aws_s3_set : :label_aws_s3_not_set)],
-      [:malware_scan, RedmineAwsS3::ENV_MALWARE_SCAN,
-       l(RedmineAwsS3.malware_scan? ? :label_aws_s3_enabled : :label_aws_s3_disabled)]].each do |name, env, value| %>
+  <% [[:bucket, RedmineAws::S3::ENV_BUCKET, RedmineAws::S3.bucket],
+      [:region, RedmineAws::S3::ENV_REGION, RedmineAws::S3.region],
+      [:domain, RedmineAws::S3::ENV_DOMAIN, RedmineAws::S3.cloudfront_domain],
+      [:key_pair_id, RedmineAws::S3::ENV_KEY_PAIR_ID, RedmineAws::S3.key_pair_id],
+      [:private_key, RedmineAws::S3::ENV_PRIVATE_KEY,
+       l(RedmineAws::S3.private_key? ? :label_aws_s3_set : :label_aws_s3_not_set)],
+      [:malware_scan, RedmineAws::S3::ENV_MALWARE_SCAN,
+       l(RedmineAws::S3.malware_scan? ? :label_aws_s3_enabled : :label_aws_s3_disabled)]].each do |name, env, value| %>
   <p><label><%= l(:"field_aws_s3_#{name}") %></label><%= value || '-' %> <em class="info"><%= env %></em></p>
   <% end %>
   <p><label><%= l(:field_aws_s3_storage_path) %></label><%= Attachment.storage_path %> <em class="info">attachments_storage_path</em></p>
 </div>
 
-<% if RedmineAwsS3.enabled? %>
+<% if RedmineAws::S3.enabled? %>
 <h3><%= l(:label_aws_s3_checks) %></h3>
 
 <p>
@@ -53,10 +53,10 @@
 </div>
 <% end %>
 
-<% if RedmineAwsS3.malware_scan? || RedmineAwsS3::MalwareScan.findings.any? %>
+<% if RedmineAws::S3.malware_scan? || RedmineAws::S3::MalwareScan.findings.any? %>
 <h3><%= l(:label_aws_s3_malware_findings) %></h3>
 
-<% if (findings = RedmineAwsS3::MalwareScan.findings).any? %>
+<% if (findings = RedmineAws::S3::MalwareScan.findings).any? %>
 <div class="autoscroll">
 <table class="list findings" id="aws-s3-malware"><thead>
 <tr>

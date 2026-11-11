@@ -6,7 +6,7 @@
 # Gemfile is not in it: Redmine's Gemfile would load it again.
 Gem::Specification.new do |spec|
   spec.name = 'redmine_aws_s3'
-  spec.version = '0.1.0'
+  spec.version = File.read(File.join(__dir__, 'lib/redmine_aws/s3.rb'))[/VERSION = '([^']+)'/, 1]
   spec.summary = 'Stores Redmine attachments in Amazon S3'
   spec.authors = ['Redmine Kit']
   spec.license = 'GPL-2.0-or-later'

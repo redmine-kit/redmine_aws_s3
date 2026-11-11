@@ -10,16 +10,16 @@ class S3UploadsController < ApplicationController
   accept_api_auth :presign, :complete
 
   def presign
-    result = RedmineAwsS3::Upload.new(User.current).presign(
+    result = RedmineAws::S3::Upload.new(User.current).presign(
       filename: params[:filename], size: params[:size], content_type: params[:content_type]
     )
     render json: result
-  rescue RedmineAwsS3::Upload::Error => e
+  rescue RedmineAws::S3::Upload::Error => e
     render json: { errors: [e.message] }, status: :unprocessable_content
   end
 
   def complete
-    @attachment = RedmineAwsS3::Upload.new(User.current).complete(params[:ticket])
+    @attachment = RedmineAws::S3::Upload.new(User.current).complete(params[:ticket])
     respond_to do |format|
       format.js { render template: 'attachments/upload' }
       format.api do
@@ -30,9 +30,9 @@ class S3UploadsController < ApplicationController
         end
       end
     end
-  rescue RedmineAwsS3::Upload::Pending => e
+  rescue RedmineAws::S3::Upload::Pending => e
     scanning(e.message)
-  rescue RedmineAwsS3::Upload::Error => e
+  rescue RedmineAws::S3::Upload::Error => e
     respond_to do |format|
       format.js do
         render json: { errors: [e.message] }, status: :unprocessable_content, content_type: 'application/json'
@@ -55,7 +55,7 @@ class S3UploadsController < ApplicationController
   end
 
   def require_s3
-    render_404 unless RedmineAwsS3.enabled?
+    render_404 unless RedmineAws::S3.enabled?
   end
 
   def authorize_upload

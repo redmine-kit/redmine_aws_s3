@@ -11,28 +11,28 @@ class S3AvatarUploadsController < ApplicationController
   before_action :require_login
 
   def presign
-    result = RedmineAwsS3::AvatarUpload.new(User.current).presign(
+    result = RedmineAws::S3::AvatarUpload.new(User.current).presign(
       filename: params[:filename], size: params[:size], content_type: params[:content_type]
     )
     render json: result
-  rescue RedmineAwsS3::Upload::Error => e
+  rescue RedmineAws::S3::Upload::Error => e
     render json: { errors: [e.message] }, status: :unprocessable_content
   end
 
   # 200 when the upload can be registered; 202 while the malware scan runs.
   def check
-    RedmineAwsS3::AvatarUpload.new(User.current).check!(params[:ticket])
+    RedmineAws::S3::AvatarUpload.new(User.current).check!(params[:ticket])
     render json: { status: 'ok' }
-  rescue RedmineAwsS3::Upload::Pending => e
+  rescue RedmineAws::S3::Upload::Pending => e
     response.headers['Retry-After'] = '2'
     render json: { status: 'scanning', message: e.message }, status: :accepted
-  rescue RedmineAwsS3::Upload::Error => e
+  rescue RedmineAws::S3::Upload::Error => e
     render json: { errors: [e.message] }, status: :unprocessable_content
   end
 
   private
 
   def require_avatars
-    render_404 unless RedmineAwsS3.enabled? && RedmineAwsS3.avatars? && User.avatar_available?
+    render_404 unless RedmineAws::S3.enabled? && RedmineAws::S3.avatars? && User.avatar_available?
   end
 end

@@ -2,52 +2,56 @@
 
 require_relative '../test_helper'
 
-class RedmineAwsS3ChecksTest < ActiveSupport::TestCase
-  include RedmineAwsS3::TestHelper
+module RedmineAws
+  module S3
+    class ChecksTest < ActiveSupport::TestCase
+      include S3::TestHelper
 
-  def response(klass, code, headers = {})
-    res = klass.new('1.1', code, '')
-    headers.each { |name, value| res[name] = value }
-    res
-  end
+      def response(klass, code, headers = {})
+        res = klass.new('1.1', code, '')
+        headers.each { |name, value| res[name] = value }
+        res
+      end
 
-  def test_delivery_with_the_headers_of_the_distribution
-    signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineAwsS3::ATTACHMENT_CSP,
-                                          'X-Content-Type-Options' => 'nosniff')
-    unsigned = response(Net::HTTPForbidden, '403')
-    with_s3(stub_client) do |client|
-      urls = []
-      RedmineAwsS3::Checks.stubs(:get).with { |url| urls << url }.returns(signed, unsigned)
-      results = RedmineAwsS3::Checks.delivery
-      put = client.api_requests.find { |request| request[:operation_name] == :put_object }
-      deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
+      def test_delivery_with_the_headers_of_the_distribution
+        signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineAws::S3::ATTACHMENT_CSP,
+                                              'X-Content-Type-Options' => 'nosniff')
+        unsigned = response(Net::HTTPForbidden, '403')
+        with_s3(stub_client) do |client|
+          urls = []
+          RedmineAws::S3::Checks.stubs(:get).with { |url| urls << url }.returns(signed, unsigned)
+          results = RedmineAws::S3::Checks.delivery
+          put = client.api_requests.find { |request| request[:operation_name] == :put_object }
+          deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
 
-      assert(results.all? { |_, ok, _| ok }, results.inspect)
-      assert_match %r{\Atmp/bulk/healthcheck-}, put[:params][:key]
-      assert_equal put[:params][:key], deleted[:params][:delete][:objects].first[:key]
-      verify_signed_url(urls.first)
-      assert_equal "https://#{DOMAIN}/#{put[:params][:key]}", urls.second
-    end
-  end
+          assert(results.all? { |_, ok, _| ok }, results.inspect)
+          assert_match %r{\Atmp/bulk/healthcheck-}, put[:params][:key]
+          assert_equal put[:params][:key], deleted[:params][:delete][:objects].first[:key]
+          verify_signed_url(urls.first)
+          assert_equal "https://#{DOMAIN}/#{put[:params][:key]}", urls.second
+        end
+      end
 
-  def test_delivery_without_the_csp
-    with_s3(stub_client) do
-      RedmineAwsS3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
-      results = RedmineAwsS3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
+      def test_delivery_without_the_csp
+        with_s3(stub_client) do
+          RedmineAws::S3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
+          results = RedmineAws::S3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
 
-      assert results['Signed URL']
-      assert_not results['CSP sandbox']
-      assert_not results['nosniff']
-      assert_not results['Unsigned URL denied']
-    end
-  end
+          assert results['Signed URL']
+          assert_not results['CSP sandbox']
+          assert_not results['nosniff']
+          assert_not results['Unsigned URL denied']
+        end
+      end
 
-  def test_delivery_reports_errors
-    with_s3(stub_client(put_object: 'AccessDenied')) do
-      results = RedmineAwsS3::Checks.delivery
+      def test_delivery_reports_errors
+        with_s3(stub_client(put_object: 'AccessDenied')) do
+          results = RedmineAws::S3::Checks.delivery
 
-      assert_equal 'Delivery', results.first.first
-      assert_not results.first.second
+          assert_equal 'Delivery', results.first.first
+          assert_not results.first.second
+        end
+      end
     end
   end
 end

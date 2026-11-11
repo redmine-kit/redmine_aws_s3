@@ -4,6 +4,6 @@
 # in S3" tab (docs/admin.md).
 class AwsS3ReconcileJob < ApplicationJob
   def perform
-    RedmineAwsS3::Reconciliation.run
+    RedmineAws::S3::Reconciliation.run
   end
 end
