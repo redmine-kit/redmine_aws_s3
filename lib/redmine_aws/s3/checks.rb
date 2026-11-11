@@ -23,13 +23,13 @@ module RedmineAws
         storage = RedmineAws::S3.storage
         key = "tmp/healthcheck/#{SecureRandom.uuid}"
         body = SecureRandom.hex(16)
-        results = []
-        results << step('PutObject') { storage.client.put_object(bucket: storage.bucket, key: key, body: body) }
-        results << step('GetObject') do
-          storage.client.get_object(bucket: storage.bucket, key: key).body.read == body || raise('different contents')
-        end
-        results << step('DeleteObject') { storage.delete(key) }
-        results
+        [step('PutObject') { storage.client.put_object(bucket: storage.bucket, key: key, body: body) },
+         step('GetObject') { read_back(storage, key, body) },
+         step('DeleteObject') { storage.delete(key) }]
+      end
+
+      def read_back(storage, key, body)
+        storage.client.get_object(bucket: storage.bucket, key: key).body.read == body || raise('different contents')
       end
 
       # A check object under tmp/bulk/ through CloudFront: the signed URL

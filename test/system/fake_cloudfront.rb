@@ -63,6 +63,11 @@ module RedmineAws
         return false if expires < Time.now.to_i || signature.empty?
 
         url = "https://#{request.host_with_port}#{request.fullpath}".sub(CLOUDFRONT_PARAMS, '')
+        valid_signature?(url, signature, expires)
+      end
+
+      # The signature of the canned policy of the URL, checked with the public key.
+      def valid_signature?(url, signature, expires)
         policy = %({"Statement":[{"Resource":"#{url}","Condition":{"DateLessThan":{"AWS:EpochTime":#{expires}}}}]})
         @public_key.verify(OpenSSL::Digest.new('SHA1'), Base64.decode64(signature.tr('-_~', '+=/')), policy)
       end

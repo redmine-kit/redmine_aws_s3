@@ -30,33 +30,22 @@ module RedmineAws
 
       # Returns { url:, ticket: } for the browser.
       def presign(filename:, size:, content_type: nil)
-        filename = filename.to_s
-        size = Integer(size, exception: false)
-        raise Error, 'filename is missing' if filename.blank?
-        raise Error, 'size is invalid' if size.nil? || size.negative?
-
-        check_attachment(filename, size)
-        key = "#{RedmineAws::S3::INCOMING_PREFIX}#{SecureRandom.uuid}"
+        data = { 'key' => "#{RedmineAws::S3::INCOMING_PREFIX}#{SecureRandom.uuid}", 'filename' => filename.to_s,
+                 'size' => Integer(size, exception: false), 'content_type' => content_type.to_s.presence,
+                 'user_id' => user.id }
+        check_attachment(data['filename'], data['size'])
         expiry = RedmineAws::S3.upload_url_expiry
-        ticket = verifier.generate(
-          { 'key' => key, 'filename' => filename, 'size' => size,
-            'content_type' => content_type.to_s.presence, 'user_id' => user.id },
-          purpose: TICKET_PURPOSE, expires_in: expiry
-        )
-        { url: RedmineAws::S3.url_signer.url_for(key, expires_in: expiry), ticket: ticket }
+        { url: RedmineAws::S3.url_signer.url_for(data['key'], expires_in: expiry),
+          ticket: verifier.generate(data, purpose: TICKET_PURPOSE, expires_in: expiry) }
       end
 
       # Registers the uploaded object and returns the attachment, saved unless
       # its validations fail. The upload is deleted in every case but Pending.
       def complete(ticket)
         data = verify!(ticket)
-        key = data['key']
-        scan!(key, data)
-        attachment = Attachment.new(author: user, filesize: data['size'])
-        attachment.filename = data['filename']
-        copy!(attachment, key)
+        scan!(data['key'], data)
+        attachment = copied_attachment(data)
         copied = attachment.s3_key
-        attachment.content_type = content_type_of(attachment, data['content_type'])
         share_existing(attachment)
         return attachment if attachment.save
 
@@ -74,7 +63,19 @@ module RedmineAws
         data
       end
 
+      # A new attachment with the upload copied to its key.
+      def copied_attachment(data)
+        attachment = Attachment.new(author: user, filesize: data['size'])
+        attachment.filename = data['filename']
+        copy!(attachment, data['key'])
+        attachment.content_type = content_type_of(attachment, data['content_type'])
+        attachment
+      end
+
       def check_attachment(filename, size)
+        raise Error, 'filename is missing' if filename.blank?
+        raise Error, 'size is invalid' if size.nil? || size.negative?
+
         unless Attachment.valid_extension?(File.extname(filename))
           raise Error, ::I18n.t(:error_attachment_extension_not_allowed, extension: File.extname(filename))
         end

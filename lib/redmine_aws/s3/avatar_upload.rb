@@ -25,12 +25,7 @@ module RedmineAws
         scan!(key, data)
         begin
           Tempfile.create(['redmine-s3-upload', File.extname(data['filename'].to_s)], binmode: true) do |file|
-            raise Error, 'the upload is not in S3' unless read(key, file, data['size'])
-            raise Error, 'the uploaded file does not match its size' unless file.size == data['size']
-
-            file.rewind
-            yield ActionDispatch::Http::UploadedFile.new(tempfile: file, filename: data['filename'],
-                                                         type: data['content_type'])
+            yield uploaded_file(file, data)
           end
         ensure
           storage.delete(key)
@@ -38,6 +33,15 @@ module RedmineAws
       end
 
       private
+
+      # The upload read into file, as a file sent in a form.
+      def uploaded_file(file, data)
+        raise Error, 'the upload is not in S3' unless read(data['key'], file, data['size'])
+        raise Error, 'the uploaded file does not match its size' unless file.size == data['size']
+
+        file.rewind
+        ActionDispatch::Http::UploadedFile.new(tempfile: file, filename: data['filename'], type: data['content_type'])
+      end
 
       # An empty upload has nothing to read (S3 refuses a range of an empty
       # object); Redmine refuses it as an image.

@@ -20,26 +20,33 @@ class S3UploadsController < ApplicationController
     @attachment = RedmineAws::S3::Upload.new(User.current).complete(params[:ticket])
     respond_to do |format|
       format.js { render template: 'attachments/upload' }
-      format.api do
-        if @attachment.persisted?
-          render template: 'attachments/upload', status: :created
-        else
-          render_validation_errors(@attachment)
-        end
-      end
+      format.api { render_attachment }
     end
   rescue RedmineAws::S3::Upload::Pending => e
     scanning(e.message)
   rescue RedmineAws::S3::Upload::Error => e
-    respond_to do |format|
-      format.js do
-        render json: { errors: [e.message] }, status: :unprocessable_content, content_type: 'application/json'
-      end
-      format.api { render_api_errors(e.message) }
-    end
+    upload_error(e.message)
   end
 
   private
+
+  # As Redmine's POST /uploads answers the API.
+  def render_attachment
+    if @attachment.persisted?
+      render template: 'attachments/upload', status: :created
+    else
+      render_validation_errors(@attachment)
+    end
+  end
+
+  def upload_error(message)
+    respond_to do |format|
+      format.js do
+        render json: { errors: [message] }, status: :unprocessable_content, content_type: 'application/json'
+      end
+      format.api { render_api_errors(message) }
+    end
+  end
 
   # 202: the malware scan has not finished; the same request can be sent again.
   def scanning(message)

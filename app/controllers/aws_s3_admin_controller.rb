@@ -18,20 +18,14 @@ class AwsS3AdminController < ApplicationController
   # Invalid values are shown again in the form, with the error at the top
   # of the tab, as the tabs of Redmine's project settings show theirs.
   def update
-    values = params.fetch(:settings, {}).permit(*RedmineAws::S3::DEFAULT_SETTINGS.keys).to_h
-    invalid = values.reject { |_, value| value.to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
-    if invalid.any?
-      names = invalid.keys.map { |name| l(:"field_aws_s3_#{name}") }
-      @errors = [l(:error_aws_s3_invalid_settings, names: names.join(', '))]
-      show
-      @settings.merge!(values)
-      render :show, status: :unprocessable_content
-    else
-      RedmineAws::S3.update_settings(values)
-      log("changed the settings #{values.keys.join(', ')}")
-      flash[:notice] = l(:notice_successful_update)
-      redirect_to aws_s3_admin_path
-    end
+    values = settings_params
+    invalid = invalid_settings(values)
+    return render_invalid_settings(values, invalid) if invalid.any?
+
+    RedmineAws::S3.update_settings(values)
+    log("changed the settings #{values.keys.join(', ')}")
+    flash[:notice] = l(:notice_successful_update)
+    redirect_to aws_s3_admin_path
   end
 
   def read_write
@@ -55,6 +49,23 @@ class AwsS3AdminController < ApplicationController
   end
 
   private
+
+  def settings_params
+    params.fetch(:settings, {}).permit(*RedmineAws::S3::DEFAULT_SETTINGS.keys).to_h
+  end
+
+  # The names of the values that are not positive whole numbers.
+  def invalid_settings(values)
+    values.keys.reject { |name| values[name].to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
+  end
+
+  def render_invalid_settings(values, invalid)
+    names = invalid.map { |name| l(:"field_aws_s3_#{name}") }
+    @errors = [l(:error_aws_s3_invalid_settings, names: names.join(', '))]
+    show
+    @settings.merge!(values)
+    render :show, status: :unprocessable_content
+  end
 
   def require_s3
     render_404 unless RedmineAws::S3.enabled?

@@ -11,19 +11,23 @@ module RedmineAws
       def view_layouts_base_html_head(context = {})
         return '' unless RedmineAws::S3.enabled?
 
-        tags = [
-          tag.meta(name: 'redmine-s3-presign-url', content: url_for(controller: '/s3_uploads', action: 'presign',
-                                                                    only_path: true)),
-          tag.meta(name: 'redmine-s3-complete-url', content: url_for(controller: '/s3_uploads', action: 'complete',
-                                                                     format: 'js', only_path: true)),
-          javascript_include_tag('s3_upload', plugin: 'redmine_aws_s3')
-        ]
+        tags = upload
         tags.concat(max_size_note) if context[:controller].is_a?(SettingsController)
         tags.concat(avatar_upload) if avatar_page?(context[:controller])
         safe_join(tags, "\n")
       end
 
       private
+
+      def upload
+        [
+          tag.meta(name: 'redmine-s3-presign-url', content: url_for(controller: '/s3_uploads', action: 'presign',
+                                                                    only_path: true)),
+          tag.meta(name: 'redmine-s3-complete-url', content: url_for(controller: '/s3_uploads', action: 'complete',
+                                                                     format: 'js', only_path: true)),
+          javascript_include_tag('s3_upload', plugin: 'redmine_aws_s3')
+        ]
+      end
 
       # The avatar form of Redmine 7.1 (docs/attachments.md#avatars).
       def avatar_page?(controller)

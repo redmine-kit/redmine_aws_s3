@@ -10,7 +10,7 @@ module RedmineAws
     # (AttachmentPatch#thumbnail).
     module AvatarsControllerPatch
       def update
-        ticket = params[:s3_ticket].presence if RedmineAws::S3.enabled? && params[:avatar].blank?
+        ticket = s3_avatar_ticket
         return update_with_errors { super } unless ticket
 
         RedmineAws::S3::AvatarUpload.new(User.current).open(ticket) do |file|
@@ -24,6 +24,11 @@ module RedmineAws
       end
 
       private
+
+      # The ticket of an upload through S3, when the form sends no file.
+      def s3_avatar_ticket
+        params[:s3_ticket].presence if RedmineAws::S3.enabled? && params[:avatar].blank?
+      end
 
       # User#update_avatar saves the attachment with save!, so a file the
       # malware scan refuses (a file sent in the form, through Lambda) is shown

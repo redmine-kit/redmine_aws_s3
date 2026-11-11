@@ -27,21 +27,31 @@ module RedmineAws
         environment = ENVIRONMENT.merge(S3::ENV_PRIVATE_KEY => S3::TestHelper.private_key.to_pem)
         @saved = environment.keys.index_with { |name| ENV.fetch(name, nil) }
         ENV.update(environment)
-        client = s3_test_client
-        client.create_bucket(bucket: BUCKET) unless client.list_buckets.buckets.any? { |b| b.name == BUCKET }
-        RedmineAws::S3.client = client
-        RedmineAws::S3.update_settings(
-          'malware_findings' => [{ 'time' => 3.days.ago.utc.iso8601, 'status' => 'THREATS_FOUND',
-                                   'filename' => 'invoice.pdf.exe', 'key' => 'incoming/example', 'user' => 'jsmith' }],
-          'reconciliation' => { 'started_at' => 1.day.ago.utc.iso8601, 'finished_at' => 1.day.ago.utc.iso8601,
-                                'attachments' => 1284, 'objects' => 1285, 'missing_count' => 0, 'unused_count' => 1,
-                                'missing' => [], 'unused' => ['2026/10/261014093112_draft.docx'] }
-        )
+        RedmineAws::S3.client = bucket_client
+        RedmineAws::S3.update_settings('malware_findings' => [finding], 'reconciliation' => reconciliation)
       end
 
       def teardown
         @saved.each { |name, value| value.nil? ? ENV.delete(name) : ENV[name] = value }
         RedmineAws::S3.client = nil
+      end
+
+      # The S3 of the tests, with the example bucket.
+      def bucket_client
+        client = s3_test_client
+        client.create_bucket(bucket: BUCKET) unless client.list_buckets.buckets.any? { |b| b.name == BUCKET }
+        client
+      end
+
+      def finding
+        { 'time' => 3.days.ago.utc.iso8601, 'status' => 'THREATS_FOUND', 'filename' => 'invoice.pdf.exe',
+          'key' => 'incoming/example', 'user' => 'jsmith' }
+      end
+
+      def reconciliation
+        { 'started_at' => 1.day.ago.utc.iso8601, 'finished_at' => 1.day.ago.utc.iso8601,
+          'attachments' => 1284, 'objects' => 1285, 'missing_count' => 0, 'unused_count' => 1,
+          'missing' => [], 'unused' => ['2026/10/261014093112_draft.docx'] }
       end
 
       def test_screens

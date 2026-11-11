@@ -13,22 +13,36 @@ module RedmineAws
         res
       end
 
-      def test_delivery_with_the_headers_of_the_distribution
+      # The answers of a distribution with the headers: the object for the
+      # signed URL, 403 for the unsigned one. Returns the URLs requested.
+      def stub_distribution
         signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineAws::S3::ATTACHMENT_CSP,
                                               'X-Content-Type-Options' => 'nosniff')
-        unsigned = response(Net::HTTPForbidden, '403')
-        with_s3(stub_client) do |client|
-          urls = []
-          RedmineAws::S3::Checks.stubs(:get).with { |url| urls << url }.returns(signed, unsigned)
+        urls = []
+        RedmineAws::S3::Checks.stubs(:get).with { |url| urls << url }
+                              .returns(signed, response(Net::HTTPForbidden, '403'))
+        urls
+      end
+
+      def test_delivery_with_the_headers_of_the_distribution
+        with_s3(stub_client) do
+          stub_distribution
           results = RedmineAws::S3::Checks.delivery
-          put = client.api_requests.find { |request| request[:operation_name] == :put_object }
-          deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
 
           assert(results.all? { |_, ok, _| ok }, results.inspect)
-          assert_match %r{\Atmp/bulk/healthcheck-}, put[:params][:key]
-          assert_equal put[:params][:key], deleted[:params][:delete][:objects].first[:key]
+        end
+      end
+
+      def test_delivery_requests_a_check_object_and_deletes_it
+        with_s3(stub_client) do |client|
+          urls = stub_distribution
+          RedmineAws::S3::Checks.delivery
+          key = api_request(client, :put_object)[:params][:key]
+
+          assert_match %r{\Atmp/bulk/healthcheck-}, key
+          assert_equal key, deleted_keys(client).first
           verify_signed_url(urls.first)
-          assert_equal "https://#{DOMAIN}/#{put[:params][:key]}", urls.second
+          assert_equal "https://#{DOMAIN}/#{key}", urls.second
         end
       end
 

@@ -22,13 +22,7 @@ module RedmineAws
       def files_to_final_location
         had_file = instance_variable_get(:@temp_file).present?
         super
-        return unless had_file && RedmineAws::S3.enabled? && disk_filename.present?
-
-        if RedmineAws::S3::MalwareScan.required?
-          RedmineAws::S3::MalwareScan.put_scanned(local_diskfile, s3_key, filename: filename, user: author)
-        else
-          RedmineAws::S3.storage.put_file(s3_key, local_diskfile)
-        end
+        s3_put_file if had_file && RedmineAws::S3.enabled? && disk_filename.present?
       rescue RedmineAws::S3::MalwareScan::Error => e
         FileUtils.rm_f(local_diskfile)
         errors.add(:base, e.message)
@@ -112,6 +106,10 @@ module RedmineAws
       end
 
       private
+
+      def s3_put_file
+        RedmineAws::S3::MalwareScan.put(local_diskfile, s3_key, filename: filename, user: author)
+      end
 
       # Shares a file with the same SHA256 and size, deciding by the digest
       # instead of comparing local files, and deletes the newer object.

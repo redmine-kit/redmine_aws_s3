@@ -12,20 +12,6 @@ AllCops:
 Style/Documentation:
   Enabled: false
 
-# Tests read better as one scenario per method.
-Metrics/MethodLength:
-  Max: 25
-  Exclude:
-    - 'test/**/*'
-
-Metrics/AbcSize:
-  Max: 30
-  Exclude:
-    - 'test/**/*'
-
-Metrics/ClassLength:
-  Exclude:
-    - 'test/**/*'
-
-Layout/LineLength:
-  Max: 120
+# Metrics and line length: RuboCop's defaults, in tests too. A method that a
+# default really doesn't fit disables the cop on that method, with the reason
+# (rubocop:disable Metrics/... -- <reason>).

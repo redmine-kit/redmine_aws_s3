@@ -49,9 +49,8 @@ module RedmineAws
         with_s3(stub_client) do |client|
           import = new_import
           import.destroy
-          deleted = client.api_requests.find { |request| request[:operation_name] == :delete_objects }
 
-          assert_equal "imports/#{import.filename}", deleted[:params][:delete][:objects].first[:key]
+          assert_equal "imports/#{import.filename}", deleted_keys(client).first
           assert_not File.exist?(import.filepath)
         end
       end

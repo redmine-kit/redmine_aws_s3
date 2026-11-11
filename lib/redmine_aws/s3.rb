@@ -44,12 +44,7 @@ module RedmineAws
 
       # Called from init.rb, on every code reload.
       def setup
-        { Attachment => AttachmentPatch, AttachmentsController => AttachmentsControllerPatch, Import => ImportPatch,
-          SettingsController => SettingsControllerPatch, MailHandler => MailHandlerPatch }.each do |target, patch|
-          target.prepend(patch) unless target < patch
-        end
-        # Avatars of Redmine 7.1 (docs/attachments.md#avatars).
-        AvatarsController.prepend(AvatarsControllerPatch) if avatars? && !(AvatarsController < AvatarsControllerPatch)
+        prepend_patches
         # Loaded here so that the listener registers itself in every environment.
         Hooks.name
         RedmineAws::Admin.register_tab(:s3, label: :label_aws_s3_admin,
@@ -59,6 +54,15 @@ module RedmineAws
         RedmineAws::Admin.register_check(:s3, label: :label_aws_s3_check) do
           Checks.head_bucket
         end
+      end
+
+      def prepend_patches
+        patches = { Attachment => AttachmentPatch, AttachmentsController => AttachmentsControllerPatch,
+                    Import => ImportPatch, SettingsController => SettingsControllerPatch,
+                    MailHandler => MailHandlerPatch }
+        # Avatars of Redmine 7.1 (docs/attachments.md#avatars).
+        patches[AvatarsController] = AvatarsControllerPatch if avatars?
+        patches.each { |target, patch| target.prepend(patch) unless target < patch }
       end
 
       def enabled?

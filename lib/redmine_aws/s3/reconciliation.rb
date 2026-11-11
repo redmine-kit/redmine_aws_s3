@@ -14,12 +14,18 @@ module RedmineAws
 
       def run
         started_at = result&.fetch('started_at', nil) || Time.now.utc.iso8601
-        in_s3 = RedmineAws::S3.storage.keys('files/')
-                              .reject { |key| key.start_with?(DERIVED_PREFIX) }.to_set
-        in_db = attachment_keys
-        save({ 'started_at' => started_at, 'finished_at' => Time.now.utc.iso8601,
-               'attachments' => in_db.size, 'objects' => in_s3.size }
-               .merge(listing('missing', in_db - in_s3), listing('unused', in_s3 - in_db)))
+        in_s3 = object_keys
+        save({ 'started_at' => started_at }.merge(summary(attachment_keys, in_s3)))
+      end
+
+      # The keys of the objects under files/, without Redmine's derived cache.
+      def object_keys
+        RedmineAws::S3.storage.keys('files/').reject { |key| key.start_with?(DERIVED_PREFIX) }.to_set
+      end
+
+      def summary(in_db, in_s3)
+        { 'finished_at' => Time.now.utc.iso8601, 'attachments' => in_db.size, 'objects' => in_s3.size }
+          .merge(listing('missing', in_db - in_s3), listing('unused', in_s3 - in_db))
       end
 
       # The S3 keys of the files of all attachments.
