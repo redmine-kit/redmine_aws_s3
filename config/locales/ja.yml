@@ -18,6 +18,7 @@ ja:
   label_aws_s3_scan_result_threats_found: 脅威を検出
   label_aws_s3_scan_result_unsupported: サポート対象外
   label_aws_s3_scan_result_access_denied: アクセス拒否
+  label_aws_s3_scan_result_unknown: 不明
   label_aws_s3_scan_result_failed: 失敗
   field_aws_s3_malware_scan: GuardDuty マルウェアスキャン
   error_aws_s3_malware_found: マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。

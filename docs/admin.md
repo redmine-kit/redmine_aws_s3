@@ -73,6 +73,7 @@ The screen's terms follow the Japanese of the AWS documentation where AWS has on
 | Unsupported / サポート対象外 | `UNSUPPORTED` | Same page. Made from the description (the scan is skipped for files that are not supported) | To recheck in the console |
 | Access denied / アクセス拒否 | `ACCESS_DENIED` | Same page. Made from the description 「GuardDuty はこのオブジェクトにアクセスできず」 | To recheck in the console |
 | Failed / 失敗 | `FAILED` | Same page. Made from the scan status 「失敗」 | To recheck in the console |
+| Unknown / 不明 | Any other value | A value that GuardDuty may add later is shown with this label, not as the raw value | Product term |
 | Bucket / バケット, S3 objects / S3 オブジェクト数 | Bucket (「バケット」), object (「オブジェクト」) | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | Documentation |
 | CloudFront key pair ID / CloudFront キーペア ID | Key pair ID (「キーペア ID」) | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | Documentation |
 | Consistency check / 整合性チェック | — | The product's own term; AWS has no term for it | Product term |

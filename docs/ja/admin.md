@@ -79,6 +79,7 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 | サポート対象外 / Unsupported | `UNSUPPORTED` | 同じページ。サポートしないファイルではスキャンをスキップするという説明から作った | コンソールで要確認 |
 | アクセス拒否 / Access denied | `ACCESS_DENIED` | 同じページ。説明の「GuardDuty はこのオブジェクトにアクセスできず」から作った | コンソールで要確認 |
 | 失敗 / Failed | `FAILED` | 同じページ。スキャンのステータスの「失敗」から作った | コンソールで要確認 |
+| 不明 / Unknown | ほかの値 | GuardDuty があとで追加するかもしれない値は、生の値ではなくこのラベルで表示する | 製品の用語 |
 | バケット / Bucket、S3 オブジェクト数 / S3 objects | 「バケット」、「オブジェクト」 | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | ドキュメント |
 | CloudFront キーペア ID / CloudFront key pair ID | 「キーペア ID」 | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | ドキュメント |
 | 整合性チェック / Consistency check | — | この製品の用語。AWS に対応する用語はない | 製品の用語 |

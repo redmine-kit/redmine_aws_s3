@@ -18,6 +18,7 @@ en:
   label_aws_s3_scan_result_threats_found: Threats found
   label_aws_s3_scan_result_unsupported: Unsupported
   label_aws_s3_scan_result_access_denied: Access denied
+  label_aws_s3_scan_result_unknown: Unknown
   label_aws_s3_scan_result_failed: Failed
   field_aws_s3_malware_scan: GuardDuty malware scan
   error_aws_s3_malware_found: The malware scan found threats, so the file was blocked.
