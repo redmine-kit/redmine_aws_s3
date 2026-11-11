@@ -54,10 +54,10 @@
 </div>
 <% end %>
 
-<% if RedmineAws::S3.malware_scan? || RedmineAws::S3::MalwareScan.findings.any? %>
+<% if RedmineAws::S3.malware_scan? || @findings.any? %>
 <h3><%= l(:label_aws_s3_malware_findings) %></h3>
 
-<% if (findings = RedmineAws::S3::MalwareScan.findings).any? %>
+<% if @findings.any? %>
 <div class="autoscroll">
 <table class="list findings" id="aws-s3-malware"><thead>
 <tr>
@@ -67,8 +67,8 @@
     <th><%= l(:label_user) %></th>
 </tr></thead>
 <tbody>
-<% findings.each do |finding| %>
-<% user = User.find_by_login(finding['user'].to_s) if finding['user'].present? %>
+<% @findings.each do |finding| %>
+<% user = @finding_users[finding['user']] %>
 <tr>
     <td><%= finding['time'].present? ? format_time(Time.iso8601(finding['time'])) : '' %></td>
     <td><%= RedmineAws::S3::MalwareScan.status_label(finding['status']) %></td>

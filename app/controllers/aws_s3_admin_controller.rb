@@ -10,6 +10,9 @@ class AwsS3AdminController < ApplicationController
   def show
     @settings = RedmineAws::S3::DEFAULT_SETTINGS.keys.index_with { |name| RedmineAws::S3.setting(name) }
     @reconciliation = RedmineAws::S3::Reconciliation.result
+    @findings = RedmineAws::S3::MalwareScan.findings
+    # The users of the findings by login, in one query.
+    @finding_users = User.where(login: @findings.filter_map { |finding| finding['user'].presence }).index_by(&:login)
   end
 
   # Invalid values are shown again in the form, with the error at the top
