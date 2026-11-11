@@ -127,6 +127,8 @@ Request bodies through CloudFront are limited to 1 MB, which is what the Lambda@
 
 These files are written to the `/tmp` cache (below) by Redmine's standard `files_to_final_location`, then put to S3 with PutObject. If PutObject fails, an exception is raised and the record is not saved. When the malware scan is on, the file is put to `tmp/incoming/<UUID>` instead, Redmine waits for the scan (up to 20 seconds) and copies it to `files/` only if it is clean; otherwise the attachment gets a validation error and is not saved. Attachments of received mail are not waited for (below).
 
+The write to `files/` (PutObject, or CopyObject from `tmp/incoming/`, and the CopyObject of an upload through CloudFront) is a conditional write (`If-None-Match: *`), so it never replaces an object. Redmine picks the file name in its own `/tmp` only, so two Lambda environments can pick the same name in the same second. The one whose write S3 refuses (412, or 409 for writes at the same time) takes the next free name and writes again, and the record keeps that name.
+
 ## Malware scan
 
 Amazon GuardDuty Malware Protection for S3 can scan what users upload before Redmine uses it. It is off by default, so the plugin works without GuardDuty; `REDMINE_S3_MALWARE_SCAN=true` turns the waiting on ([setup.md](setup.md#configuration)).

@@ -6,6 +6,11 @@ module RedmineAws
   module S3
     # The S3 operations the plugin uses, on one bucket.
     class Storage
+      # The key has an object already: a conditional write (If-None-Match: *)
+      # lost to another Redmine server that wrote the same key first. S3
+      # answers 412, or 409 for writes at the same time.
+      class KeyTaken < StandardError; end
+
       attr_reader :client, :bucket
 
       def initialize(client, bucket)
@@ -13,10 +18,13 @@ module RedmineAws
         @bucket = bucket
       end
 
-      def put_file(key, path)
+      # new_only: only when the key has no object yet (raises KeyTaken).
+      def put_file(key, path, new_only: false)
         File.open(path, 'rb') do |io|
-          client.put_object(bucket: bucket, key: key, body: io, checksum_algorithm: 'SHA256')
+          client.put_object(bucket: bucket, key: key, body: io, checksum_algorithm: 'SHA256', **condition(new_only))
         end
+      rescue ::Aws::S3::Errors::PreconditionFailed, ::Aws::S3::Errors::ConditionalRequestConflict
+        raise KeyTaken, key
       end
 
       # Writes the object to path through a temporary file in the same
@@ -65,9 +73,12 @@ module RedmineAws
         !head(key).nil?
       end
 
-      def copy(source_key, key)
+      # new_only: only when the key has no object yet (raises KeyTaken).
+      def copy(source_key, key, new_only: false)
         client.copy_object(bucket: bucket, key: key, copy_source: "#{bucket}/#{escape_key(source_key)}",
-                           checksum_algorithm: 'SHA256')
+                           checksum_algorithm: 'SHA256', **condition(new_only))
+      rescue ::Aws::S3::Errors::PreconditionFailed, ::Aws::S3::Errors::ConditionalRequestConflict
+        raise KeyTaken, key
       end
 
       def delete(*keys)
@@ -95,6 +106,11 @@ module RedmineAws
 
       def escape_key(key)
         key.split('/').map { |part| ERB::Util.url_encode(part) }.join('/')
+      end
+
+      # A conditional write: S3 refuses it when the key has an object.
+      def condition(new_only)
+        new_only ? { if_none_match: '*' } : {}
       end
     end
   end

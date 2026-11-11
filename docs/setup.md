@@ -12,7 +12,7 @@ What a Redmine server needs to use Redmine AWS S3: installation, configuration, 
 ## Installation
 
 1. Put the plugin in `plugins/redmine_aws_s3`, and [Redmine AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). Redmine loads plugins in alphabetical order, so `redmine_aws` comes first.
-2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.178 or later (which has the full-object checksums, `ChecksumType`) and `aws-sdk-cloudfront` 1.x.
+2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.202 or later (which has the full-object checksums, `ChecksumType`, and the conditional writes of `CopyObject`) and `aws-sdk-cloudfront` 1.x.
 3. No migrations are needed.
 4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
 

@@ -101,10 +101,11 @@ module RedmineAws
       # computes the SHA256 of the whole object, and deletes the upload. The
       # SHA256 becomes the digest; a size other than the declared one fails.
       def copy!(attachment, key)
-        attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
-        attachment.disk_filename = DiskName.free(attachment.filename, attachment.disk_directory)
+        directory = attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
         begin
-          storage.copy(key, attachment.s3_key)
+          attachment.disk_filename = DiskName.claim(attachment.filename, directory) do |name|
+            storage.copy(key, RedmineAws::S3.file_key(directory, name), new_only: true)
+          end
         rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound
           raise Error, 'the upload is not in S3'
         end

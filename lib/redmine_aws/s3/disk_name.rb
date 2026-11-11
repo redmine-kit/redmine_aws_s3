@@ -7,6 +7,8 @@ module RedmineAws
     # hash for names that are not short ASCII).
     module DiskName
       MAX_LENGTH = 50
+      # How many names claim tries before it gives up.
+      ATTEMPTS = 5
 
       module_function
 
@@ -21,6 +23,22 @@ module RedmineAws
 
           timestamp = timestamp.succ
         end
+      end
+
+      # Yields a name (first, or a free one) to the block, which stores the
+      # file under it with a conditional write, and returns the name. When
+      # another Redmine server stored a file under that name first (S3's
+      # Storage::KeyTaken: same second, same name, a different /tmp), it
+      # yields the next free name.
+      def claim(filename, directory, first: nil)
+        name = first || free(filename, directory)
+        ATTEMPTS.times do
+          yield name
+          return name
+        rescue Storage::KeyTaken
+          name = free(filename, directory)
+        end
+        raise Storage::KeyTaken, name
       end
 
       def ascii(filename)
