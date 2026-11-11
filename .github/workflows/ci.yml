@@ -103,3 +103,37 @@ jobs:
         run: bin/services --system --down
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+
+  # The tests against the latest release of redmine_aws (its newest v0.1.*
+  # tag, the source of the published gem), as well as against its main
+  # above: adapters install the release. Skipped until there is one.
+  release:
+    needs: static
+    name: test (redmine_aws release)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - id: release
+        run: |
+          tag=$(git ls-remote --tags --refs https://github.com/redmine-kit/redmine_aws.git 'v0.1.*' |
+            sed 's|.*refs/tags/||' | sort -V | tail -n 1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          [[ -n "$tag" ]] || echo "::notice::redmine_aws has no v0.1.* release yet; not tested against one"
+      - if: steps.release.outputs.tag != ''
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: redmine-kit/redmine_aws
+          ref: ${{ steps.release.outputs.tag }}
+          path: redmine_aws
+          persist-credentials: false
+      - if: steps.release.outputs.tag != ''
+        run: bin/test
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
+          REDMINE_AWS_DIR: redmine_aws
+      - if: always() && steps.release.outputs.tag != ''
+        run: bin/services --down
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
