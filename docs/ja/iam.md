@@ -1,6 +1,6 @@
 # IAM 権限
 
-プラグインを入れた Redmine を動かすプロセス (画面の要求、ジョブ、rake) には、どれもバケットへの同じ権限を渡します。ブラウザーはこの認証情報を使いません。アップロードとダウンロードは、CloudFront の秘密鍵で署名した URL で、CloudFront を通ります。
+プラグインをインストールした Redmine を動かすプロセス (Web リクエスト、ジョブ、rake) には、どれもバケットへの同じ権限を渡します。ブラウザーはこの認証情報を使いません。アップロードとダウンロードは、CloudFront の秘密鍵で署名した URL で、CloudFront を通ります。
 
 <a id="permissions"></a>
 
@@ -8,16 +8,16 @@
 
 | 操作 | 対象 | 理由 |
 | --- | --- | --- |
-| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`imports/*`<br>`tmp/*` | 添付ファイル、Markdown のプレビュー、サムネイルの保存と削除、登録時の `tmp/incoming/` からのコピーと、コピーのチェックサム付きの `HeadObject`、アップロードとコピーの削除、CSV のインポート、一括のダウンロードの zip、読み書きテスト (`tmp/healthcheck/`) |
+| `s3:GetObject`<br>`s3:PutObject`<br>`s3:DeleteObject` | バケットの<br>`files/*`<br>`imports/*`<br>`tmp/*` | 添付ファイル、Markdown のプレビュー、サムネイルの保存と削除、登録時の `tmp/incoming/` からのコピーと、コピーのチェックサム付きの `HeadObject`、アップロードとコピーの削除、CSV のインポート、一括ダウンロードの zip、読み書きテスト (`tmp/healthcheck/`) |
 | `s3:GetObjectTagging` | バケットの<br>`tmp/incoming/*`<br>`imports/*` | マルウェアスキャンを使うときに、GuardDuty の結果を読む ([attachments.md](attachments.md#malware-scan)) |
 | `s3:ListBucket` | バケット | ないオブジェクトへの `HeadObject` を、403 でなく 404 にする。前方一致でのサムネイルの削除、整合性チェック、接続テストの `HeadBucket` |
-| CloudFront の秘密鍵を読む | それを入れた秘密の値 (Serverless では、[Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
+| CloudFront の秘密鍵を読む | それを保存した秘密の値 (Serverless では、[Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/ja/) を通した、`/<instance>/env/` への `ssm:GetParametersByPath`) | CloudFront の URL の署名 |
 
 <a id="example-policy"></a>
 
 ## ポリシーの例
 
-プラグインを入れた Redmine を動かす、すべてのプロセスのポリシーです。
+プラグインをインストールした Redmine を動かす、すべてのプロセスのポリシーです。
 
 ```json
 {
@@ -106,7 +106,7 @@ OAC を通した CloudFront を許すバケットポリシーです。
 }
 ```
 
-TLS でない要求を拒むバケットポリシーです。
+TLS でないリクエストを拒むバケットポリシーです。
 
 ```json
 {

@@ -30,7 +30,7 @@ Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます
 | 配信 | 配信テスト | テストがエラーで止まったときに限り、エラーのメッセージとともに出す |
 
 - **使い道:** 古い Redmine から添付ファイルを移したあと ([migration.md](https://redmine-kit.github.io/serverless/ja/migration.html)) に、整合性チェックで漏れがないかを確認できます。
-- **「ステータス」のタブ:** バケットがあるときは、Redmine AWS の「ステータス」のタブの接続テストに「S3」の行が加わります。添付ファイルのバケットの `HeadBucket` を呼び、バケットの名前を出します。
+- **「ステータス」のタブ:** バケットがあるときは、Redmine AWS の「ステータス」のタブの「接続テスト」に「S3」の行が加わります。添付ファイルのバケットの `HeadBucket` を呼び、バケットの名前を出します。
 - **秘密の値は出さない:** AWS の認証情報と CloudFront の秘密鍵は画面に出しません。AWS の API は、リンクを押したときに限り呼びます。
 - **バケットがないとき:** タブは開き、「REDMINE_S3_BUCKET が未設定のため、添付ファイルはローカルディスクに保存します。」と出します。環境変数と設定は出し、接続テスト、ブロックしたファイル、整合性チェックは出しません。
 - **操作の記録:** 設定の変更、接続テスト、整合性チェックは、管理者のログイン名とともに Redmine のログに書きます。
@@ -39,7 +39,7 @@ Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます
 
 ## AWS メニュー
 
-Redmine の管理メニューの「AWS」の項目 (最初のタブを開く `/admin/aws`) は [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、それぞれの Redmine AWS のプラグインがそこにタブを登録します (`RedmineAws::Admin`)。このプラグインは、「S3」のタブを位置 50 に登録し、バケットがあるときは、「ステータス」のタブの接続テストに「S3」の行 (`HeadBucket`) を追加します。
+Redmine の管理メニューの「AWS」の項目 (最初のタブを開く `/admin/aws`) は [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、それぞれの Redmine AWS のプラグインがそこにタブを登録します (`RedmineAws::Admin`)。このプラグインは、「S3」のタブを位置 50 に登録し、バケットがあるときは、「ステータス」のタブの「接続テスト」に「S3」の行 (`HeadBucket`) を追加します。
 
 - **設定:** Redmine のプラグインの一覧で、このプラグインの「設定」を押すと、「S3」のタブが開きます。
 
@@ -59,17 +59,17 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 
 ## テスト
 
-画面には Redmine の機能のテストがあります。システムのテストはまだ書いていません ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
+画面には Redmine の機能テストがあります。システムテストはまだ書いていません ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
 
-このページの画面のスクリーンショットは、`bin/screenshots` で撮ります (Docker の中のヘッドレスの Chromium と、Redmine のテストのデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
+このページの画面のスクリーンショットは、`bin/screenshots` で撮ります (Docker の中のヘッドレスの Chromium と、Redmine のテストデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
 
 <a id="terms"></a>
 
 ## 用語
 
-画面の語は、AWS に語があるものは、AWS のドキュメントの日本語に合わせています (2026-11-10 に確認)。GuardDuty の日本語のドキュメントは機械翻訳です。
+画面の用語は、AWS に用語があるものは、AWS の日本語のドキュメントに合わせています (2026-11-10 に確認)。GuardDuty の日本語のドキュメントは機械翻訳です。
 
-| 画面 (ja / en) | AWS の語 | 出典 | 状態 |
+| 画面 (ja / en) | AWS の用語 | 出典 | 状態 |
 | --- | --- | --- | --- |
 | GuardDuty マルウェアスキャン / GuardDuty malware scan | 「マルウェアスキャン」 | https://docs.aws.amazon.com/ja_jp/guardduty/latest/ug/monitoring-malware-protection-s3-scans-gdu.html | ドキュメント |
 | スキャン結果 / Scan result | 「スキャン結果」。タグの `GuardDutyMalwareScanStatus` | 同じページ | ドキュメント |
@@ -79,5 +79,5 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 | 失敗 / Failed | `FAILED` | 同じページ。スキャンのステータスの「失敗」から作った | コンソールで要確認 |
 | バケット / Bucket、S3 オブジェクト数 / S3 objects | 「バケット」、「オブジェクト」 | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | ドキュメント |
 | CloudFront キーペア ID / CloudFront key pair ID | 「キーペア ID」 | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | ドキュメント |
-| 整合性チェック / Consistency check | — | この製品の語。AWS に対応する語はない | 製品の語 |
-| マルウェアスキャンでブロックしたファイル / Files blocked by malware scan | — | 「ブロック」は、スキャンのあとに Redmine が受け付けないファイルを指す、この製品の語。GuardDuty が行うのは、オブジェクトへのタグ付けまで | 製品の語 |
+| 整合性チェック / Consistency check | — | この製品の用語。AWS に対応する用語はない | 製品の用語 |
+| マルウェアスキャンでブロックしたファイル / Files blocked by malware scan | — | 「ブロック」は、スキャンのあとに Redmine が受け付けないファイルを指す、この製品の用語。GuardDuty が行うのは、オブジェクトへのタグ付けまで | 製品の用語 |

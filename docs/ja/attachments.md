@@ -1,8 +1,8 @@
 # 添付ファイルと S3
 
-Redmine AWS S3 が Redmine の添付ファイルを S3 に置く仕組みです。プラグインは開発の初期の段階で、本物の CloudFront のディストリビューションでまだ確認していないことは[未確認の事項](#to-verify)にあります。ブラウザーは、Redmine 自身の CloudFront のディストリビューションだけを通してファイルに触れ、S3 のドメインには触れません。アップロードは、CloudFront を通して S3 に PUT し、Redmine が登録するときに S3 が SHA256 を計算します。ダウンロードは、Redmine が権限を確認してから、`/files/` の下の署名付き URL にリダイレクトします。CloudFront が S3 からオブジェクトを読み、Redmine と同じ sandbox の CSP を付けます。ファイルの本体は Lambda を通りません。
+Redmine AWS S3 が Redmine の添付ファイルを S3 に置く仕組みです。プラグインは開発の初期の段階で、実際の CloudFront のディストリビューションでまだ確認していないことは[未確認の事項](#to-verify)にあります。ブラウザーは、Redmine 自身の CloudFront のディストリビューションだけを通してファイルに触れ、S3 のドメインには触れません。アップロードは、CloudFront を通して S3 に PUT し、Redmine が登録するときに S3 が SHA256 を計算します。ダウンロードは、Redmine が権限を確認してから、`/files/` の下の署名付き URL にリダイレクトします。CloudFront が S3 からオブジェクトを読み、Redmine と同じ sandbox の CSP を付けます。ファイルの本体は Lambda を通りません。
 
-Redmine の S3 のプラグイン (下記) のやり方を参考に、プラグイン Redmine AWS S3 (`redmine_aws_s3`) として作ります。外部のプラグインは入れません。[Redmine AWS Lambda](https://redmine-kit.github.io/redmine_aws_lambda/ja/) なしで、Lambda の外でも動きます。Lambda では、[Serverless](https://redmine-kit.github.io/serverless/ja/) が両方を入れます。
+Redmine の S3 のプラグイン (下記) のやり方を参考に、プラグイン Redmine AWS S3 (`redmine_aws_s3`) として作ります。外部のプラグインはインストールしません。[Redmine AWS Lambda](https://redmine-kit.github.io/redmine_aws_lambda/ja/) なしで、Lambda の外でも動きます。Lambda では、[Serverless](https://redmine-kit.github.io/serverless/ja/) が両方をインストールします。
 
 この資料の仕様は、2026-11-08 時点の公式の情報と、Redmine 7.0.3 のソース (7.0-stable の d718d63) で確認したものです。出典は [sources.md](https://redmine-kit.github.io/serverless/ja/sources.html) にあります。
 
@@ -14,11 +14,11 @@ Redmine は、添付ファイルをローカルのディスクに保存します
 
 - **保存:** `Attachment#files_to_final_location` (`app/models/attachment.rb` L146-175) が、`files/<年>/<月>/` にファイルを書き、書きながら SHA256 を計算して `digest` に入れます。ファイル名は `yymmddHHMMSS_元の名前` です。
 - **digest の使い道:** 添付のトークン (`<id>.<digest>`)、ETag、サムネイルのファイル名、同じ内容のファイルの共有が、すべて `digest` に頼っています。
-- **ローカルのパスを使う処理:** サムネイル (ImageMagick、Ghostscript)、Office のファイルのプレビュー (Pandoc)、PDF の出力の画像、添付の一括のダウンロード (zip)、テキストと差分の表示が、`Attachment#diskfile` のパスを読みます。
+- **ローカルのパスを使う処理:** サムネイル (ImageMagick、Ghostscript)、Office のファイルのプレビュー (Pandoc)、PDF の出力の画像、添付ファイルの一括ダウンロード (zip)、テキストと差分の表示が、`Attachment#diskfile` のパスを読みます。
 - **アップロードの流れ:** ブラウザーは、ファイルを選ぶとすぐに `POST /uploads.js` に生のバイト列を送ります (`app/assets/javascripts/attachments.js` の `uploadBlob`)。Redmine は、どこにも付いていない添付のレコードを作って、トークンを返します。チケットなどを保存するときに、トークンでレコードを付けます。
 - **ダウンロードの流れ:** `AttachmentsController#download` が、権限を確認してから `send_file` でファイルを返します。
 
-Lambda では、要求と応答が 6 MB までなので、この流れのままでは大きなファイルを扱えません。関数 URL はバイナリを base64 にするので、実際に送れるファイルは約 4.5 MB です (推測)。さらに、CloudFront を通る要求の本文は 1 MB までです ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。
+Lambda では、リクエストとレスポンスが 6 MB までなので、この流れのままでは大きなファイルを扱えません。関数 URL はバイナリを base64 にするので、実際に送れるファイルは約 4.5 MB です (推測)。さらに、CloudFront を通るリクエストの本文は 1 MB までです ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。
 
 <a id="the-s3-plugin-used-as-a-reference"></a>
 
@@ -43,7 +43,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 | ダウンロード | S3 の署名付き URL にリダイレクトする | Redmine のドメインの CloudFront の署名付き URL (`/files/...`) にリダイレクトし、S3 から返す | Redmine が添付ファイルに付ける sandbox の CSP を、S3 では付けられない (下記) |
 | digest | hgyoon-w のものは、保存の時刻に置き換える | SHA256 のまま | トークン、ETag、サムネイル、同じ内容の共有が digest に頼っている |
 | ローカルのパスを使う処理 | `diskfile` のたびに S3 から取る (cloud_attachment_pro) | `/tmp` にキャッシュして使い回す | 同じ環境での取り直しを減らす。ファイルは一度保存したら変わらないので、キャッシュが古くならない |
-| CSV のインポート | 対応していない | インポートのファイルも S3 に置く | インポートは複数の要求にまたがり、別の環境に届くことがある |
+| CSV のインポート | 対応していない | インポートのファイルも S3 に置く | インポートは複数のリクエストにまたがり、別の環境に届くことがある |
 
 <a id="options-considered"></a>
 
@@ -61,7 +61,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 
 バケットは 1 つです (この資料では `redmine-files` と書きます。インスタンスの名前が `redmine` のときの例で、本当の名前は [deploy-config.md](https://redmine-kit.github.io/serverless/ja/deploy-config.html#names-derived-from-the-instance-name) の決まりで作ります)。
 
-キーは Redmine 自身の保存の形に合わせます。`attachments_storage_path` の下のパスは `files/` の下のキーに、Redmine の `tmp/` の下のパスは `tmp/` の下のキーになり、ファイル名も Redmine と同じです。ディスクと S3 のあいだの移行は、そのままのコピーで済みます。Redmine にないもの (登録の前のアップロード、一括のダウンロードの zip、確認のためのオブジェクト) だけを、`tmp/` の下の独自の名前にします。
+キーは Redmine 自身の保存の形に合わせます。`attachments_storage_path` の下のパスは `files/` の下のキーに、Redmine の `tmp/` の下のパスは `tmp/` の下のキーになり、ファイル名も Redmine と同じです。ディスクと S3 のあいだの移行は、そのままのコピーで済みます。Redmine にないもの (登録の前のアップロード、一括ダウンロードの zip、確認のためのオブジェクト) だけを、`tmp/` の下の独自の名前にします。
 
 | Redmine のパス | S3 のキー | CloudFront のパス | 内容 | 消すとき |
 | --- | --- | --- | --- | --- |
@@ -69,7 +69,7 @@ Redmine の S3 のプラグインは、どれも同じ考え方です。S3 の A
 | `<attachments_storage_path>/derived_cache/markdownized_previews/<digest>_<filesize>.md` | `files/derived_cache/markdownized_previews/<digest>_<filesize>.md` | なし (Redmine が読む) | Office のファイルなどの Markdown のプレビュー | 添付を消したとき |
 | `tmp/thumbnails/<digest>_<filesize>_<size>.thumb` (`Attachment#thumbnail_path`) | `tmp/thumbnails/<digest>_<filesize>_<size>.thumb` | `/tmp/thumbnails/...` | サムネイル | 添付を消したとき |
 | `tmp/imports/<ファイル名>` (`Import#filepath`) | `imports/<ファイル名>` | なし | CSV のインポートのファイル。Redmine が付ける名前 (16 進) | インポートが終わったとき。残ったものはライフサイクルで 7 日 |
-| なし (Redmine はメモリで zip を作る) | `tmp/bulk/<SHA256>.zip` | `/tmp/bulk/...` | 添付の一括のダウンロードの zip。名前は添付ファイルの ID と digest の SHA256 | ライフサイクルで 1 日 |
+| なし (Redmine はメモリで zip を作る) | `tmp/bulk/<SHA256>.zip` | `/tmp/bulk/...` | 添付ファイルの一括ダウンロードの zip。名前は添付ファイルの ID と digest の SHA256 | ライフサイクルで 1 日 |
 | なし | `tmp/incoming/<UUID>` | `/tmp/incoming/...` (PUT) | ブラウザーが送ったファイル (登録の前) | 登録したとき。残ったものはライフサイクルで 1 日 |
 | なし | `tmp/healthcheck/<UUID>` | なし | 管理画面の「読み書きテスト」のオブジェクト | テストのすぐあと。残ったものはライフサイクルで 1 日 |
 
@@ -77,7 +77,7 @@ CSV のインポートのキーは、`tmp/imports/` ではなく `imports/` の�
 
 - **バージョニング:** 有効にします。ファイルを消すと削除マーカーになり、古いバージョンはライフサイクルで 30 日後に消します。誤って消したファイルを、30 日のあいだは戻せます。
 - **暗号化:** SSE-S3 (S3 のデフォルト) にします。
-- **公開しない:** アカウント全体で S3 のパブリックアクセスをブロックしています。バケットポリシーで、TLS でない要求を断り、Redmine の CloudFront のディストリビューションには、そのオリジンアクセスコントロール (OAC) を通したものだけ、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許します ([setup.md](setup.md#the-bucket))。
+- **公開しない:** アカウント全体で S3 のパブリックアクセスをブロックしています。バケットポリシーで、TLS でないリクエストを断り、Redmine の CloudFront のディストリビューションには、そのオリジンアクセスコントロール (OAC) を通したものだけ、`files/`、`tmp/thumbnails/`、`tmp/bulk/` の読み取りと、`tmp/incoming/` への書き込みを許します ([setup.md](setup.md#the-bucket))。
 - **CORS は要らない:** ブラウザーは Redmine 自身のドメインだけを使うので、バケットに CORS の設定は要りません。
 - **バケットに届くもの:** OAC を通した CloudFront と、Redmine を動かすプロセスのロールだけです。ブラウザーに S3 の署名付き URL は渡しません。
 
@@ -137,9 +137,9 @@ sequenceDiagram
 - File API のないブラウザーのフォームの送信 (1 MB まで)
 - メールで受けた添付ファイル (S3 から `redmine-task` が読むので、CloudFront と関数 URL の制限は当たらない)
 
-CloudFront を通る要求の本文は、本文のハッシュを入れる Lambda@Edge が読める 1 MB までです ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。大きなファイルを API で送るときは、CloudFront を通したアップロード (上の流れ。API キーと OAuth でも使える) を使います。
+CloudFront を通るリクエストの本文は、本文のハッシュを追加する Lambda@Edge が読める 1 MB までです ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。大きなファイルを API で送るときは、CloudFront を通したアップロード (上の流れ。API キーと OAuth でも使える) を使います。
 
-これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ (下記) に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外を発生させ、レコードを保存しません。マルウェアスキャンを使うときは、代わりに `tmp/incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証のエラーにして保存しません。受信したメールの添付ファイルは待ちません (下記)。
+これらは、Redmine の標準の `files_to_final_location` で `/tmp` のキャッシュ (下記) に書いたあと、S3 に PutObject します。PutObject が失敗したら、例外を発生させ、レコードを保存しません。マルウェアスキャンを使うときは、代わりに `tmp/incoming/<UUID>` に置き、スキャンを最大 20 秒待って、問題がなかったときだけ `files/` にコピーします。そうでなければ、添付ファイルを検証エラーにして保存しません。受信したメールの添付ファイルは待ちません (下記)。
 
 <a id="malware-scan"></a>
 
@@ -148,8 +148,8 @@ CloudFront を通る要求の本文は、本文のハッシュを入れる Lambd
 Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファイルを、Redmine が使う前にスキャンできます。デフォルトでは使わないので、GuardDuty がなくてもプラグインは動きます。`REDMINE_S3_MALWARE_SCAN=true` で、結果を待つようにします ([setup.md](setup.md#configuration))。
 
 - **スキャンするもの:** 添付ファイルのバケットの Malware Protection のプランが、`tmp/incoming/` (アップロード) と `imports/` (CSV のインポートのファイル) の下の新しいオブジェクトをスキャンし、`GuardDutyMalwareScanStatus` のタグを付けます。値は `NO_THREATS_FOUND`、`THREATS_FOUND`、`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` のどれかです。
-- **待ち方:** Redmine は、1 回の要求のなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
-- **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202` (`{"status":"scanning"}`、`Retry-After: 2`) を返します。ブラウザーは、1、2、4、8、15、30 秒後に同じ要求を送り直し、それでも終わらなければ、まだスキャン中だと出します。REST API のクライアントにも `202` を返すので、`complete.json` を送り直します。
+- **待ち方:** Redmine は、1 回のリクエストのなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
+- **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202` (`{"status":"scanning"}`、`Retry-After: 2`) を返します。ブラウザーは、1、2、4、8、15、30 秒後に同じリクエストを送り直し、それでも終わらなければ、まだスキャン中だと出します。REST API のクライアントにも `202` を返すので、`complete.json` を送り直します。
 - **ブロックするファイル:** `THREATS_FOUND` なら、オブジェクトを消し、「マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。」と出してファイルをブロックします。`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` も同じようにブロックし、「マルウェアスキャンが完了しなかったため、ファイルをブロックしました (`<status>`)。」と出します。ブロックしたファイルは、ログに書き、[管理画面](admin.md#attachments-in-s3)の「マルウェアスキャンでブロックしたファイル」に出します (最新の 20 件)。
 - **Lambda を通るアップロード:** 先に `tmp/incoming/` に置きます ([上記](#uploads-through-lambda))。20 秒たっても結果がなければ、「まだスキャン中」としてアップロードを失敗させるので、送り直します。
 - **受信したメール:** 受信したメールの添付ファイルは、SES が独自にウイルスを判定するので ([mail.md](https://redmine-kit.github.io/serverless/ja/mail.html#receiving))、待たずに `files/` に置きます。
@@ -170,7 +170,7 @@ sequenceDiagram
   participant R as Redmine (Lambda)
   participant S as S3
   B->>C: GET /attachments/download/ID/名前
-  C->>R: 要求 (Redmine のビヘイビア)
+  C->>R: リクエスト (Redmine のビヘイビア)
   R->>R: 権限を確認する (Redmine の標準)
   R-->>B: 302 (https://ドメイン/files/...?署名、5 分)
   B->>C: GET /files/... (署名付き URL)
@@ -180,17 +180,17 @@ sequenceDiagram
 
 1. Redmine の標準の確認 (ログイン、プロジェクトの権限) を通します。
 2. ダウンロードの回数を数えます (バージョンとプロジェクトのファイル。Redmine の標準と同じ)。
-3. CloudFront の署名付き URL `https://<ドメイン>/files/<年>/<月>/<ファイル名>?...` (期限 5 分) に、302 でリダイレクトします。クエリーの `response-content-disposition` と `response-content-type` で、Redmine と同じファイル名と表示のしかたを指定します。Redmine 7.0 は、PDF だけを `inline`、ほかを `attachment` にします (`AttachmentsController#disposition`)。Redmine 7.1 が `inline` にするのは、PDF のプレビューが要求したとき (`?disposition=inline`) で、判定した種類が PDF か PDF 互換 (`Attachment#pdf_previewable?`。Illustrator など) のファイルだけです。そのファイルは、Redmine と同じく `application/pdf` で返します。プラグインは Redmine 自身の `disposition` を呼ぶので、使っている Redmine のとおりになります。
-4. CloudFront が署名を確認し、パスをキーにして、OAC で S3 からオブジェクトを読みます。クエリーは S3 に渡しません。ビューワーレスポンスの CloudFront Functions が、2 つのクエリーから `Content-Disposition` と `Content-Type` を設定し、sandbox の CSP と `nosniff` を付けます ([下](#download))。
+3. CloudFront の署名付き URL `https://<ドメイン>/files/<年>/<月>/<ファイル名>?...` (期限 5 分) に、302 でリダイレクトします。クエリ文字列の `response-content-disposition` と `response-content-type` で、Redmine と同じファイル名と表示のしかたを指定します。Redmine 7.0 は、PDF だけを `inline`、ほかを `attachment` にします (`AttachmentsController#disposition`)。Redmine 7.1 が `inline` にするのは、PDF のプレビューがリクエストしたとき (`?disposition=inline`) で、判定した種類が PDF か PDF 互換 (`Attachment#pdf_previewable?`。Illustrator など) のファイルだけです。そのファイルは、Redmine と同じく `application/pdf` で返します。プラグインは Redmine 自身の `disposition` を呼ぶので、使っている Redmine のとおりになります。
+4. CloudFront が署名を確認し、パスをキーにして、OAC で S3 からオブジェクトを読みます。クエリ文字列は S3 に渡しません。ビューワーレスポンスの CloudFront Functions が、2 つのクエリ文字列から `Content-Disposition` と `Content-Type` を設定し、sandbox の CSP と `nosniff` を付けます ([下](#download))。
 
-- **キャッシュビヘイビア:** `/files/*` (添付ファイル) と `/tmp/*` (サムネイル、zip、アップロード) は、OAC で添付ファイルのバケットに送ります。Redmine と `/assets/*` を合わせても 4 つで、CloudFront の定額プランの Free の上限 (5 つ) に収まります。ほかのパスは、今までどおり Redmine に送ります。閲覧する側には、ディストリビューションの信頼されたキーグループの鍵で作った署名付き URL が要ります。Free で使えるとおり、ポリシーはマネージドのものだけです。キャッシュポリシーは CachingDisabled、オリジンリクエストポリシーはなし、レスポンスヘッダーポリシーは SecurityHeadersPolicy です。CachingDisabled は、クエリー、Cookie、ヘッダーを S3 に渡しません。署名付き URL のクエリーを渡すと、その `Signature` が OAC の署名と並び、S3 は認証の方法が 2 つある要求を断ります。キャッシュはしないので、ダウンロードのたびに S3 を 1 回読みます。
+- **キャッシュビヘイビア:** `/files/*` (添付ファイル) と `/tmp/*` (サムネイル、zip、アップロード) は、OAC で添付ファイルのバケットに送ります。Redmine と `/assets/*` を合わせても 4 つで、CloudFront の定額プランの Free の上限 (5 つ) に収まります。ほかのパスは、今までどおり Redmine に送ります。閲覧する側には、ディストリビューションの信頼されたキーグループの鍵で作った署名付き URL が要ります。Free で使えるとおり、ポリシーはマネージドのものだけです。キャッシュポリシーは CachingDisabled、オリジンリクエストポリシーはなし、レスポンスヘッダーポリシーは SecurityHeadersPolicy です。CachingDisabled は、クエリ文字列、Cookie、ヘッダーを S3 に渡しません。署名付き URL のクエリ文字列を渡すと、その `Signature` が OAC の署名と並び、S3 は認証の方法が 2 つあるリクエストを断ります。キャッシュはしないので、ダウンロードのたびに S3 を 1 回読みます。
 - **Redmine のパスと重ならない:** Redmine には、`/files`、`/tmp` で始まるルートはありません。添付ファイルは `/attachments/...`、プロジェクトのファイルは `/projects/<id>/files` です。`public/` にも、その名前のディレクトリはありません (2026-11-09 に Redmine 7.0.3 の `config/routes.rb` で確認)。
-- **CSP:** これらのビヘイビアのビューワーレスポンスの CloudFront Functions (Serverless では `redmine-attachment-headers`) が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` を付けます。CSP は、Redmine の `AttachmentsController` が添付ファイルを返すときに付けるのと同じ値です (2026-11-09 に Redmine 7.0.3 のコードで確認)。`X-Content-Type-Options: nosniff` は、マネージドポリシーの `SecurityHeadersPolicy` がすべてのレスポンスに付けます。この CSP を持つマネージドのレスポンスヘッダーポリシーはなく、カスタムのレスポンスヘッダーポリシーはビジネスプランからです (「CloudFront flat-rate pricing plans」、2026-11-10 に確認)。成功の応答では、署名付き URL の `response-content-disposition` と `response-content-type` をデコードして、`Content-Disposition` と `Content-Type` に設定します。印字できる ASCII でない値は使いません。署名はクエリーを含むので、これらの値は Redmine が決めたものです。
+- **CSP:** これらのビヘイビアのビューワーレスポンスの CloudFront Functions (Serverless では `redmine-attachment-headers`) が、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` を付けます。CSP は、Redmine の `AttachmentsController` が添付ファイルを返すときに付けるのと同じ値です (2026-11-09 に Redmine 7.0.3 のコードで確認)。`X-Content-Type-Options: nosniff` は、マネージドポリシーの `SecurityHeadersPolicy` がすべてのレスポンスに付けます。この CSP を持つマネージドのレスポンスヘッダーポリシーはなく、カスタムのレスポンスヘッダーポリシーはビジネスプランからです (「CloudFront flat-rate pricing plans」、2026-11-10 に確認)。成功の応答では、署名付き URL の `response-content-disposition` と `response-content-type` をデコードして、`Content-Disposition` と `Content-Type` に設定します。印字できる ASCII でない値は使いません。署名はクエリ文字列を含むので、これらの値は Redmine が決めたものです。
 - **Redmine と同じオリジン:** 添付ファイルは、Redmine の標準と同じく、Redmine のオリジンから返ります。それを切り離すのは sandbox の CSP です。sandbox の文書は不透明なオリジンになり、スクリプトも動かないので、HTML や SVG の添付ファイルは、Redmine の Cookie を読むことも、Redmine を呼ぶこともできません。そのため、このヘッダーは必ず付いている必要があります。デプロイのあとの確認で、`/files/` の下の応答に sandbox の CSP と `nosniff` が付いていることを確認します ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment))。
 - **CloudFront を使う理由:** S3 の署名付きの GET で上書きできるのは、`response-content-type`、`-language`、`-expires`、`-cache-control`、`-disposition`、`-encoding` だけです。ほかのヘッダーは追加できないので、CSP を S3 から付けることはできません。
 - **ディストリビューションは 1 つ:** 2 つめのディストリビューション、証明書、DNS のレコードは要りません。Redmine のディストリビューションの WAF が、添付ファイルにも効きます。
-- **ファイルがあるかの確認:** Redmine は、ダウンロードの前にローカルのファイルがあるかを確認します (`file_readable`、`Attachment#readable?`)。この確認は、手元のキャッシュのファイル、なければ S3 の HeadObject に替えます。
-- **画像の表示:** wiki やチケットの本文の画像 (`/attachments/download/<id>/<名前>`) も、同じリダイレクトで表示されます。`<img>` は、`attachment` の指定があっても画像を表示し、sandbox の CSP も画像の表示は止めません。画像の数だけ Lambda が呼ばれるので、画像の多いページでは、同時の要求の数だけ環境が起動します (推測。作ったあとで測る)。
+- **ファイルがあるかの確認:** Redmine は、ダウンロードの前にローカルのファイルがあるかを確認します (`file_readable`、`Attachment#readable?`)。この確認は、ローカルキャッシュのファイル、なければ S3 の HeadObject に替えます。
+- **画像の表示:** wiki やチケットの本文の画像 (`/attachments/download/<id>/<名前>`) も、同じリダイレクトで表示されます。`<img>` は、`attachment` の指定があっても画像を表示し、sandbox の CSP も画像の表示は止めません。画像の数だけ Lambda が呼ばれるので、画像の多いページでは、同時リクエスト数だけ環境が起動します (推測。作ったあとで測る)。
 - **署名:** 署名付き URL は、信頼されたキーグループの秘密鍵で作ります。Redmine はこの鍵を SSM Parameter Store から読みます ([setup.md](setup.md#configuration))。URL は 5 分のあいだ有効で、プロセスの認証情報には左右されません。
 
 <a id="thumbnails"></a>
@@ -202,7 +202,7 @@ Redmine の標準のままにします。サムネイルの画像は、Redmine �
 - **作る:** そのパスに初めて届いたときに、S3 から元のファイルを `/tmp` のキャッシュに取り、Redmine の標準の `Redmine::Thumbnail.generate` で作って、`tmp/thumbnails/` に PutObject します。キャッシュの上限 (256 MB) より大きな画像はサムネイルを作らず、Redmine の標準のアイコンを出します。
 - **返す:** `/tmp/thumbnails/` の下の、CloudFront の署名付き URL (期限 5 分) にリダイレクトします。応答のヘッダーは、ダウンロードと同じです。
 - **ブラウザーのキャッシュ:** リダイレクトの応答に `Cache-Control: private, max-age=300` を付けます。同じ画面を 5 分のうちに開き直しても、Lambda を呼びません。
-- **同時の要求:** 1 つの画面に多くのサムネイルがあると、その数だけ同時に Lambda が呼ばれ、環境が増えます。`redmine-web` の同時実行数の予約 (10) を超えると、超えた分は断られます。サムネイルの多い画面で測り、足りなければ同時実行数の予約を増やします。それでも足りないときは、HTML に署名付き URL を直接書く形 (S3 のプラグインのやり方) を考えます。
+- **同時リクエスト:** 1 つの画面に多くのサムネイルがあると、その数だけ同時に Lambda が呼ばれ、環境が増えます。`redmine-web` の同時実行数の予約 (10) を超えると、超えた分は断られます。サムネイルの多い画面で測り、足りなければ同時実行数の予約を増やします。それでも足りないときは、HTML に署名付き URL を直接書く形 (S3 のプラグインのやり方) を考えます。
 
 <a id="text-diffs-and-previews"></a>
 
@@ -210,11 +210,11 @@ Redmine の標準のままにします。サムネイルの画像は、Redmine �
 
 - **テキストと差分の表示:** Redmine の標準のままです。`Attachment#diskfile` が `/tmp` のキャッシュのパスを返すので、標準の表示 (`AttachmentsController#show`) がそのまま動きます。表示する大きさは `file_max_size_displayed` (デフォルト 512 KB) までです。
 - **Office のファイルのプレビュー (Pandoc)、PDF の出力の画像:** ローカルのパスが要るので、`/tmp` のキャッシュから読みます。
-- **添付の一括のダウンロード (zip):** S3 に仮のファイルとして作り、`/tmp/bulk/` の下の、CloudFront の署名付き URL にリダイレクトします (下記)。
+- **添付ファイルの一括ダウンロード (zip):** S3 に仮のファイルとして作り、`/tmp/bulk/` の下の、CloudFront の署名付き URL にリダイレクトします (下記)。
 
 <a id="downloading-all-attachments"></a>
 
-### 添付の一括のダウンロード
+### 添付ファイルの一括ダウンロード
 
 Redmine は、チケットなどの添付ファイルをまとめて zip で返します (`AttachmentsController#download_all`)。標準では、zip をメモリで作り (`Attachment.archive_attachments`)、そのまま応答で返すので、Lambda の応答の 6 MB の制限に当たります。そこで、zip を S3 の仮のファイルとして作り、`/tmp/bulk/` の下の、CloudFront の署名付き URL にリダイレクトします。
 
@@ -243,7 +243,7 @@ sequenceDiagram
 - **仮のファイルを消す:** `tmp/bulk/` の下は、ライフサイクルで 1 日後に消します。
 - **ほかの出力:** チケットの一覧の CSV や PDF、wiki の HTML などの出力は、Redmine から、そのまま返します。チケットの出力はデフォルトで 500 件まで (`issues_export_limit`) で、ほかの出力も文字が中心で圧縮されるので、6 MB に届かない見込みです ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-6-mb-limit))。
 - **作り直さない:** 同じ添付ファイルの組み合わせ (添付ファイルの ID と digest から作るキー) の zip が、まだ `tmp/bulk/` にあれば、作り直さずにリダイレクトします。
-- **ファイルがあるかの確認:** Redmine は、添付ファイルごとに `readable?` で確認します。`readable?` は、手元のキャッシュにファイルがあればそれを使い、なければ添付ファイルごとに S3 の HeadObject を 1 回送ります (添付ファイルが多いときの時間はまだ測っていない)。
+- **ファイルがあるかの確認:** Redmine は、添付ファイルごとに `readable?` で確認します。`readable?` は、ローカルキャッシュにファイルがあればそれを使い、なければ添付ファイルごとに S3 の HeadObject を 1 回送ります (添付ファイルが多いときの時間はまだ測っていない)。
 
 <a id="avatars"></a>
 
@@ -303,7 +303,7 @@ sequenceDiagram
 
 Redmine 自身の `AvatarsController#show` は差し替えません。キーの確認、サムネイルのないアバターへの `404`、切り抜いたサムネイルだけを返すこと、`Cache-Control: max-age=86400, public` (ログインが必須なら `private`)、ETag は、そのままです。サムネイルは、差し替えた `Attachment#thumbnail` から取ります。ローカルのファイルがあればそれを、なければ S3 のものを使い、それもなければ画像 (`/tmp` のキャッシュに取得したもの) から作って S3 に置きます。切り抜いたサムネイルは、Redmine と同じく `_crop` の付いた別の名前です。`tmp/thumbnails/<digest>_<filesize>_<サイズ>_crop.thumb` になります。
 
-- **署名付き URL ではなく Lambda から返す:** 添付ファイルのサムネイルと違い、アバターは Redmine が返します。署名付き URL の有効期限は 5 分ですが、Redmine はブラウザーにアバターを 1 日キャッシュさせるからです。アバターのサムネイルは小さく (Redmine は表示する場所の大きさと、高解像度の画面向けにその 2 倍を要求し、最大 800 px)、レスポンスの 6 MB に十分収まります。
+- **署名付き URL ではなく Lambda から返す:** 添付ファイルのサムネイルと違い、アバターは Redmine が返します。署名付き URL の有効期限は 5 分ですが、Redmine はブラウザーにアバターを 1 日キャッシュさせるからです。アバターのサムネイルは小さく (Redmine は表示する場所の大きさと、高解像度の画面向けにその 2 倍をリクエストし、最大 800 px)、レスポンスの 6 MB に十分収まります。
 - **誤って公開しない:** CloudFront の Redmine のビヘイビアはキャッシュしない (`CachingDisabled`) ので、CloudFront にアバターは残らず、署名付き URL でアバターを渡すこともありません。`public` と `private` は、Redmine が設定したとおりブラウザーにだけ効きます。
 - **リクエスト:** 画面のアバターは、最初はそれぞれ Lambda へのリクエストになり、そのあとはブラウザーが 1 日キャッシュします。実行環境で最初のリクエストは、サムネイルを S3 から読むか、画像から作ります。
 - **削除:** アバターの削除、置き換え、ユーザーの削除で添付ファイルを削除します。`delete_from_disk!` が、`files/` の画像と、切り抜いたものを含むサムネイル `tmp/thumbnails/<digest>_<filesize>_*` を削除します ([削除](#deletion))。
@@ -327,7 +327,7 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
   - 削除 (`delete_from_disk!`) と、ファイルがあるかの確認 (`readable?`) は、`diskfile` を通さないように差し替えます。消すだけのファイルや、確認するだけのファイルを取りに行かないためです。
 - **古くならない:** 添付ファイルは一度保存したら変わらないので、キャッシュを確認直す必要はありません。
 - **大きさ:** 関数の `/tmp` は、Lambda のデフォルトの 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。環境が消えると、キャッシュも消えます。
-- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず (SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル (元の画像)、`file_max_size_displayed` (デフォルト 512 KB) までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size` (デフォルト 100 MB) までの一括のダウンロードの zip (元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
+- **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず (SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル (元の画像)、`file_max_size_displayed` (デフォルト 512 KB) までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size` (デフォルト 100 MB) までの一括ダウンロードの zip (元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
 - **CSV のインポート:** インポートのファイルも、`/tmp/redmine/imports` に書いたあと `imports/` に PutObject し、読むときにローカルになければ S3 から取ります。`Import#filepath` は `Rails.root/tmp/imports` に固定されているので、イメージの `tmp` を `/tmp/redmine` へのシンボリックリンクにします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#read-only-file-system))。
 - **Markdown のプレビュー:** Redmine は Office のファイルなどを Pandoc で Markdown に変え、`attachments_storage_path` の下の `derived_cache/markdownized_previews/` に置きます。Lambda では `/tmp` のキャッシュの中になるので、ほかに書き込めるパスは要りません。プラグインは、同じパス (`files/derived_cache/markdownized_previews/`) で S3 にも置きます。持っていない環境は Pandoc を動かし直さずに S3 から取り、添付を消すときに一緒に消します。
 
@@ -349,14 +349,14 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 | --- | --- | --- |
 | `Attachment#files_to_final_location` | 標準の処理のあと、S3 に PutObject する | Lambda を通るアップロード |
 | `Attachment#readable?` | S3 の HeadObject | ダウンロードの前の確認 |
-| `Attachment#thumbnailable?` | 手元のキャッシュより大きいファイルにはサムネイルを作らない | `/tmp` の上限 |
+| `Attachment#thumbnailable?` | ローカルキャッシュより大きいファイルにはサムネイルを作らない | `/tmp` の上限 |
 | `Attachment#diskfile` を使う処理 | 使う前に `/tmp` のキャッシュに取る | サムネイル、プレビュー、PDF、zip |
 | `Attachment#delete_from_disk!` | S3 から消す | 削除 |
 | `Attachment#reuse_existing_file_if_possible` | digest とサイズで比べる | 同じ内容の共有 |
 | `Attachment#thumbnail` | ローカルにあればそれを、なければ S3 のものを使い、それもなければ作って置く (切り抜いたものは `_crop` の付いた別の名前) | サムネイル、[アバター](#showing-avatars) |
 | `AttachmentsController#download`<br>`#thumbnail` | CloudFront の署名付き URL にリダイレクト (サムネイルは `Cache-Control` を付ける。Redmine 7.1 では、inline で表示する PDF 互換のファイルを `application/pdf` にする) | ダウンロード、サムネイル |
 | `AvatarsController#update` (Redmine 7.1) | ファイルの代わりにチケットがあれば、アップロードを S3 から読み、ファイルとして Redmine 自身の `update` に渡す。マルウェアスキャンが拒否した保存は、フォームのエラーにする | [アバター](#upload-of-avatars) |
-| `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付の一括のダウンロード |
+| `AttachmentsController#download_all` | zip を `/tmp` に書いて S3 の仮のファイルに置き、CloudFront の署名付き URL にリダイレクトする | 添付ファイルの一括ダウンロード |
 | `Import#file=`<br>`#file_exists?`<br>`#remove_file` | S3 に置き、なければ S3 から取り、S3 から消す | CSV のインポート |
 | `MailHandler#receive` | 受信したメールの添付ファイルでは、マルウェアスキャンを待たない | [マルウェアスキャン](#malware-scan) |
 | `SettingsController#plugin` (このプラグインの GET だけ) | 「S3」のタブにリダイレクトする | プラグインの一覧の「設定」([admin.md](admin.md)) |
@@ -371,17 +371,17 @@ Redmine 本体のファイルは書き換えず、プラグインから `prepend
 
 ## 権限
 
-プラグインを入れた Redmine を動かすプロセスには、どれも、添付ファイルのバケットのプレフィックスごとの読み書きを付け、CloudFront の署名付き URL のための秘密鍵を読ませます。一覧とポリシーの例は [iam.md](iam.md)、Serverless のロールは [iam.md](https://redmine-kit.github.io/serverless/ja/iam.html) にあります。Serverless では、Lambda は VPC の中で動き、S3 のゲートウェイエンドポイント (無料) を通って S3 に届きます。Lambda の外では、バケットに同じ操作を許す認証情報が、プロセスに要ります。
+プラグインをインストールした Redmine を動かすプロセスには、どれも、添付ファイルのバケットのプレフィックスごとの読み書きを付け、CloudFront の署名付き URL のための秘密鍵を読ませます。一覧とポリシーの例は [iam.md](iam.md)、Serverless のロールは [iam.md](https://redmine-kit.github.io/serverless/ja/iam.html) にあります。Serverless では、Lambda は VPC の中で動き、S3 のゲートウェイエンドポイント (無料) を通って S3 に届きます。Lambda の外では、バケットに同じ操作を許す認証情報が、プロセスに要ります。
 
 <a id="to-verify"></a>
 
 ## 未確認の事項
 
 - AWS でも、`ChecksumAlgorithm` に `SHA256` を指定したコピーの `HeadObject` が、LocalStack と同じく `ChecksumType` が `FULL_OBJECT` の `ChecksumSHA256` を返すこと
-- CloudFront が、CloudFront Functions より前に署名付き URL の署名を確認すること、署名付き URL のクエリーのない OAC からの要求を S3 が受け付けること
-- S3 のオリジンへの PUT で、CloudFront が受け付ける要求の本文の大きさ (資料に見つからない)、オリジンの応答のタイムアウト (デフォルト 30 秒) が大きなアップロードにどう効くか
-- 大きなアップロードの本文での WAF (大きすぎる本文の扱い、範囲の絞り込み、`SizeRestrictions_BODY`)
-- CloudFront の定額のプランで、アップロードの通信がどう数えられるか
+- CloudFront が、CloudFront Functions より前に署名付き URL の署名を確認すること、署名付き URL のクエリ文字列のない OAC からのリクエストを S3 が受け付けること
+- S3 のオリジンへの PUT で、CloudFront が受け付けるリクエストの本文の大きさ (ドキュメントに見つからない)、オリジンの応答のタイムアウト (デフォルト 30 秒) が大きなアップロードにどう効くか
+- 大きなアップロードの本文での WAF (オーバーサイズの処理、スコープダウン、`SizeRestrictions_BODY`)
+- CloudFront の定額プランで、アップロードの通信がどう数えられるか
 - 大きなアップロード (1 GB など) の登録で、S3 でのコピーにどれだけかかるか
 - ビューワーレスポンスの CloudFront Functions が設定する `Content-Disposition` で、日本語のファイル名が正しく保存されるか
 - `uploadBlob` を差し替えたときに、貼り付けた画像とドラッグ・アンド・ドロップが標準と同じに動くか

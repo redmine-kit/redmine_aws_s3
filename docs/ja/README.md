@@ -13,7 +13,7 @@ Redmine AWS S3 (`redmine_aws_s3`) は、添付ファイルを Amazon S3 に置�
 
 | 機能 | 内容 | 有効にする条件 | 資料 |
 | --- | --- | --- | --- |
-| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト (ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括のダウンロードの zip、GuardDuty のマルウェアスキャンを待つこと (使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある ([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
+| S3 の添付ファイル | 保存と削除、CloudFront を通した S3 へのアップロード (SHA256 は S3 が計算する)、sandbox の CSP を付ける CloudFront の署名付き URL へのリダイレクト (ダウンロードとサムネイル)、`/tmp` のキャッシュ、CSV のインポートのファイル、一括ダウンロードの zip、GuardDuty のマルウェアスキャンを待つこと (使うときだけ) | `REDMINE_S3_BUCKET` と CloudFront の設定がある ([setup.md](setup.md#configuration))。なければ Redmine の標準のまま | [attachments.md](attachments.md) |
 | アバター (Redmine 7.1) | アバターのフォームが画像を CloudFront 経由で S3 に送るので、数 MB の写真も使え、Redmine が自身のルールで登録する。切り抜いたサムネイルは S3 に置き、Redmine が返す | S3 のバケットを設定し、Redmine にアバターがある (7.1) とき。Redmine 7.0 では何も変わらない | [attachments.md](attachments.md#avatars) |
 | 管理画面 | Redmine の管理メニューの「AWS」([Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu)) の下の「S3」のタブ。環境変数と設定、S3 の読み書きテストと CloudFront からの配信テスト、マルウェアスキャンでブロックしたファイル、データベースと S3 の整合性チェック | 管理者 | [admin.md](admin.md) |
 
@@ -21,13 +21,13 @@ Redmine AWS S3 (`redmine_aws_s3`) は、添付ファイルを Amazon S3 に置�
 
 ## Lambda 以外での利用
 
-S3 に届き、CloudFront で配信している Redmine なら、どこでも動きます。AWS Lambda には書き込めるディスクがなく、1 つの要求は 6 MB までなので、[Serverless](https://redmine-kit.github.io/serverless/ja/) は [Redmine AWS Lambda](https://redmine-kit.github.io/redmine_aws_lambda/ja/) といっしょにインストールします。
+S3 に届き、CloudFront で配信している Redmine なら、どこでも動きます。AWS Lambda には書き込めるディスクがなく、1 つのリクエストは 6 MB までなので、[Serverless](https://redmine-kit.github.io/serverless/ja/) は [Redmine AWS Lambda](https://redmine-kit.github.io/redmine_aws_lambda/ja/) といっしょにインストールします。
 
 <a id="gems-and-database"></a>
 
 ## gem とデータベース
 
-依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。また、「AWS」の管理メニューを持つプラグイン [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_aws`) を必要とします。gem はこれに依存し、`init.rb` はインストールされていることを確認します (`requires_redmine_plugin`)。データベースのテーブルを追加しないので、実行する migration はありません。
+依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。また、「AWS」の管理メニューを持つプラグイン [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_aws`) を必要とします。gem はこれに依存し、`init.rb` はインストールされていることを確認します (`requires_redmine_plugin`)。データベースのテーブルを追加しないので、実行するマイグレーションはありません。
 
 <a id="tests"></a>
 
