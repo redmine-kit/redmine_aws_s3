@@ -1,5 +1,5 @@
-# Attachments in S3
+# S3
 
-Administration › AWS › **Attachments in S3** shows how Redmine keeps attachments in Amazon S3: the **Environment variables** that turn the plugin on (set or not set), the **Checks** of reading and writing the bucket and of delivery through CloudFront, the **Files refused by the malware scan**, and the **Reconciliation** of the attachments with the bucket.
+Administration › AWS › **S3** shows how Redmine keeps attachments in Amazon S3: the **Environment variables** that turn the plugin on ("Set" or "Not set"), the **Connection tests** of reading and writing the bucket and of delivery through CloudFront, the **Files blocked by malware scan**, the **Consistency check** between the attachments and the bucket, and the **Settings** of the signed URLs and the local cache.
 
 More: [Redmine AWS S3: administration page](https://redmine-kit.github.io/redmine_aws_s3/admin.html) and [attachments](https://redmine-kit.github.io/redmine_aws_s3/attachments.html).
