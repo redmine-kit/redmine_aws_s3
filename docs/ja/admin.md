@@ -1,6 +1,6 @@
 # 管理画面
 
-Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます(`require_admin`)。画面は、[Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、すべての Redmine AWS のプラグインが共有する、Redmine の管理メニューの「AWS」の下の「S3」のタブです。
+Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます (`require_admin`)。画面は、[Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/admin.html#the-aws-menu) が追加し、すべての Redmine AWS のプラグインが共有する、Redmine の管理メニューの「AWS」の下の「S3」のタブです。
 
 <a id="attachments-in-s3"></a>
 
@@ -10,10 +10,10 @@ Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます
 
 | 欄 | 内容 | 取得元 |
 | --- | --- | --- |
-| 環境変数 | 「バケット」、「リージョン」、「CloudFront ドメイン」、「CloudFront キーペア ID」、「CloudFront 秘密鍵」(「設定済み」か「未設定」)、「GuardDuty マルウェアスキャン」(「有効」か「無効」)、「ローカルキャッシュ」。それぞれの値の横に環境変数の名前を出す。「ローカルキャッシュ」の横は `attachments_storage_path` | 環境変数([setup.md](setup.md#configuration))と `config/configuration.yml`。表示のみ。秘密鍵そのものは出さない |
-| 接続テスト | 「読み書きテスト」は、テスト用のオブジェクト(`tmp/healthcheck/<UUID>`)を置いて、読んで、消す。「配信テスト」は、テスト用のオブジェクトを置き、`/tmp/bulk/` の下の署名付き URL を作り、CloudFront を通して、署名ありとなしで取る。結果は、名称、ステータス、詳細の列の表に出す([下記](#connection-tests)) | テキストのリンク。配信テストのオブジェクトは最後に消す |
-| マルウェアスキャンでブロックしたファイル | マルウェアスキャンでブロックした最新の 20 件のファイル。列は「日時」、「スキャン結果」、「ファイル」、「ユーザー」(Redmine のユーザーへのリンク)。「GuardDuty マルウェアスキャン」が「有効」のときか、ブロックしたファイルの記録があるときに出す | プラグインの設定に残す([attachments.md](attachments.md#malware-scan)) |
-| 整合性チェック | 「整合性チェックを実行」で、`files/` を一覧してデータベースの添付ファイルと比べるジョブ `AwsS3ReconcileJob` を始める。実行中は「ステータス: 実行中」と「開始日時」を出す。終わったら、「最終実行」、「添付ファイル数」、「S3 オブジェクト数」(`files/` の下)、「S3 にないファイル」、「未使用のオブジェクト」を出し、そのあとに、その 2 つの名前の下に一覧を出す(それぞれ最初の 100 件) | テキストのリンク。結果はプラグインの設定に残すので、どの実行環境でも最新の結果が出る |
+| 環境変数 | 「バケット」、「リージョン」、「CloudFront ドメイン」、「CloudFront キーペア ID」、「CloudFront 秘密鍵」(「設定済み」か「未設定」)、「GuardDuty マルウェアスキャン」(「有効」か「無効」)、「ローカルキャッシュ」。それぞれの値の横に環境変数の名前を出す。「ローカルキャッシュ」の横は `attachments_storage_path` | 環境変数 ([setup.md](setup.md#configuration)) と `config/configuration.yml`。表示のみ。秘密鍵そのものは出さない |
+| 接続テスト | 「読み書きテスト」は、テスト用のオブジェクト (`tmp/healthcheck/<UUID>`) を置いて、読んで、消す。「配信テスト」は、テスト用のオブジェクトを置き、`/tmp/bulk/` の下の署名付き URL を作り、CloudFront を通して、署名ありとなしで取る。結果は、名称、ステータス、詳細の列の表に出す ([下記](#connection-tests)) | テキストのリンク。配信テストのオブジェクトは最後に消す |
+| マルウェアスキャンでブロックしたファイル | マルウェアスキャンでブロックした最新の 20 件のファイル。列は「日時」、「スキャン結果」、「ファイル」、「ユーザー」(Redmine のユーザーへのリンク)。「GuardDuty マルウェアスキャン」が「有効」のときか、ブロックしたファイルの記録があるときに出す | プラグインの設定に残す ([attachments.md](attachments.md#malware-scan)) |
+| 整合性チェック | 「整合性チェックを実行」で、`files/` を一覧してデータベースの添付ファイルと比べるジョブ `AwsS3ReconcileJob` を始める。実行中は「ステータス: 実行中」と「開始日時」を出す。終わったら、「最終実行」、「添付ファイル数」、「S3 オブジェクト数」(`files/` の下)、「S3 にないファイル」、「未使用のオブジェクト」を出し、そのあとに、その 2 つの名前の下に一覧を出す (それぞれ最初の 100 件) | テキストのリンク。結果はプラグインの設定に残すので、どの実行環境でも最新の結果が出る |
 | 設定 | 「ダウンロード URL の有効期限」と「アップロード URL の有効期限」(秒)、「ローカルキャッシュサイズの上限」(MB) | プラグインの設定。画面で変える。正の整数に限る。正しくない入力では、その項目のラベルを挙げてエラーを出す |
 
 <a id="connection-tests"></a>
@@ -23,13 +23,13 @@ Redmine AWS S3 の管理画面です。Redmine の管理者だけが開けます
 | 名称 | テスト | OK になる条件 |
 | --- | --- | --- |
 | PutObject、GetObject、DeleteObject | 読み書きテスト | それぞれの呼び出しが成功し、GetObject が置いた内容を返す |
-| 署名付き URL | 配信テスト | 署名付き URL で、CloudFront がオブジェクトを返す(200) |
+| 署名付き URL | 配信テスト | 署名付き URL で、CloudFront がオブジェクトを返す (200) |
 | CSP sandbox | 配信テスト | 応答の `Content-Security-Policy` に `sandbox` がある |
 | nosniff | 配信テスト | 応答に `X-Content-Type-Options: nosniff` がある |
 | 署名なし URL 拒否 | 配信テスト | 署名を除いた同じ URL が 401 か 403 を返す |
 | 配信 | 配信テスト | テストがエラーで止まったときに限り、エラーのメッセージとともに出す |
 
-- **使い道:** 古い Redmine から添付ファイルを移したあと([migration.md](https://redmine-kit.github.io/serverless/ja/migration.html))に、整合性チェックで漏れがないかを確認できます。
+- **使い道:** 古い Redmine から添付ファイルを移したあと ([migration.md](https://redmine-kit.github.io/serverless/ja/migration.html)) に、整合性チェックで漏れがないかを確認できます。
 - **「ステータス」のタブ:** バケットがあるときは、Redmine AWS の「ステータス」のタブの接続テストに「S3」の行が加わります。添付ファイルのバケットの `HeadBucket` を呼び、バケットの名前を出します。
 - **秘密の値は出さない:** AWS の認証情報と CloudFront の秘密鍵は画面に出しません。AWS の API は、リンクを押したときに限り呼びます。
 - **バケットがないとき:** タブは開き、「REDMINE_S3_BUCKET が未設定のため、添付ファイルはローカルディスクに保存します。」と出します。環境変数と設定は出し、接続テスト、ブロックしたファイル、整合性チェックは出しません。
@@ -47,7 +47,7 @@ Redmine の管理メニューの「AWS」の項目 (最初のタブを開く `/a
 
 ## 添付ファイルサイズの上限
 
-Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、管理 › 設定 › ファイル)は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に「S3 では CloudFront Function(/tmp/*)の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで」と添えます。CloudFront を通したアップロードは、`/tmp/*` の CloudFront Functions(`/tmp/incoming/` へのアップロードに同じ値を使う必要がある)と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです([attachments.md](attachments.md#upload))。
+Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、管理 › 設定 › ファイル) は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に「S3 では CloudFront Function (/tmp/*) の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで」と添えます。CloudFront を通したアップロードは、`/tmp/*` の CloudFront Functions (`/tmp/incoming/` へのアップロードに同じ値を使う必要がある) と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです ([attachments.md](attachments.md#upload))。
 
 <a id="permissions"></a>
 
@@ -59,17 +59,17 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 
 ## テスト
 
-画面には Redmine の機能のテストがあります。システムのテストはまだ書いていません([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
+画面には Redmine の機能のテストがあります。システムのテストはまだ書いていません ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
 
-このページの画面のスクリーンショットは、`bin/screenshots` で撮ります(Docker の中のヘッドレスの Chromium と、Redmine のテストのデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
+このページの画面のスクリーンショットは、`bin/screenshots` で撮ります (Docker の中のヘッドレスの Chromium と、Redmine のテストのデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
 
 <a id="terms"></a>
 
 ## 用語
 
-画面の語は、AWS に語があるものは、AWS のドキュメントの日本語に合わせています(2026-11-10 に確認)。GuardDuty の日本語のドキュメントは機械翻訳です。
+画面の語は、AWS に語があるものは、AWS のドキュメントの日本語に合わせています (2026-11-10 に確認)。GuardDuty の日本語のドキュメントは機械翻訳です。
 
-| 画面(ja / en) | AWS の語 | 出典 | 状態 |
+| 画面 (ja / en) | AWS の語 | 出典 | 状態 |
 | --- | --- | --- | --- |
 | GuardDuty マルウェアスキャン / GuardDuty malware scan | 「マルウェアスキャン」 | https://docs.aws.amazon.com/ja_jp/guardduty/latest/ug/monitoring-malware-protection-s3-scans-gdu.html | ドキュメント |
 | スキャン結果 / Scan result | 「スキャン結果」。タグの `GuardDutyMalwareScanStatus` | 同じページ | ドキュメント |
