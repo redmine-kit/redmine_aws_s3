@@ -70,10 +70,18 @@
   }
 
   // rails-ujs disables the submit button on submit; it is enabled again
-  // when the upload fails.
+  // when the upload fails. rails-ujs disables it 13 ms after the submit
+  // event, so an error answered sooner (a refused size) is followed by a
+  // second enabling after that.
+  var ENABLE_AGAIN_AFTER = 50;
+
   function enable(form) {
-    if (window.Rails && typeof window.Rails.enableElement === 'function') { window.Rails.enableElement(form); }
-    form.querySelectorAll('input[type="submit"]').forEach(function(button) { button.disabled = false; });
+    var run = function() {
+      if (window.Rails && typeof window.Rails.enableElement === 'function') { window.Rails.enableElement(form); }
+      form.querySelectorAll('input[type="submit"]').forEach(function(button) { button.disabled = false; });
+    };
+    run();
+    setTimeout(run, ENABLE_AGAIN_AFTER);
   }
 
   function upload(form, input, file) {
@@ -130,6 +138,6 @@
     if (input) { input.disabled = false; }
   });
 
-  window.RedmineS3AvatarUpload = { check: check, retryDelays: CHECK_RETRY_DELAYS };
+  window.RedmineS3AvatarUpload = { check: check, retryDelays: CHECK_RETRY_DELAYS, enable: enable };
   document.addEventListener('DOMContentLoaded', install);
 })();
