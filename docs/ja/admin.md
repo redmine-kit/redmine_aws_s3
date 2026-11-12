@@ -10,7 +10,7 @@ Redmine AWS S3 の管理画面です。システム管理者だけが開けま�
 
 | 欄 | 内容 | 取得元 |
 | --- | --- | --- |
-| 環境変数 | 「バケット」、「リージョン」、「CloudFront ドメイン」、「CloudFront キーペア ID」、「CloudFront 秘密鍵」(「設定済み」か「未設定」)、「GuardDuty マルウェアスキャン」(「有効」か「無効」)、「ローカルキャッシュ」。それぞれの値の横に環境変数の名前を出す。「ローカルキャッシュ」の横は `attachments_storage_path`。画面で変更しない値 (これ、接続テストと整合性チェックの結果) は、管理 › 情報 と同じく、見出しの行のない一覧に出す ([Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/api.html#values) の部分テンプレート `aws_admin/values`) | 環境変数 ([setup.md](setup.md#configuration)) と `config/configuration.yml`。表示のみ。秘密鍵そのものは出さない |
+| 環境変数 | 「バケット」、「リージョン」、「CloudFront ドメイン」、「CloudFront キーペア ID」、「CloudFront 秘密鍵」(「設定済み」か「未設定」)、「GuardDuty マルウェアスキャン」(「有効」か「無効」)、「ローカルキャッシュ」。それぞれの値の横に環境変数の名前を出す。「ローカルキャッシュ」の横は `attachments_storage_path`。画面で変更しない値 (これ、接続テストと整合性チェックの結果) は、「管理」›「情報」 と同じく、見出しの行のない一覧に出す ([Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/api.html#values) の部分テンプレート `aws_admin/values`) | 環境変数 ([setup.md](setup.md#configuration)) と `config/configuration.yml`。表示のみ。秘密鍵そのものは出さない |
 | 接続テスト | 「読み書きテスト」は、テスト用のオブジェクト (`tmp/healthcheck/<UUID>`) を置いて、読んで、消す。「配信テスト」は、テスト用のオブジェクトを置き、`/tmp/bulk/` の下の署名付き URL を作り、CloudFront を通して、署名ありとなしで取る。結果は 1 件ごとに、名称、Redmine の成功か失敗のアイコン、詳細を 1 行に出す ([下記](#connection-tests)) | テキストのリンク。配信テストのオブジェクトは最後に消す |
 | マルウェアスキャンでブロックしたファイル | マルウェアスキャンでブロックした最新の 20 件のファイル。列は「日時」、「スキャン結果」、「ファイル」、「ユーザー」(Redmine のユーザーへのリンク)。「GuardDuty マルウェアスキャン」が「有効」のときか、ブロックしたファイルの記録があるときに出す | プラグインの設定に残す ([attachments.md](attachments.md#malware-scan)) |
 | 整合性チェック | 「整合性チェックを実行」で、`files/` を一覧してデータベースの添付ファイルと比べるジョブ `AwsS3ReconcileJob` を始める。実行中は「ステータス: 実行中」と「開始日時」を出す。ジョブが失敗したとき (`s3:ListBucket` がないときなど) は「ステータス: 失敗」とし、「詳細」に例外のクラスを出し、メッセージはジョブがログに記録する。開始から 1 時間たっても終わらない実行 (ワーカーのタイムアウト) は、そこに「タイムアウト」と出す。終わったら、「最終実行」、「添付ファイル数」、「S3 オブジェクト数」(`files/` の下)、「S3 にないファイル」、「未使用のオブジェクト」を出し、そのあとに、その 2 つの名前の下に一覧を出す (それぞれ最初の 100 件) | テキストのリンク。結果はプラグインの設定に残すので、どの実行環境でも最新の結果が出る |
@@ -49,7 +49,7 @@ Redmine の管理メニューの「AWS」の項目 (最初のタブを開く `/a
 
 ## 添付ファイルサイズの上限
 
-Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、管理 › 設定 › ファイル) は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に「S3 では CloudFront Function (/tmp/*) の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで」と添えます。CloudFront を通したアップロードは、`/tmp/*` の CloudFront Functions (`/tmp/incoming/` へのアップロードに同じ値を使う必要がある) と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです ([attachments.md](attachments.md#upload))。
+Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、「管理」›「設定」›「ファイル」) は、変えられるままにします。プラグインが有効なとき、設定の画面の小さなスクリプトで、この設定の横に「S3 では CloudFront Function (/tmp/*) の上限も同じ値にしてください。Lambda では POST /uploads.json は 1 MB まで」と添えます。CloudFront を通したアップロードは、`/tmp/*` の CloudFront Functions (`/tmp/incoming/` へのアップロードに同じ値を使う必要がある) と、1 回の PUT で CloudFront が受け付ける大きさで限られます。Lambda では、REST API の `POST /uploads.json` は 1 MB までです ([attachments.md](attachments.md#upload))。
 
 <a id="permissions"></a>
 

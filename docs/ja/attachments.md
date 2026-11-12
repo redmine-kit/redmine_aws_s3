@@ -314,7 +314,7 @@ Redmine 自身の `AvatarsController#show` は差し替えません。キーの�
 
 ### ファビコン
 
-Redmine 7.1 では、システム管理者がファビコンも設定できます (管理 › 設定 › 表示 の「カスタムファビコン」、PNG または ICO で 32 KB まで)。Redmine はこれを添付ファイルではなく設定のテーブルに保存するので、このプラグインは何もしません。Serverless が CloudFront でキャッシュします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-favicon))。
+Redmine 7.1 では、システム管理者がファビコンも設定できます (「管理」›「設定」›「表示」の「カスタムファビコン」、PNG または ICO で 32 KB まで)。Redmine はこれを添付ファイルではなく設定のテーブルに保存するので、このプラグインは何もしません。Serverless が CloudFront でキャッシュします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#the-favicon))。
 
 <a id="the-tmp-cache"></a>
 
