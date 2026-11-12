@@ -89,6 +89,17 @@ module RedmineAws
         end
       end
 
+      # Values above the limits that the plugin applies are refused, with
+      # Redmine's own message, not saved and clamped silently.
+      def test_update_refuses_values_over_the_maximum
+        patch :update, params: { settings: { download_url_expiry: '604801', cache_size_mb: '10241' } }
+
+        assert_response :unprocessable_content
+        assert_select '#errorExplanation li', text: 'Download URL expiry must be less than or equal to 604800'
+        assert_select '#errorExplanation li', text: 'Local cache size limit must be less than or equal to 10240'
+        assert_default_expiries
+      end
+
       def test_update_ignores_settings_that_are_not_strings
         patch :update, params: { settings: { download_url_expiry: ['120'], upload_url_expiry: { a: '1' } } }
 

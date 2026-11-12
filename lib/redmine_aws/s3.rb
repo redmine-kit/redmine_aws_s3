@@ -152,12 +152,12 @@ module RedmineAws
         end
       end
 
-      def download_url_expiry = setting('download_url_expiry').to_i.clamp(1, 7.days.to_i)
+      def download_url_expiry = SettingLimits.limit('download_url_expiry', setting('download_url_expiry'))
 
-      def upload_url_expiry = setting('upload_url_expiry').to_i.clamp(1, 7.days.to_i)
+      def upload_url_expiry = SettingLimits.limit('upload_url_expiry', setting('upload_url_expiry'))
 
       def cache_size
-        setting('cache_size_mb').to_i.clamp(1, 10_240).megabytes
+        SettingLimits.limit('cache_size_mb', setting('cache_size_mb')).megabytes
       end
 
       # S3 key of an attachment's file, the same form as its path under

@@ -21,8 +21,8 @@ class AwsS3AdminController < ApplicationController
   # of the tab, as the tabs of Redmine's project settings show theirs.
   def update
     values = settings_params
-    invalid = invalid_settings(values)
-    return render_invalid_settings(values, invalid) if invalid.any?
+    errors = settings_errors(values)
+    return render_invalid_settings(values, errors) if errors.any?
 
     RedmineAws::S3.update_settings(values)
     log("changed the settings #{values.keys.join(', ')}")
@@ -61,9 +61,28 @@ class AwsS3AdminController < ApplicationController
     values.keys.reject { |name| values[name].to_s.match?(/\A[1-9][0-9]{0,6}\z/) }
   end
 
-  def render_invalid_settings(values, invalid)
-    names = invalid.map { |name| l(:"field_aws_s3_#{name}") }
-    @errors = [l(:error_aws_s3_invalid_settings, names: names.join(', '))]
+  # The values that are not positive whole numbers in one message, then
+  # each one over its maximum, as Redmine's validations say it.
+  def settings_errors(values)
+    invalid = invalid_settings(values)
+    errors = invalid.any? ? [l(:error_aws_s3_invalid_settings, names: setting_names(invalid))] : []
+    errors + (values.keys - invalid).filter_map { |name| over_maximum(name, values[name].to_i) }
+  end
+
+  def setting_names(names)
+    names.map { |name| l(:"field_aws_s3_#{name}") }.join(', ')
+  end
+
+  def over_maximum(name, value)
+    max = RedmineAws::S3::SettingLimits::MAXIMA.fetch(name)
+    return if value <= max
+
+    ::I18n.t('errors.format', attribute: l(:"field_aws_s3_#{name}"),
+                              message: ::I18n.t('activerecord.errors.messages.less_than_or_equal_to', count: max))
+  end
+
+  def render_invalid_settings(values, errors)
+    @errors = errors
     show
     @settings.merge!(values)
     render :show, status: :unprocessable_content
