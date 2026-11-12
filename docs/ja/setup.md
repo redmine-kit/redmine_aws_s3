@@ -17,7 +17,7 @@ Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール
 
 1. プラグインを `plugins/redmine_aws_s3` に、これが必要とする [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。Redmine はプラグインをアルファベット順に読み込むので、`redmine_aws` が先になります。
 2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム (`ChecksumType`) と `CopyObject` の条件付き書き込みを持つ 1.202 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
-3. マイグレーションは要りません。
+3. migration は不要です。
 4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配信するために、アセットをビルドします (Redmine のいつものアセットの手順でもかまいません)。
 
    ```sh
