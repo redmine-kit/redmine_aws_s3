@@ -36,8 +36,8 @@ module RedmineAws
 
       # The upload read into file, as a file sent in a form.
       def uploaded_file(file, data)
-        raise Error, 'the upload is not in S3' unless read(data['key'], file, data['size'])
-        raise Error, 'the uploaded file does not match its size' unless file.size == data['size']
+        raise Error, ::I18n.t(:error_aws_s3_upload_not_found) unless read(data['key'], file, data['size'])
+        raise Error, ::I18n.t(:error_aws_s3_upload_size_mismatch) unless file.size == data['size']
 
         file.rewind
         ActionDispatch::Http::UploadedFile.new(tempfile: file, filename: data['filename'], type: data['content_type'])

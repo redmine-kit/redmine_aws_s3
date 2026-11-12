@@ -7,7 +7,15 @@ import assert from 'node:assert/strict';
 
 const read = (name) => readFileSync(new URL(`../../assets/javascripts/${name}`, import.meta.url), 'utf8');
 globalThis.window = globalThis;
-globalThis.document = { addEventListener: () => {}, querySelector: () => null, querySelectorAll: () => [] };
+// The texts of the page's <meta> tag (Hooks#upload_messages).
+const texts = { scanning: 'The malware scan of the file has not finished. Try again later.',
+  failed: 'Upload failed', failedStatus: 'Upload failed ({status})', networkError: 'Network error' };
+const metaTag = { getAttribute: () => JSON.stringify(texts) };
+globalThis.document = {
+  addEventListener: () => {},
+  querySelector: (s) => (s.includes('redmine-s3-messages') ? metaTag : null),
+  querySelectorAll: () => []
+};
 globalThis.addEventListener = () => {};
 let answers = [];
 let calls = 0;
@@ -27,11 +35,12 @@ await check('/s3_uploads/avatar/check', 't', 0);
 assert.equal(calls, 3);
 
 calls = 0;
-answers = [{ status: 422, responseText: '{"errors":["the upload ticket is invalid or expired"]}' }];
-await assert.rejects(check('/s3_uploads/avatar/check', 't', 0), (e) => e === 'the upload ticket is invalid or expired');
+answers = [{ status: 422, responseText: '{"errors":["The upload has expired. Add the file again."]}' }];
+await assert.rejects(check('/s3_uploads/avatar/check', 't', 0),
+  (e) => e === 'The upload has expired. Add the file again.');
 
 calls = 0;
 answers = Array.from({ length: retryDelays.length + 1 }, scanning);
-await assert.rejects(check('/s3_uploads/avatar/check', 't', 0), /still being scanned/);
+await assert.rejects(check('/s3_uploads/avatar/check', 't', 0), (e) => e === texts.scanning);
 assert.equal(calls, retryDelays.length + 1);
 console.log('avatar check: ok');

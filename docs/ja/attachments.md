@@ -151,9 +151,9 @@ Amazon GuardDuty Malware Protection for S3 で、ユーザーが送ったファ�
 
 - **スキャンするもの:** 添付ファイルのバケットの Malware Protection のプランが、`tmp/incoming/` (アップロード) と `imports/` (CSV のインポートのファイル) の下の新しいオブジェクトをスキャンし、`GuardDutyMalwareScanStatus` のタグを付けます。値は `NO_THREATS_FOUND`、`THREATS_FOUND`、`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` のどれかです。
 - **待ち方:** Redmine は、1 回のリクエストのなかで、`GetObjectTagging` で 1 秒ごとに、最大 20 秒タグを読みます。
-- **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202` (`{"status":"scanning"}`、`Retry-After: 2`) を返します。ブラウザーは、1、2、4、8、15、30 秒後に同じリクエストを送り直し、それでも終わらなければ、まだスキャン中だと出します。REST API のクライアントにも `202` を返すので、`complete.json` を送り直します。
+- **CloudFront を通したアップロード:** `POST /s3_uploads/complete` は、タグが `NO_THREATS_FOUND` のときだけファイルを登録します。まだタグがなければ、オブジェクトを残して `202` と `Retry-After: 2` を返します。ブラウザーへの本文は `{"status":"scanning","message":"…"}` で、メッセージはユーザーの言語の「ファイルのマルウェアスキャンが完了していません。しばらくしてからもう一度試してください。」です。ブラウザーは、1、2、4、8、15、30 秒後に同じリクエストを送り直し、それでも終わらなければ、このメッセージを表示します。REST API のクライアントには本文のない `202` を返すので、`complete.json` を送り直します。
 - **ブロックするファイル:** `THREATS_FOUND` なら、オブジェクトを消し、「マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。」と出してファイルをブロックします。`UNSUPPORTED`、`ACCESS_DENIED`、`FAILED` も同じようにブロックし、「マルウェアスキャンが完了しなかったため、ファイルをブロックしました (サポート対象外)。」のように出します。括弧の中は、[管理画面](admin.md#attachments-in-s3)の「スキャン結果」の列と同じ言葉 (サポート対象外、アクセス拒否、失敗) です。ブロックしたファイルは、キーとユーザーをログに書き (ファイル名は書きません)、[管理画面](admin.md#attachments-in-s3)の「マルウェアスキャンでブロックしたファイル」に出します (最新の 20 件)。
-- **Lambda を通るアップロード:** 先に `tmp/incoming/` に置きます ([上記](#uploads-through-lambda))。20 秒たっても結果がなければ、「まだスキャン中」としてアップロードを失敗させるので、送り直します。
+- **Lambda を通るアップロード:** 先に `tmp/incoming/` に置きます ([上記](#uploads-through-lambda))。20 秒たっても結果がなければ、「ファイルのマルウェアスキャンが完了していません。しばらくしてからもう一度試してください。」としてアップロードを失敗させるので、送り直します。
 - **受信したメール:** 受信したメールの添付ファイルは、SES が独自にウイルスを判定するので ([mail.md](https://redmine-kit.github.io/serverless/ja/mail.html#receiving))、待たずに `files/` に置きます。
 - **CSV のインポート:** インポートのファイルは、タグが `NO_THREATS_FOUND` になってから読みます。ブロックしたファイルは消し、Redmine はファイルを読めないと出します。
 - **バケットポリシー:** オブジェクトのタグが `NO_THREATS_FOUND` でなければ、`tmp/incoming/*` と `imports/*` の `GetObject` (つまり `HeadObject` と `CopyObject` のコピー元) を拒みます。GuardDuty のロールは除きます ([iam.md](iam.md#resource-based-policies))。待たないコードがあっても、問題がないとわかる前にファイルが読まれることはありません。

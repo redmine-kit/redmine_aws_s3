@@ -28,7 +28,7 @@ module RedmineAws
           post :presign, params: presign_params.merge(size: 'x')
 
           assert_response :unprocessable_content
-          assert_equal ['size is invalid'], response.parsed_body['errors']
+          assert_equal ['Size is invalid'], response.parsed_body['errors']
         end
       end
 

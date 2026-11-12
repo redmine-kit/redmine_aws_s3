@@ -15,12 +15,13 @@ module RedmineAws
 
       # The malware scan has not finished; the client calls complete again.
       class Pending < Error
-        def initialize(message = 'the file is still being scanned for malware')
+        def initialize(message = ::I18n.t(:error_aws_s3_malware_scanning))
           super
         end
       end
 
       TICKET_PURPOSE = :redmine_aws_s3_upload
+      INCOMING = RedmineAws::S3::INCOMING_PREFIX
 
       attr_reader :user
 
@@ -33,7 +34,7 @@ module RedmineAws
         data = { 'key' => "#{RedmineAws::S3::INCOMING_PREFIX}#{SecureRandom.uuid}", 'filename' => filename.to_s,
                  'size' => Integer(size, exception: false), 'content_type' => content_type.to_s.presence,
                  'user_id' => user.id }
-        check_attachment(data['filename'], data['size'])
+        UploadCheck.check!(data['filename'], data['size'])
         expiry = RedmineAws::S3.upload_url_expiry
         { url: RedmineAws::S3.url_signer.url_for(data['key'], expires_in: expiry),
           ticket: verifier.generate(data, purpose: TICKET_PURPOSE, expires_in: expiry) }
@@ -56,8 +57,9 @@ module RedmineAws
 
       def verify!(ticket)
         data = verifier.verified(ticket.to_s, purpose: TICKET_PURPOSE)
-        raise Error, 'the upload ticket is invalid or expired' unless data && data['user_id'] == user.id
-        raise Error, 'the key is not an upload' unless data['key'].to_s.start_with?(RedmineAws::S3::INCOMING_PREFIX)
+        # A ticket that Redmine did not sign never gets here; both are "expired".
+        raise Error, ::I18n.t(:error_aws_s3_upload_expired) unless data && data['user_id'] == user.id
+        raise Error, ::I18n.t(:error_aws_s3_upload_expired) unless data['key'].to_s.start_with?(INCOMING)
 
         data
       end
@@ -69,20 +71,6 @@ module RedmineAws
         copy!(attachment, data['key'])
         attachment.content_type = content_type_of(attachment, data['content_type'])
         attachment
-      end
-
-      def check_attachment(filename, size)
-        raise Error, 'filename is missing' if filename.blank?
-        raise Error, 'size is invalid' if size.nil? || size.negative?
-
-        unless Attachment.valid_extension?(File.extname(filename))
-          raise Error, ::I18n.t(:error_attachment_extension_not_allowed, extension: File.extname(filename))
-        end
-
-        max = Setting.attachment_max_size.to_i.kilobytes
-        return unless size > max
-
-        raise Error, ::I18n.t(:error_attachment_too_big, max_size: max)
       end
 
       # Waits for GuardDuty's tag when the scan is on (docs/attachments.md#malware-scan).
@@ -106,7 +94,7 @@ module RedmineAws
             storage.copy(key, RedmineAws::S3.file_key(directory, name), new_only: true)
           end
         rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound
-          raise Error, 'the upload is not in S3'
+          raise Error, ::I18n.t(:error_aws_s3_upload_not_found)
         end
         storage.delete(key)
         attachment.digest = digest!(attachment)
@@ -114,15 +102,21 @@ module RedmineAws
 
       def digest!(attachment)
         head = storage.head(attachment.s3_key, checksum: true)
-        error = if head&.content_length != attachment.filesize
-                  'the uploaded file does not match its size'
-                elsif head.checksum_type != 'FULL_OBJECT' || head.checksum_sha256.blank?
-                  'S3 returned no SHA256 of the whole file'
-                end
+        error = digest_error(head, attachment)
         return Base64.strict_decode64(head.checksum_sha256).unpack1('H*') unless error
 
         storage.delete(attachment.s3_key)
-        raise Error, error
+        raise Error, ::I18n.t(error)
+      end
+
+      # The message key when the copy is not the declared file, or nil.
+      def digest_error(head, attachment)
+        return :error_aws_s3_upload_size_mismatch if head&.content_length != attachment.filesize
+        return if head.checksum_type == 'FULL_OBJECT' && head.checksum_sha256.present?
+
+        # A bucket or S3 problem that the user cannot fix.
+        Rails.logger.error("[redmine_aws_s3] no full-object SHA256 for #{attachment.s3_key}")
+        :error_aws_s3_upload_failed
       end
 
       # Redmine 7.1 detects the type from the contents and the name when it

@@ -50,7 +50,7 @@ module RedmineAws
           post :complete, params: { ticket: 'bad', attachment_id: 1, format: 'js' }, xhr: true
 
           assert_response :unprocessable_content
-          assert_equal ['the upload ticket is invalid or expired'], response.parsed_body['errors']
+          assert_equal ['The upload has expired. Add the file again.'], response.parsed_body['errors']
         end
       end
 
@@ -74,7 +74,7 @@ module RedmineAws
             post :complete, params: { ticket: 'bad', format: 'json', key: key }
 
             assert_response :unprocessable_content
-            assert_equal ['the upload ticket is invalid or expired'], response.parsed_body['errors']
+            assert_equal ['The upload has expired. Add the file again.'], response.parsed_body['errors']
           end
         end
       end

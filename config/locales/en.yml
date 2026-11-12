@@ -23,6 +23,15 @@ en:
   field_aws_s3_malware_scan: GuardDuty malware scan
   error_aws_s3_malware_found: The malware scan found threats, so the file was blocked.
   error_aws_s3_malware_not_scanned: "The malware scan did not complete, so the file was blocked (%{status})."
+  error_aws_s3_upload_expired: The upload has expired. Add the file again.
+  error_aws_s3_upload_not_found: The uploaded file was not found. Add the file again.
+  error_aws_s3_upload_size_mismatch: The size of the uploaded file does not match. Add the file again.
+  error_aws_s3_upload_failed: The file could not be registered. Contact your Redmine administrator.
+  error_aws_s3_malware_scanning: The malware scan of the file has not finished. Try again later.
+  error_aws_s3_upload_failed_status: "Upload failed (%{status})"
+  error_aws_s3_upload_failed_no_status: Upload failed
+  label_aws_s3_network_error: Network error
+  label_aws_s3_different_contents: Different contents
   button_aws_s3_read_write: Read/write test
   button_aws_s3_delivery: Delivery test
   button_aws_s3_reconcile: Run consistency check

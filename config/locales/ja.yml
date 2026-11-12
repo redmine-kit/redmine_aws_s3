@@ -23,6 +23,15 @@ ja:
   field_aws_s3_malware_scan: GuardDuty マルウェアスキャン
   error_aws_s3_malware_found: マルウェアスキャンで脅威を検出したため、ファイルをブロックしました。
   error_aws_s3_malware_not_scanned: "マルウェアスキャンが完了しなかったため、ファイルをブロックしました (%{status})。"
+  error_aws_s3_upload_expired: アップロードの有効期限が切れました。もう一度ファイルを追加してください。
+  error_aws_s3_upload_not_found: アップロードしたファイルが見つかりません。もう一度ファイルを追加してください。
+  error_aws_s3_upload_size_mismatch: アップロードしたファイルのサイズが一致しません。もう一度ファイルを追加してください。
+  error_aws_s3_upload_failed: ファイルを登録できませんでした。システム管理者に連絡してください。
+  error_aws_s3_malware_scanning: ファイルのマルウェアスキャンが完了していません。しばらくしてからもう一度試してください。
+  error_aws_s3_upload_failed_status: "アップロードに失敗しました (%{status})"
+  error_aws_s3_upload_failed_no_status: アップロードに失敗しました
+  label_aws_s3_network_error: ネットワークエラー
+  label_aws_s3_different_contents: 内容が一致しません
   button_aws_s3_read_write: 読み書きテスト
   button_aws_s3_delivery: 配信テスト
   button_aws_s3_reconcile: 整合性チェックを実行

@@ -26,12 +26,17 @@ module RedmineAws
         key = "tmp/healthcheck/#{SecureRandom.uuid}"
         body = SecureRandom.hex(16)
         [step('PutObject') { storage.client.put_object(bucket: storage.bucket, key: key, body: body) },
-         step('GetObject') { read_back(storage, key, body) },
+         read_back(storage, key, body),
          step('DeleteObject') { storage.delete(key) }]
       end
 
+      # GetObject, failed with "Different contents" when the object is not
+      # what was put.
       def read_back(storage, key, body)
-        storage.client.get_object(bucket: storage.bucket, key: key).body.read == body || raise('different contents')
+        same = storage.client.get_object(bucket: storage.bucket, key: key).body.read == body
+        ['GetObject', same, same ? '' : ::I18n.t(:label_aws_s3_different_contents)]
+      rescue StandardError => e
+        failure('GetObject', e)
       end
 
       # A check object under tmp/bulk/ through CloudFront: the signed URL

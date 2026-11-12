@@ -41,7 +41,7 @@ module RedmineAws
           put '/my/avatar', params: { s3_ticket: ticket }
 
           assert_response :unprocessable_content
-          assert_select '#errorExplanation', text: /the upload ticket is invalid or expired/
+          assert_select '#errorExplanation', text: 'The upload has expired. Add the file again.'
           assert_nil User.find(1).avatar_id
         end
       end

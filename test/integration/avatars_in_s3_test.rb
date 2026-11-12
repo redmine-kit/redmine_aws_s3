@@ -91,7 +91,7 @@ module RedmineAws
             put '/my/avatar', params: { avatar: uploaded_test_file(IMAGE, 'image/png') }
 
             assert_response :unprocessable_content
-            assert_select '#errorExplanation', text: /still being scanned/
+            assert_select '#errorExplanation', text: 'The malware scan of the file has not finished. Try again later.'
             assert_nil User.find(2).avatar_id
           end
         end

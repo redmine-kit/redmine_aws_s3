@@ -26,6 +26,22 @@
     return element ? element.getAttribute('content') : null;
   }
 
+  // The texts in the user's language, from the plugin's <meta> tag.
+  function messages() {
+    try { return JSON.parse(meta('redmine-s3-messages')) || {}; } catch (e) { return {}; }
+  }
+
+  // "Upload failed (<HTTP status or network error>)".
+  function failedText(xhr) {
+    var text = messages();
+    return String(text.failedStatus).replace('{status}', (xhr && xhr.status) || text.networkError);
+  }
+
+  // The message of a 202 answer (the malware scan), or the one of the page.
+  function scanningText(body) {
+    try { return JSON.parse(body).message || messages().scanning; } catch (e) { return messages().scanning; }
+  }
+
   function errorText(xhr, fallback) {
     var json = xhr && xhr.responseJSON;
     if (!json && xhr && xhr.responseText) {
@@ -65,10 +81,10 @@
               complete(url, ticket, attempt + 1).then(resolve, reject);
             }, COMPLETE_RETRY_DELAYS[attempt]);
           } else {
-            reject('The file is still being scanned for malware. Try again later.');
+            reject(scanningText(text));
           }
         })
-        .fail(function(xhr) { reject(errorText(xhr, 'Upload failed')); });
+        .fail(function(xhr) { reject(errorText(xhr, messages().failed)); });
     });
   }
 
@@ -93,9 +109,9 @@
         complete(completeUrl + '?attachment_id=' + encodeURIComponent(attachmentId), presigned.ticket, 0)
           .then(function(script) { deferred.resolve(script); }, function(text) { fail(text); });
       }, function(xhr) {
-        fail(errorText(xhr, 'Upload failed (' + (xhr.status || 'network error') + ')'));
+        fail(errorText(xhr, failedText(xhr)));
       });
-    }).fail(function(xhr) { fail(errorText(xhr, 'Upload failed')); });
+    }).fail(function(xhr) { fail(errorText(xhr, messages().failed)); });
     return deferred.promise();
   }
 
@@ -110,7 +126,8 @@
   }
 
   window.RedmineS3Upload = {
-    complete: complete, uploadBlob: s3UploadBlob, retryDelays: COMPLETE_RETRY_DELAYS, put: put, errorText: errorText
+    complete: complete, uploadBlob: s3UploadBlob, retryDelays: COMPLETE_RETRY_DELAYS, put: put, errorText: errorText,
+    messages: messages, failedText: failedText
   };
   document.addEventListener('DOMContentLoaded', install);
   ['change', 'drop', 'paste'].forEach(function(type) { document.addEventListener(type, install, true); });

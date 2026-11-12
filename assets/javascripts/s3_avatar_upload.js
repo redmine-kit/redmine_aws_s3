@@ -34,7 +34,9 @@
     return new Promise(function(resolve, reject) {
       $.ajax(url, { type: 'POST', dataType: 'json', data: data })
         .done(function(json, status, xhr) { resolve({ json: json, status: xhr.status }); })
-        .fail(function(xhr) { reject(window.RedmineS3Upload.errorText(xhr, 'Upload failed')); });
+        .fail(function(xhr) {
+          reject(window.RedmineS3Upload.errorText(xhr, window.RedmineS3Upload.messages().failed));
+        });
     });
   }
 
@@ -47,7 +49,7 @@
     return post(url, { ticket: ticket }).then(function(result) {
       if (result.status !== 202) { return null; }
       if (attempt >= CHECK_RETRY_DELAYS.length) {
-        throw 'The file is still being scanned for malware. Try again later.';
+        throw (result.json && result.json.message) || window.RedmineS3Upload.messages().scanning;
       }
       return wait(CHECK_RETRY_DELAYS[attempt]).then(function() { return check(url, ticket, attempt + 1); });
     });
@@ -93,7 +95,7 @@
         return window.RedmineS3Upload.put(presigned.url, file, $.noop).then(function() {
           return presigned.ticket;
         }, function(xhr) {
-          throw window.RedmineS3Upload.errorText(xhr, 'Upload failed (' + (xhr.status || 'network error') + ')');
+          throw window.RedmineS3Upload.errorText(xhr, window.RedmineS3Upload.failedText(xhr));
         });
       })
       .then(function(ticket) {

@@ -25,8 +25,18 @@ module RedmineAws
                                                                     only_path: true)),
           tag.meta(name: 'redmine-s3-complete-url', content: url_for(controller: '/s3_uploads', action: 'complete',
                                                                      format: 'js', only_path: true)),
+          tag.meta(name: 'redmine-s3-messages', content: upload_messages.to_json),
           javascript_include_tag('s3_upload', plugin: 'redmine_aws_s3')
         ]
+      end
+
+      # The texts of the upload scripts, in the user's language. The script
+      # puts the HTTP status in place of {status}.
+      def upload_messages
+        { 'scanning' => l(:error_aws_s3_malware_scanning),
+          'failed' => l(:error_aws_s3_upload_failed_no_status),
+          'failedStatus' => l(:error_aws_s3_upload_failed_status, status: '{status}'),
+          'networkError' => l(:label_aws_s3_network_error) }
       end
 
       # The avatar form of Redmine 7.1 (docs/attachments.md#avatars).

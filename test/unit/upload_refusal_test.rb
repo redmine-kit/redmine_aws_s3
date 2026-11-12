@@ -29,14 +29,15 @@ module RedmineAws
 
       def test_a_copy_without_a_sha256_is_refused
         with_s3(stub_client(head_object: ['NotFound', head_of(CONTENT).merge(checksum_sha256: nil)])) do
-          assert_raises(RedmineAws::S3::Upload::Error) { upload.complete(presign[:ticket]) }
+          error = assert_raises(RedmineAws::S3::Upload::Error) { upload.complete(presign[:ticket]) }
+          assert_equal 'The file could not be registered. Contact your Redmine administrator.', error.message
         end
       end
 
       def test_a_missing_upload_is_refused
         with_s3(stub_client(head_object: 'NotFound', copy_object: 'NoSuchKey')) do
           error = assert_raises(RedmineAws::S3::Upload::Error) { upload.complete(presign[:ticket]) }
-          assert_includes error.message, 'not in S3'
+          assert_equal 'The uploaded file was not found. Add the file again.', error.message
         end
       end
     end

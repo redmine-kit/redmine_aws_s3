@@ -26,7 +26,7 @@ module RedmineAws
         with_s3(stub_client(get_object: { body: "#{CONTENT}x" })) do |client|
           error = open_a_larger_avatar
 
-          assert_equal 'the uploaded file does not match its size', error.message
+          assert_equal 'The size of the uploaded file does not match. Add the file again.', error.message
           assert_equal "bytes=0-#{CONTENT.bytesize}", api_request(client, :get_object)[:params][:range]
           assert_includes client.api_requests.pluck(:operation_name), :delete_objects
         end
