@@ -50,7 +50,7 @@ module RedmineAws
       # until their total is under the limit. Markdown previews
       # (derived_cache) count too.
       def prune(keep: nil, root: Attachment.storage_path, limit: RedmineAws::S3.cache_size)
-        files = files_under(root).select { |file, _, _| cached?(file) }
+        files = cached_files(root)
         total = files.sum { |_, size, _| size }
         files.sort_by { |_, _, mtime| mtime }.each do |file, size, _|
           break if total <= limit
@@ -61,14 +61,17 @@ module RedmineAws
         end
       end
 
-      # [path, size, mtime] of each file under root.
-      def files_under(root)
-        Dir.glob(File.join(root, '**', '*')).filter_map do |file|
+      # [path, size, mtime] of each cached file under root, found by its mark
+      # (only the marked files are read, not every file of the directory).
+      def cached_files(root)
+        Dir.glob(File.join(root, '**', "*#{MARK}")).filter_map do |mark|
+          file = mark.delete_suffix(MARK)
           stat = File.stat(file)
-          [file, stat.size, stat.mtime] if stat.file?
+          [file, stat.size, stat.mtime]
         rescue SystemCallError
           nil
         end
+      end
       end
     end
   end
