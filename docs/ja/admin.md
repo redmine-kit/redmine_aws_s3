@@ -29,7 +29,7 @@ Redmine AWS S3 の管理画面です。システム管理者だけが開けま�
 | 署名なし URL 拒否 | 配信テスト | 署名を除いた同じ URL が 401 か 403 を返す |
 | 配信 | 配信テスト | テストがエラーで止まったときに限り出す |
 
-- **失敗した呼び出し:** 失敗した呼び出しの詳細には、例外のクラスだけを表示します (例: `Aws::S3::Errors::AccessDenied`)。Redmine AWS の「ステータス」タブと同じです。ホスト、アカウント、リソースを含むことがある例外のメッセージは画面に表示せず、テストの名称、クラス、メッセージを Redmine のログに書きます (`[redmine_aws_s3] connection test PutObject failed: …`)。
+- **失敗した呼び出し:** 失敗した呼び出しの詳細には、例外のクラスだけを表示します (例: `Aws::S3::Errors::AccessDenied`)。Redmine AWS の「ステータス」のタブと同じです。ホスト、アカウント、リソースを含むことがある例外のメッセージは画面に表示せず、テストの名称、クラス、メッセージを Redmine のログに書きます (`[redmine_aws_s3] connection test PutObject failed: …`)。
 
 - **使い道:** 古い Redmine から添付ファイルを移したあと ([migration.md](https://redmine-kit.github.io/serverless/ja/migration.html)) に、整合性チェックで漏れがないかを確認できます。
 - **「ステータス」のタブ:** バケットがあるときは、Redmine AWS の「ステータス」のタブの「接続テスト」に「S3」の行が加わります。添付ファイルのバケットの `HeadBucket` を呼び、バケットの名前を出します。
