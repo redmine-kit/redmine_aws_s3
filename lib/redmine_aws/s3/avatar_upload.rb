@@ -47,6 +47,10 @@ module RedmineAws
       # object); Redmine refuses it as an image.
       def read(key, file, size)
         size.zero? || storage.read(key, file, bytes: size + 1)
+      rescue ::Aws::S3::Errors::AccessDenied
+        # PUT again after the scan to a URL still valid: the bucket policy
+        # refuses an object not scanned yet.
+        false
       end
     end
   end

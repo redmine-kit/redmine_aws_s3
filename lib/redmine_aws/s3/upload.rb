@@ -93,7 +93,9 @@ module RedmineAws
           attachment.disk_filename = DiskName.claim(attachment.filename, directory) do |name|
             storage.copy(key, RedmineAws::S3.file_key(directory, name), new_only: true)
           end
-        rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound
+        # AccessDenied: the object was PUT again after the scan to a URL still
+        # valid, and the bucket policy refuses an object not scanned yet.
+        rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound, ::Aws::S3::Errors::AccessDenied
           raise Error, ::I18n.t(:error_aws_s3_upload_not_found)
         end
         storage.delete(key)
