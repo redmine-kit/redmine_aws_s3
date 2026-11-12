@@ -70,7 +70,7 @@ bundle install
 
 On Serverless, [Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
 
-The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/), add this class to the list.
+The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. [Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/setup.html) allows it by default; another queue that runs only listed job classes needs it in its list.
 
 On a Redmine that already has attachments, copy the existing files to the bucket (`files/<directory>/<file name>`, the same paths as under `attachments_storage_path`) before setting `REDMINE_S3_BUCKET`: with the bucket set, Redmine reads attachments from S3. [Serverless's migration.md](https://redmine-kit.github.io/serverless/migration.html) has the full steps; the consistency check on the administration page then shows whether anything is missing.
 
