@@ -165,7 +165,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 <a id="how-aws-is-tested"></a>
 
-### AWS とのテストの方法
+### AWS のテスト方法
 
 単体テストと機能テストでは、SDK の `stub_responses` で S3 を置き換えます。結合テストは同じテストを、CI では組織のトークンで LocalStack に対して、フォークからの Pull Request やトークンのないローカルでの実行では moto に対して動かします。moto 5.2.5 は、`HeadObject` で `ChecksumSHA256` を返しません (2026-11-09 に確認)。そこで moto では、その `HeadObject` の結果を保存されたバイト列から計算し、S3 のチェックサムの 2 つのテストはスキップします。署名付き URL は、テストで作ったキーペアの公開鍵で検証します。LocalStack 2026.10.6 は、複数のテストのプロセスが同時に送ると、再利用した接続のリクエストにまれに本文のない `400` を返します (4 プロセスの PutObject で約 1,000 回に 1 回、新しい接続では起きない。2026-11-11 に再現)。S3 ではこうならないので、テストの S3 クライアントはアイドル接続を残しません (`http_idle_timeout: 0`)。
 
@@ -177,7 +177,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 <a id="what-the-tests-check"></a>
 
-### テストで確認する内容
+### テストの確認内容
 
 差し替える処理にはすべてテストがあり、AWS への呼び出しはすべてこのリポジトリでテストします。S3 が返しうる応答ごとに `stub_responses` で、実際のリクエストは LocalStack か moto に対して確認します (PutObject、`ChecksumMode` 付きの HeadObject、CopyObject、DeleteObjects、ListObjectsV2、GuardDuty が付けるはずのタグでの GetObjectTagging、テストが付ける PutObjectTagging)。
 
@@ -200,7 +200,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 <a id="not-checked-against-aws"></a>
 
-### AWS では確認していないこと
+### AWS で未確認の事項
 
 LocalStack では、`ChecksumAlgorithm` に `SHA256` を指定したコピーに、単一の PUT からでもマルチパートアップロードからでも、オブジェクト全体の SHA256 が付くことを確認します。moto ではこの 2 つをスキップし、スタブで確認します。CloudFront (署名付き URL の受け付け、OAC、関数) と GuardDuty は、ローカルでは再現しません。これらは、[未確認の事項](attachments.md#to-verify)と、[Serverless](https://redmine-kit.github.io/serverless/ja/testing.html#checks-after-deployment) のデプロイのあとの確認にあります。
 
