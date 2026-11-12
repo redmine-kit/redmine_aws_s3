@@ -11,6 +11,7 @@ ja:
   label_aws_s3_unsigned_url_denied: 署名なし URL 拒否
   label_aws_s3_delivery: 配信
   label_aws_s3_reconciliation: 整合性チェック
+  label_aws_s3_timed_out: タイムアウト
   label_aws_s3_running: 実行中
   label_aws_s3_malware_findings: マルウェアスキャンでブロックしたファイル
   label_aws_s3_time: 日時

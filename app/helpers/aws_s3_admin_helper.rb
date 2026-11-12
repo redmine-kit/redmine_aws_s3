@@ -21,8 +21,14 @@ module AwsS3AdminHelper
 
   # The last consistency check, running or finished.
   def aws_s3_reconciliation_rows(result)
-    return aws_s3_running_rows(result) if result['finished_at'].blank?
+    case RedmineAws::S3::Reconciliation.state(result)
+    when :running then aws_s3_running_rows(result)
+    when :failed then aws_s3_failed_rows(result)
+    else aws_s3_finished_rows(result)
+    end
+  end
 
+  def aws_s3_finished_rows(result)
     [{ name: l(:field_aws_s3_finished_at), value: format_time(Time.iso8601(result['finished_at'])) }] +
       %w[attachments objects missing_count unused_count].map { |key| aws_s3_count_row(result, key) }
   end
@@ -34,7 +40,17 @@ module AwsS3AdminHelper
   end
 
   def aws_s3_running_rows(result)
-    [{ name: l(:field_status), value: l(:label_aws_s3_running) },
-     { name: l(:field_aws_s3_started_at), value: format_time(Time.iso8601(result['started_at'])) }]
+    [{ name: l(:field_status), value: l(:label_aws_s3_running) }, aws_s3_started_row(result)]
+  end
+
+  # Stopped by an error (its class), or not finished in time ("Timed out").
+  def aws_s3_failed_rows(result)
+    [{ name: l(:field_status), value: l(:label_aws_failed) }, aws_s3_started_row(result),
+     { name: l(:label_details), value: result['error'].presence || l(:label_aws_s3_timed_out) }]
+  end
+
+  def aws_s3_started_row(result)
+    started = RedmineAws::S3::Reconciliation.started_at(result)
+    { name: l(:field_aws_s3_started_at), value: started ? format_time(started) : '-' }
   end
 end

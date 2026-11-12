@@ -21,6 +21,24 @@ module RedmineAws
         assert_select 'div.box.tabular', 1, 'only the settings form'
       end
 
+      def test_a_failed_reconciliation
+        failed = { 'started_at' => 1.minute.ago.utc.iso8601, 'error' => 'Aws::S3::Errors::AccessDenied' }
+        RedmineAws::S3.update_settings('reconciliation' => failed)
+        with_s3(stub_client) { get :show }
+
+        assert_select 'table.list.values.reconciliation tr', text: /Status\s*Failed/
+        assert_select 'table.list.values.reconciliation tr', text: /Details\s*Aws::S3::Errors::AccessDenied/
+      end
+
+      # A run that never finished (a timeout of the worker).
+      def test_a_reconciliation_that_never_finished
+        RedmineAws::S3.update_settings('reconciliation' => { 'started_at' => 2.hours.ago.utc.iso8601 })
+        with_s3(stub_client) { get :show }
+
+        assert_select 'table.list.values.reconciliation tr', text: /Status\s*Failed/
+        assert_select 'table.list.values.reconciliation tr', text: /Details\s*Timed out/
+      end
+
       def test_the_results_of_a_connection_test
         results = [['PutObject', true, ''], ['GetObject', false, 'Aws::S3::Errors::NoSuchKey']]
         with_s3(stub_client) { get :show, flash: { aws_s3_checks: results } }

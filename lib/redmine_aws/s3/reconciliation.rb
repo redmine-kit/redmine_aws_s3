@@ -7,6 +7,9 @@ module RedmineAws
     # environment shows the latest one.
     module Reconciliation
       LIMIT = 100
+      # A run not finished after this stopped (a timeout of the job, a killed
+      # worker); it is shown as timed out. Listing files/ takes minutes.
+      RUN_LIMIT = 1.hour
       # Redmine's derived cache (Markdown previews) under files/, not attachments.
       DERIVED_PREFIX = 'files/derived_cache/'
 
@@ -16,6 +19,28 @@ module RedmineAws
         in_s3 = object_keys
         found = summary(attachment_keys, in_s3)
         save { |last| { 'started_at' => last&.fetch('started_at', nil) || found['finished_at'] }.merge(found) }
+      end
+
+      # Keeps the class of the error that stopped the run; the job logs the
+      # message.
+      def failed(error)
+        save { |last| { 'started_at' => last&.fetch('started_at', nil), 'error' => error.class.name }.compact }
+      end
+
+      # :running, :failed (with an error, or not finished within RUN_LIMIT),
+      # or :finished.
+      def state(result)
+        return :finished if result['finished_at'].present?
+        return :failed if result['error'].present?
+
+        started = started_at(result)
+        started && started > RUN_LIMIT.ago ? :running : :failed
+      end
+
+      def started_at(result)
+        Time.iso8601(result['started_at'].to_s)
+      rescue ArgumentError
+        nil
       end
 
       # The keys of the objects under files/, without Redmine's derived cache.

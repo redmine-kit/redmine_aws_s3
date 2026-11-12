@@ -11,6 +11,7 @@ en:
   label_aws_s3_unsigned_url_denied: Unsigned URL denied
   label_aws_s3_delivery: Delivery
   label_aws_s3_reconciliation: Consistency check
+  label_aws_s3_timed_out: Timed out
   label_aws_s3_running: Running
   label_aws_s3_malware_findings: Files blocked by malware scan
   label_aws_s3_time: Time

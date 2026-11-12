@@ -64,7 +64,9 @@ module RedmineAws
       def test_a_running_reconciliation
         RedmineAws::S3.update_settings('reconciliation' => { 'started_at' => '2026-11-06T22:40:00Z' })
         with_s3(stub_client) do
-          with_settings(date_format: '%Y-%m-%d', time_format: '%H:%M') { get :show }
+          travel_to(Time.utc(2026, 11, 6, 22, 50)) do
+            with_settings(date_format: '%Y-%m-%d', time_format: '%H:%M') { get :show }
+          end
 
           assert_select 'table.list.values.reconciliation tr', text: /Status\s*Running/
           assert_select 'table.list.values.reconciliation tr', text: /Started at\s*2026-11-06 \d\d:40/
