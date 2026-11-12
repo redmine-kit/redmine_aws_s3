@@ -41,17 +41,33 @@ module RedmineAws
         end
       end
 
-      # A mark whose file is gone, and a download stopped before its rename.
-      def test_prune_deletes_leftovers
-        dir = Dir.mktmpdir
-        mark = File.join(dir, "gone.txt#{Cache::MARK}")
-        part = File.join(dir, 'a.txt.0123.part')
-        FileUtils.touch([mark, part])
-        File.utime(2.hours.ago.to_time, 2.hours.ago.to_time, part)
-        Cache.prune(root: dir, limit: 1.megabyte)
+      def test_prune_deletes_a_mark_whose_file_is_gone
+        in_tmpdir do |dir|
+          mark = File.join(dir, "gone.txt#{Cache::MARK}")
+          FileUtils.touch(mark)
+          Cache.prune(root: dir, limit: 1.megabyte)
 
-        assert_not File.exist?(mark)
-        assert_not File.exist?(part)
+          assert_not File.exist?(mark)
+        end
+      end
+
+      # A download stopped before its rename, after an hour.
+      def test_prune_deletes_an_old_partial_download
+        in_tmpdir do |dir|
+          old, recent = %w[old recent].map { |name| File.join(dir, "#{name}.txt.0123.part") }
+          FileUtils.touch([old, recent])
+          File.utime(2.hours.ago.to_time, 2.hours.ago.to_time, old)
+          Cache.prune(root: dir, limit: 1.megabyte)
+
+          assert_equal [false, true], [File.exist?(old), File.exist?(recent)]
+        end
+      end
+
+      private
+
+      def in_tmpdir
+        dir = Dir.mktmpdir
+        yield dir
       ensure
         FileUtils.rm_rf(dir)
       end
