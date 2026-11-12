@@ -21,7 +21,7 @@ module RedmineAws
       end
 
       def teardown
-        FileUtils.rm_f(@target)
+        FileUtils.rm_f([@target, "#{@target}.s3cache"])
       end
 
       def preview_key
@@ -41,6 +41,7 @@ module RedmineAws
         with_s3(stub_client(head_object: 'NotFound')) do |client|
           assert_equal '# Preview', @attachment.markdownized_preview_content
           assert preview_put?(client)
+          assert RedmineAws::S3::Cache.cached?(@target), 'the preview put to S3 is cached'
         end
       end
 
@@ -63,6 +64,7 @@ module RedmineAws
           assert_equal '# Preview', @attachment.markdownized_preview_content
           assert_includes operations(client), :get_object
           assert_not preview_put?(client)
+          assert RedmineAws::S3::Cache.cached?(@target), 'the preview fetched from S3 is cached'
         end
       end
     end
