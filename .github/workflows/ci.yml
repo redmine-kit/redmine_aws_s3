@@ -125,9 +125,10 @@ jobs:
       - if: always()
         run: bin/services --down
 
-  # The tests against the latest release of redmine_aws (its newest v0.1.*
-  # tag, the source of the published gem), as well as against its main
-  # above: adapters install the release. Skipped until there is one.
+  # The tests against the latest release of redmine_aws (its newest v0.*
+  # tag, the source of the published gem; the gemspec allows ~> 0.1, so 0.2
+  # and later too), as well as against its main above: adapters install the
+  # release. Skipped until there is one.
   release:
     needs: static
     name: test (redmine_aws release)
@@ -138,10 +139,10 @@ jobs:
           persist-credentials: false
       - id: release
         run: |
-          tag=$(git ls-remote --tags --refs https://github.com/redmine-kit/redmine_aws.git 'v0.1.*' |
+          tag=$(git ls-remote --tags --refs https://github.com/redmine-kit/redmine_aws.git 'v0.*' |
             sed 's|.*refs/tags/||' | sort -V | tail -n 1)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          [[ -n "$tag" ]] || echo "::notice::redmine_aws has no v0.1.* release yet; not tested against one"
+          [[ -n "$tag" ]] || echo "::notice::redmine_aws has no v0.* release yet; not tested against one"
       - if: steps.release.outputs.tag != ''
         uses: actions/checkout@v7.0.1
         with:
