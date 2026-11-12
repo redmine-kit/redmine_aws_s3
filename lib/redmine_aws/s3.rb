@@ -137,20 +137,8 @@ module RedmineAws
         (settings.is_a?(Hash) && settings[name].presence) || DEFAULT_SETTINGS.fetch(name)
       end
 
-      # Merges values into the plugin settings, keeping the other keys (such
-      # as the reconciliation result). Merged into the row read again under a
-      # lock, not into Setting's cache, which a process without requests (the
-      # job worker) never refreshes: an administrator's newer change stays.
-      # With a block, the values are made from the row read under the lock
-      # (two results written at the same time both stay).
-      def update_settings(values = nil)
-        Setting.transaction do
-          settings = Setting.where(name: 'plugin_redmine_aws_s3').lock.first&.value
-          settings = settings.is_a?(Hash) ? settings.to_h.stringify_keys : {}
-          values = yield(settings) if block_given?
-          Setting.plugin_redmine_aws_s3 = settings.merge(values.to_h.stringify_keys)
-        end
-      end
+      # Merges values into the plugin settings (PluginSettings.update).
+      def update_settings(values = nil, &) = PluginSettings.update(values, &)
 
       def download_url_expiry = SettingLimits.limit('download_url_expiry', setting('download_url_expiry'))
 

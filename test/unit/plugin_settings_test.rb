@@ -49,6 +49,29 @@ module RedmineAws
         assert_equal '2026-11-06T22:40:00Z', Setting.find_by(name: NAME).value.dig('reconciliation', 'started_at')
       end
 
+      # The first write creates the row (with the defaults) before locking
+      # it, so that two first writes lock a row, not a gap.
+      def test_the_first_write_creates_the_row
+        Setting.where(name: NAME).delete_all
+        RedmineAws::S3.update_settings('reconciliation' => { 'objects' => 1 })
+
+        rows = Setting.where(name: NAME).to_a
+        assert_equal 1, rows.size
+        assert_equal ['300', { 'objects' => 1 }], rows.first.value.values_at('download_url_expiry', 'reconciliation')
+      end
+
+      # Two first writes at once can leave two rows; Redmine reads the newest,
+      # and so does update_settings.
+      def test_the_newest_row_is_merged
+        newest = Setting.new(name: NAME, value: { 'upload_url_expiry' => '600' })
+        newest.save!(validate: false)
+        RedmineAws::S3.update_settings('reconciliation' => { 'objects' => 1 })
+
+        value = newest.reload.value
+        assert_equal '600', value['upload_url_expiry']
+        assert_equal({ 'objects' => 1 }, value['reconciliation'])
+      end
+
       private
 
       # Saves the row without touching this process's cache of Setting.
