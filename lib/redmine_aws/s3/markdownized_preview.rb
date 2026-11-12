@@ -18,20 +18,26 @@ module RedmineAws
       # block makes it only when there is none; the one it made is stored.
       def around(attachment)
         target = attachment.markdownized_preview_cache_path
-        return File.read(target, mode: 'rb') if File.exist?(target) || fetch(key(attachment), target)
+        return File.read(target, mode: 'rb') if File.exist?(target) || fetched?(key(attachment), target)
 
         content = yield
-        RedmineAws::S3.storage.put_file(key(attachment), target) if content && File.exist?(target)
+        if content && File.exist?(target)
+          RedmineAws::S3.storage.put_file(key(attachment), target)
+          Cache.add(target)
+        end
         content
       end
 
       # Whether the preview was fetched from S3.
-      def fetch(key, target)
+      def fetched?(key, target)
         storage = RedmineAws::S3.storage
         return false unless storage.exists?(key)
 
         FileUtils.mkdir_p(File.dirname(target))
-        storage.download(key, target)
+        return false unless storage.download(key, target)
+
+        Cache.add(target)
+        true
       end
     end
   end

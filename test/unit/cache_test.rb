@@ -15,12 +15,15 @@ module RedmineAws
         FileUtils.rm_rf(@dir)
       end
 
-      def write(name, size, age)
+      # A file of the cache (known to be in S3), or another file when cached is
+      # false.
+      def write(name, size, age, cached: true)
         path = File.join(@dir, name)
         FileUtils.mkdir_p(File.dirname(path))
         File.binwrite(path, 'x' * size)
         time = Time.now - age
         File.utime(time, time, path)
+        FileUtils.touch("#{path}#{RedmineAws::S3::Cache::MARK}") if cached
         path
       end
 
@@ -44,6 +47,18 @@ module RedmineAws
         assert_not File.exist?(other)
       end
 
+      # A file that the cache did not put there (an original of a Redmine that
+      # starts using S3) is never deleted, and does not count.
+      def test_prune_keeps_files_that_are_not_cached
+        original = write('2026/10/original', 800, 300, cached: false)
+        cached = write('2026/11/cached', 400, 100)
+        RedmineAws::S3::Cache.prune(root: @dir, limit: 0)
+
+        assert File.exist?(original)
+        assert_not File.exist?(cached)
+        assert_not File.exist?("#{cached}#{RedmineAws::S3::Cache::MARK}")
+      end
+
       def test_fetch_touches_a_cached_file
         path = write('a', 10, 3600)
         client = stub_client
@@ -64,6 +79,7 @@ module RedmineAws
         end
 
         assert_equal 'abc', File.read(path)
+        assert RedmineAws::S3::Cache.cached?(path)
       end
     end
   end

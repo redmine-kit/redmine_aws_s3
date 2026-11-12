@@ -82,6 +82,8 @@ Serverless では、[Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_
 
 管理画面の整合性チェックは、Active Job の `AwsS3ReconcileJob` として動きます。実行してよいジョブのクラスを一覧で決めるキュー ([Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/ja/) など) を通すときは、このクラスを一覧に追加します。
 
+すでに添付ファイルがある Redmine では、`REDMINE_S3_BUCKET` を設定する前に、今のファイルをバケットにコピーします (`files/<ディレクトリ>/<ファイル名>`。`attachments_storage_path` の下と同じパス)。バケットを設定すると、Redmine は添付ファイルを S3 から読むためです。手順全体は [Serverless の migration.md](https://redmine-kit.github.io/serverless/ja/migration.html) にあります。そのあと、管理画面の整合性チェックで、足りないファイルがないかを確認できます。
+
 <a id="aws-resources"></a>
 
 ## AWS リソース

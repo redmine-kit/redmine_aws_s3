@@ -72,6 +72,8 @@ On Serverless, [Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/)
 
 The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. If jobs go through a queue that allows only listed job classes, such as [Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/), add this class to the list.
 
+On a Redmine that already has attachments, copy the existing files to the bucket (`files/<directory>/<file name>`, the same paths as under `attachments_storage_path`) before setting `REDMINE_S3_BUCKET`: with the bucket set, Redmine reads attachments from S3. [Serverless's migration.md](https://redmine-kit.github.io/serverless/migration.html) has the full steps; the consistency check on the administration page then shows whether anything is missing.
+
 ## AWS resources
 
 ### The bucket

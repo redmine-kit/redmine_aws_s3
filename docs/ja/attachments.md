@@ -328,7 +328,7 @@ Redmine の `attachments_storage_path` を `/tmp/redmine/files` にし、ここ�
   - ローカルになく、レコードが保存済みなら、S3 から取ってからパスを返します。別の名前で書いてから名前を変えるので、途中のファイルを読むことはありません。
   - 削除 (`delete_from_disk!`) と、ファイルがあるかの確認 (`readable?`) は、`diskfile` を通さないように差し替えます。消すだけのファイルや、確認するだけのファイルを取りに行かないためです。
 - **古くならない:** 添付ファイルは一度保存したら変わらないので、キャッシュを確認直す必要はありません。
-- **大きさ:** 関数の `/tmp` は、Lambda のデフォルトの 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。環境が消えると、キャッシュも消えます。
+- **大きさ:** 関数の `/tmp` は、Lambda のデフォルトの 512 MB です。添付ファイルのキャッシュは 256 MB までとし、超えたら古いものから消します。数えて消すのは、S3 にあるとわかっているファイルだけです。S3 から取ったか、プラグインが S3 に置いたファイルで、それぞれの横に空のファイル (`<ファイル名>.s3cache`) を置いて印にします。S3 を使い始めた Redmine の元のファイルなど、ディレクトリのほかのファイルは消しません。環境が消えると、キャッシュも消えます。
 - **512 MB で足りる理由:** 登録のときに Lambda がオブジェクト全体を読まず (SHA256 は S3 が計算する)、ダウンロードは Lambda を通りません。`/tmp` を使うのは、Redmine 自身がファイルを読むときだけです。サムネイル (元の画像)、`file_max_size_displayed` (デフォルト 512 KB) までのテキストと差分の表示、Office のプレビュー、`bulk_download_max_size` (デフォルト 100 MB) までの一括ダウンロードの zip (元のファイルと zip を合わせて最大 200 MB ほど)、CSV のインポート、受けたメールの添付ファイル、PDF の出力です。
 - **CSV のインポート:** インポートのファイルも、`/tmp/redmine/imports` に書いたあと `imports/` に PutObject し、読むときにローカルになければ S3 から取ります。`Import#filepath` は `Rails.root/tmp/imports` に固定されているので、イメージの `tmp` を `/tmp/redmine` へのシンボリックリンクにします ([lambda.md](https://redmine-kit.github.io/serverless/ja/lambda.html#read-only-file-system))。
 - **Markdown のプレビュー:** Redmine は Office のファイルなどを Pandoc で Markdown に変え、`attachments_storage_path` の下の `derived_cache/markdownized_previews/` に置きます。Lambda では `/tmp` のキャッシュの中になるので、ほかに書き込めるパスは要りません。プラグインは、同じパス (`files/derived_cache/markdownized_previews/`) で S3 にも置きます。持っていない環境は Pandoc を動かし直さずに S3 から取り、添付を消すときに一緒に消します。

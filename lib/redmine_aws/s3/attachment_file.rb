@@ -18,6 +18,8 @@ module RedmineAws
                           filename: attachment.filename, user: attachment.author)
         end
         FileUtils.mv(path, attachment.local_diskfile) unless path == attachment.local_diskfile
+        # In S3 now: the local file is a copy that the cache may delete.
+        Cache.add(attachment.local_diskfile)
       end
     end
   end

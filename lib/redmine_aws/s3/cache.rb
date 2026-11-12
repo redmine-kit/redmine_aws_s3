@@ -5,8 +5,13 @@ module RedmineAws
     # The local cache of S3 under Redmine's attachments_storage_path
     # (docs/attachments.md#the-tmp-cache): files are fetched when Redmine reads
     # them, kept while the environment lives, and the least recently used ones
-    # are deleted beyond the size limit.
+    # are deleted beyond the size limit. Only files known to be in S3 (fetched
+    # from it or put to it) are cached, each marked by an empty file next to
+    # it: files that were there before (the originals of a Redmine that starts
+    # using S3) are never deleted.
     module Cache
+      MARK = '.s3cache'
+
       module_function
 
       # Makes the object at key available at path. Returns the path, or nil
@@ -18,8 +23,20 @@ module RedmineAws
         end
         return nil unless RedmineAws::S3.storage.download(key, path)
 
-        prune(keep: path)
+        add(path)
         path
+      end
+
+      # Marks the file at path, which is in S3, as cached, and prunes.
+      def add(path)
+        FileUtils.touch("#{path}#{MARK}")
+        prune(keep: path)
+      rescue SystemCallError
+        nil
+      end
+
+      def cached?(path)
+        File.exist?("#{path}#{MARK}")
       end
 
       def touch(path)
@@ -29,16 +46,17 @@ module RedmineAws
         nil
       end
 
-      # Deletes the least recently used files under the storage path until the
-      # total is under the limit. Office preview caches (derived_cache) count too.
+      # Deletes the least recently used cached files under the storage path
+      # until their total is under the limit. Markdown previews
+      # (derived_cache) count too.
       def prune(keep: nil, root: Attachment.storage_path, limit: RedmineAws::S3.cache_size)
-        files = files_under(root)
+        files = files_under(root).select { |file, _, _| cached?(file) }
         total = files.sum { |_, size, _| size }
         files.sort_by { |_, _, mtime| mtime }.each do |file, size, _|
           break if total <= limit
           next if file == keep
 
-          FileUtils.rm_f(file)
+          FileUtils.rm_f([file, "#{file}#{MARK}"])
           total -= size
         end
       end
