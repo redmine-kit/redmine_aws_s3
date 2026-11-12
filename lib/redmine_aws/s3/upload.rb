@@ -89,17 +89,20 @@ module RedmineAws
       # SHA256 becomes the digest; a size other than the declared one fails.
       def copy!(attachment, key)
         directory = attachment.disk_directory = Time.zone.now.strftime('%Y/%m')
-        begin
-          attachment.disk_filename = DiskName.claim(attachment.filename, directory) do |name|
-            storage.copy(key, RedmineAws::S3.file_key(directory, name), new_only: true)
-          end
-        # AccessDenied: the object was PUT again after the scan to a URL still
-        # valid, and the bucket policy refuses an object not scanned yet.
-        rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound, ::Aws::S3::Errors::AccessDenied
-          raise Error, ::I18n.t(:error_aws_s3_upload_not_found)
-        end
+        attachment.disk_filename = copy_upload(key, attachment.filename, directory)
         storage.delete(key)
         attachment.digest = digest!(attachment)
+      end
+
+      # Copies the upload under a free name in the directory; returns the name.
+      def copy_upload(key, filename, directory)
+        DiskName.claim(filename, directory) do |name|
+          storage.copy(key, RedmineAws::S3.file_key(directory, name), new_only: true)
+        end
+      rescue ::Aws::S3::Errors::NoSuchKey, ::Aws::S3::Errors::NotFound
+        raise Error, ::I18n.t(:error_aws_s3_upload_not_found)
+      rescue ::Aws::S3::Errors::AccessDenied => e
+        raise Error, access_denied(e)
       end
 
       def digest!(attachment)
@@ -109,6 +112,15 @@ module RedmineAws
 
         storage.delete(attachment.s3_key)
         raise Error, ::I18n.t(error)
+      end
+
+      # S3 refused to copy or read the upload. With the malware scan, the
+      # bucket policy refuses an object PUT again after the scan (not scanned
+      # yet): the upload is as missing. Otherwise the permissions (IAM, KMS)
+      # are wrong, which the user cannot fix. Logged with the message.
+      def access_denied(error)
+        Rails.logger.error("[redmine_aws_s3] S3 refused the upload: #{error.class}: #{error.message}")
+        ::I18n.t(MalwareScan.required? ? :error_aws_s3_upload_not_found : :error_aws_s3_upload_failed)
       end
 
       # The message key when the copy is not the declared file, or nil.
