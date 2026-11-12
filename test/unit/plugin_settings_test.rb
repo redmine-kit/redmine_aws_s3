@@ -29,6 +29,26 @@ module RedmineAws
         assert_equal({ 'objects' => 1 }, saved['reconciliation'])
       end
 
+      # Two files refused at the same time: the finding of the other process,
+      # saved after this one read its cache, stays.
+      def test_findings_written_at_the_same_time_both_stay
+        Setting.plugin_redmine_aws_s3
+        change_in_another_process('malware_findings' => [{ 'key' => 'other' }])
+        MalwareScan.record(key: 'this', filename: 'a.exe', user: nil, status: 'THREATS_FOUND')
+
+        assert_equal %w[this other], Setting.find_by(name: NAME).value['malware_findings'].pluck('key')
+      end
+
+      # The start that another process saved (the button) is kept by the run.
+      def test_a_run_keeps_the_start_saved_by_another_process
+        Setting.plugin_redmine_aws_s3
+        change_in_another_process('reconciliation' => { 'started_at' => '2026-11-06T22:40:00Z' })
+        Reconciliation.stubs(:object_keys).returns(Set.new)
+        Reconciliation.run
+
+        assert_equal '2026-11-06T22:40:00Z', Setting.find_by(name: NAME).value.dig('reconciliation', 'started_at')
+      end
+
       private
 
       # Saves the row without touching this process's cache of Setting.

@@ -141,10 +141,13 @@ module RedmineAws
       # as the reconciliation result). Merged into the row read again under a
       # lock, not into Setting's cache, which a process without requests (the
       # job worker) never refreshes: an administrator's newer change stays.
-      def update_settings(values)
+      # With a block, the values are made from the row read under the lock
+      # (two results written at the same time both stay).
+      def update_settings(values = nil)
         Setting.transaction do
           settings = Setting.where(name: 'plugin_redmine_aws_s3').lock.first&.value
           settings = settings.is_a?(Hash) ? settings.to_h.stringify_keys : {}
+          values = yield(settings) if block_given?
           Setting.plugin_redmine_aws_s3 = settings.merge(values.to_h.stringify_keys)
         end
       end

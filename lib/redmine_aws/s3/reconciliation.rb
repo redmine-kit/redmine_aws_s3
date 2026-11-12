@@ -13,9 +13,9 @@ module RedmineAws
       module_function
 
       def run
-        started_at = result&.fetch('started_at', nil) || Time.now.utc.iso8601
         in_s3 = object_keys
-        save({ 'started_at' => started_at }.merge(summary(attachment_keys, in_s3)))
+        found = summary(attachment_keys, in_s3)
+        save { |last| { 'started_at' => last&.fetch('started_at', nil) || found['finished_at'] }.merge(found) }
       end
 
       # The keys of the objects under files/, without Redmine's derived cache.
@@ -39,7 +39,7 @@ module RedmineAws
       end
 
       def started
-        save('started_at' => Time.now.utc.iso8601)
+        save { { 'started_at' => Time.now.utc.iso8601 } }
       end
 
       def result
@@ -47,8 +47,10 @@ module RedmineAws
         settings.is_a?(Hash) ? settings['reconciliation'] : nil
       end
 
-      def save(result)
-        RedmineAws::S3.update_settings('reconciliation' => result)
+      # Saves the result that the block makes from the last one, read again
+      # under the lock of update_settings.
+      def save
+        RedmineAws::S3.update_settings { |settings| { 'reconciliation' => yield(settings['reconciliation']) } }
       end
     end
   end
