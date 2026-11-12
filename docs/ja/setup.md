@@ -1,6 +1,6 @@
 # 導入
 
-Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール、設定、バケット、CloudFront のディストリビューション、IAM 権限、ネットワーク) です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手動で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、moto でテストしています。実際の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
+Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール、設定、バケット、CloudFront のディストリビューション、IAM 権限、ネットワーク) です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手動で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、CI では LocalStack で、LocalStack のトークンがないとき (フォークからの Pull Request、ローカルでの実行) は moto でテストしています。実際の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
 
 <a id="requirements"></a>
 
