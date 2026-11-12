@@ -26,6 +26,7 @@ module RedmineAws
       rescue RedmineAws::S3::MalwareScan::Error => e
         FileUtils.rm_f(local_diskfile)
         errors.add(:base, e.message)
+        RedmineAws::S3::MalwareScan.save_finding_after_rollback(e)
         throw :abort
       end
 
