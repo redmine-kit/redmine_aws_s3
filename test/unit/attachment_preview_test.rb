@@ -21,7 +21,7 @@ module RedmineAws
       end
 
       def teardown
-        FileUtils.rm_f([@target, "#{@target}.s3cache"])
+        RedmineAws::S3::Cache.delete(@target)
       end
 
       def preview_key

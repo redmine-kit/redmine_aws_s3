@@ -11,6 +11,7 @@ module RedmineAws
     # using S3) are never deleted.
     module Cache
       MARK = '.s3cache'
+      PART_LIMIT = 1.hour
 
       module_function
 
@@ -56,22 +57,41 @@ module RedmineAws
           break if total <= limit
           next if file == keep
 
-          FileUtils.rm_f([file, "#{file}#{MARK}"])
+          delete(file)
           total -= size
         end
+        delete_partial_downloads(root)
+      end
+
+      # Deletes a cached file and its mark.
+      def delete(path)
+        FileUtils.rm_f([path, "#{path}#{MARK}"])
       end
 
       # [path, size, mtime] of each cached file under root, found by its mark
-      # (only the marked files are read, not every file of the directory).
+      # (only the marked files are read, not every file of the directory). A
+      # mark whose file is gone is deleted.
       def cached_files(root)
         Dir.glob(File.join(root, '**', "*#{MARK}")).filter_map do |mark|
           file = mark.delete_suffix(MARK)
           stat = File.stat(file)
           [file, stat.size, stat.mtime]
+        rescue Errno::ENOENT
+          FileUtils.rm_f(mark)
+          nil
         rescue SystemCallError
           nil
         end
       end
+
+      # Storage#download writes to <path>.<random>.part and renames it; a
+      # process stopped in between leaves the part, deleted after an hour.
+      def delete_partial_downloads(root)
+        Dir.glob(File.join(root, '**', '*.part')).each do |part|
+          FileUtils.rm_f(part) if File.mtime(part) < PART_LIMIT.ago
+        rescue SystemCallError
+          nil
+        end
       end
     end
   end

@@ -120,7 +120,7 @@ module RedmineAws
         return unless Attachment.where(disk_filename: original_filename).none?
 
         RedmineAws::S3.storage.delete(original_key)
-        FileUtils.rm_f(original_path)
+        RedmineAws::S3::Cache.delete(original_path)
       rescue ActiveRecord::StatementInvalid, ActiveRecord::RecordNotFound
         nil
       end
@@ -153,6 +153,7 @@ module RedmineAws
             storage.delete_prefix("#{RedmineAws::S3::THUMBNAILS_PREFIX}#{digest}_#{filesize}_")
             storage.delete(RedmineAws::S3::MarkdownizedPreview.key(self))
           end
+          RedmineAws::S3::Cache.delete(local_diskfile)
         end
         super
       end
