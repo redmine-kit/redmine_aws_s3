@@ -149,7 +149,8 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 Redmine の標準のプラグインのテストです。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine AWS は、隣のチェックアウト (`../redmine_aws`) か、`REDMINE_AWS_DIR` のディレクトリから使います。
 
 ```sh
-bin/test                 # プラグインのテスト。カバレッジを coverage/ に出す
+bin/test                 # プラグインのテスト
+COVERAGE=1 bin/test      # カバレッジを coverage/coverage.xml に出力する
 bin/test core            # プラグインをインストールした (無効の) 状態で、Redmine 本体のテスト
 bin/test core-s3         # プラグインを有効にして、Redmine の添付ファイルのテスト
 bin/test system          # システムテスト。ヘッドレスの Chromium で
@@ -175,7 +176,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 
 ### 差し替えた処理、カバレッジ、CI
 
-差し替えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と Pull Request のたびに `bin/lint`、JavaScript のテスト、`bin/test`、`bin/test core-s3`、`bin/test system` を実行し、カバレッジを OIDC で [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、差し替えた処理のテストで、master が変更したメソッドがわかります。CI は、静的チェックとテストを Ruby 3.2 と 4.0 で実行します。ローカルでは、`TEST_RUBY=3.2 bin/test` (または `bin/lint`) で Ruby 3.2 で実行します。
+差し替えたりコピーしたりした Redmine のメソッドと、`attachments.js` の `uploadBlob` の SHA256 を、Redmine 7.0.3 のものと比べるテストがあります ([attachments.md](attachments.md#replaced-code))。`COVERAGE=1` を付けると、`bin/test` は、SimpleCov (Redmine の `COVERAGE`) でプラグインの `app/` と `lib/` のカバレッジを 1 プロセスで測り、`coverage/coverage.xml` (Cobertura) と HTML のレポートを書きます。GitHub Actions は、push と Pull Request のたびに `bin/lint`、JavaScript のテスト、`bin/test`、`bin/test core-s3`、`bin/test system` を実行し、Redmine 7.0.3 と Ruby 4.0 のテストのカバレッジを `plugin` フラグで [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) に送ります。送信の認証は OIDC (`id-token: write`) なので、トークンをシークレットに保存しません。Codecov のステータスは参考情報で、コミットや Pull Request を失敗にしません (`codecov.yml`)。Redmine の master ブランチでもテストを実行します。master は固定せず、失敗しても実行全体は失敗にしません。master ではアバターのテストが動き、差し替えた処理のテストで、master が変更したメソッドがわかります。CI は、静的チェックとテストを Ruby 3.2 と 4.0 で実行します。ローカルでは、`TEST_RUBY=3.2 bin/test` (または `bin/lint`) で Ruby 3.2 で実行します。
 
 <a id="what-the-tests-check"></a>
 

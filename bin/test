@@ -2,7 +2,8 @@
 # Tests (docs/setup.md#tests), in Docker: Redmine 7.0.3 with this plugin, on
 # PostgreSQL 16, with S3 from LocalStack when LOCALSTACK_AUTH_TOKEN is set and
 # from moto otherwise.
-#   bin/test                  # the plugin's tests, with coverage in coverage/
+#   bin/test                  # the plugin's tests
+#   COVERAGE=1 bin/test       # with the coverage in coverage/coverage.xml, as the CI does
 #   bin/test core             # Redmine's own tests with the plugin installed (off)
 #   bin/test system           # the plugin's system tests, in headless Chromium
 #   bin/test core-s3          # Redmine's attachment tests with the plugin on
@@ -78,10 +79,12 @@ elif [[ "${1:-}" == "core" ]]; then
 elif (($#)); then
   run bin/rails test "$@"
 else
-  # One process, so that SimpleCov sees every test (Redmine's helper starts
-  # it when COVERAGE is set).
-  rm -rf coverage && mkdir coverage
-  workers=1
-  extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_aws_s3/coverage")
+  # With COVERAGE set: one process, so that SimpleCov sees every test
+  # (Redmine's helper starts it when COVERAGE is set).
+  if [[ -n "${COVERAGE:-}" ]]; then
+    rm -rf coverage && mkdir coverage
+    workers=1
+    extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_aws_s3/coverage")
+  fi
   run bin/rails test plugins/redmine_aws_s3/test/{unit,functional,integration}
 fi

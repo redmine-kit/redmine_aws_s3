@@ -28,7 +28,10 @@ COPY test/database.yml config/database.yml
 COPY Gemfile plugins/redmine_aws_s3/Gemfile
 RUN bundle config set --local without development
 # Coverage in Cobertura for Codecov (test/test_helper.rb), for the tests only.
-RUN printf "group :test do\n  gem 'simplecov-cobertura', require: false\nend\n" > Gemfile.local
+# simplecov-cobertura 3.2.0 on Redmine 7.0.3, whose Gemfile pins simplecov
+# ~> 0.22.0 (4.0 needs simplecov 1.x); 4.0.0 on master (simplecov 1.3).
+RUN if [ -n "$REDMINE_BRANCH" ]; then cobertura=4.0.0; else cobertura=3.2.0; fi \
+  && printf "group :test do\n  gem 'simplecov-cobertura', '%s', require: false\nend\n" "$cobertura" > Gemfile.local
 # Redmine's and the plugin's gems are resolved at build time, without a lock,
 # so the tests run with the newest versions the Gemfiles allow.
 RUN bundle install --jobs 4

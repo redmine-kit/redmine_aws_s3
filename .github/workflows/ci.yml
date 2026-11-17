@@ -63,6 +63,8 @@ jobs:
       id-token: write # Codecov with OIDC, no token stored
     env:
       REDMINE_BRANCH: ${{ matrix.redmine == 'master' && 'master' || '' }}
+      # The plugin's coverage (bin/test), on the leg whose report is uploaded.
+      COVERAGE: ${{ matrix.redmine != 'master' && matrix.ruby == '4.0' && '1' || '' }}
       TEST_RUBY: ${{ matrix.ruby }}
       # The checkout of redmine_aws below.
       REDMINE_AWS_DIR: redmine_aws
@@ -97,6 +99,7 @@ jobs:
         uses: codecov/codecov-action@v7.1.1
         with:
           files: coverage/coverage.xml
+          flags: plugin
           use_oidc: true
           fail_ci_if_error: false
       - if: always()

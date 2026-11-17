@@ -127,7 +127,8 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_aws`) or from the directory in `REDMINE_AWS_DIR`:
 
 ```sh
-bin/test                 # the plugin's tests, with coverage in coverage/
+bin/test                 # the plugin's tests
+COVERAGE=1 bin/test      # with the coverage in coverage/coverage.xml
 bin/test core            # Redmine's own tests with the plugin installed (off)
 bin/test core-s3         # Redmine's attachment tests with the plugin on
 bin/test system          # the system tests, in headless Chromium
@@ -149,7 +150,7 @@ These integration tests run on LocalStack (moto without the token), not on [AWS 
 
 ### Replaced code, coverage and CI
 
-A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`) and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the JavaScript tests, `bin/test`, `bin/test core-s3` and `bin/test system`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) with OIDC. The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed. CI runs the lint and the tests on Ruby 3.2 and 4.0; locally, `TEST_RUBY=3.2 bin/test` (or `bin/lint`) runs them on Ruby 3.2.
+A test compares the SHA256 of each replaced or copied Redmine method, and of `uploadBlob` in `attachments.js`, with Redmine 7.0.3 ([attachments.md](attachments.md#replaced-code)). With `COVERAGE=1`, `bin/test` measures the coverage of the plugin's `app/` and `lib/` with SimpleCov (Redmine's `COVERAGE`), in one process, and writes `coverage/coverage.xml` (Cobertura) and an HTML report. On every push and pull request, GitHub Actions runs `bin/lint`, the JavaScript tests, `bin/test`, `bin/test core-s3` and `bin/test system`, and uploads the coverage to [Codecov](https://codecov.io/gh/redmine-kit/redmine_aws_s3) with the flag `plugin`, from Redmine 7.0.3 on Ruby 4.0. The upload authenticates with OIDC (`id-token: write`), so no token is stored as a secret. Codecov's statuses are informational and never fail a commit or a pull request (`codecov.yml`). The tests also run on Redmine's master branch, which is not pinned and does not fail the run; there the avatar tests run, and the test of the replaced code shows which methods master has changed. CI runs the lint and the tests on Ruby 3.2 and 4.0; locally, `TEST_RUBY=3.2 bin/test` (or `bin/lint`) runs them on Ruby 3.2.
 
 ### What the tests check
 
