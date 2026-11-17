@@ -11,7 +11,9 @@ if ENV['COVERAGE'] && defined?(SimpleCov)
   plugin_root = File.expand_path('..', __dir__)
   SimpleCov.root plugin_root
   SimpleCov.coverage_dir 'coverage'
-  SimpleCov.track_files '{app,lib}/**/*.rb'
+  # An absolute glob: SimpleCov reads track_files from the current directory
+  # (Redmine's, when bin/rails test runs), not from root.
+  SimpleCov.track_files "#{plugin_root}/{app,lib}/**/*.rb"
   SimpleCov.add_filter { |file| !file.filename.start_with?("#{plugin_root}/") }
   SimpleCov.add_filter { |file| file.filename.start_with?("#{plugin_root}/test/") }
   SimpleCov.formatters = [SimpleCov::Formatter::CoberturaFormatter, SimpleCov::Formatter::HTMLFormatter]
