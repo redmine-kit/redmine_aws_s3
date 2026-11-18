@@ -132,7 +132,7 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 
 ## Tests
 
-Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine Kit AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_kit_aws`) or from the directory in `REDMINE_KIT_AWS_DIR`:
+Redmine's standard plugin tests, in Apple container when it is installed and running, else in Docker (`CONTAINER_CLI=container` or `docker` chooses; at most two test runs of the redmine-kit repositories at once on a machine, `TEST_SLOTS`), with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine Kit AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_kit_aws`) or from the directory in `REDMINE_KIT_AWS_DIR`:
 
 ```sh
 bin/test                 # the plugin's tests

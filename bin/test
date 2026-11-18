@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests (docs/setup.md#tests), in Docker: Redmine 7.0.3 with this plugin, on
+# Tests (docs/setup.md#tests), in Apple container when it runs, else in Docker
+# (CONTAINER_CLI=container|docker chooses): Redmine 7.0.3 with this plugin, on
 # PostgreSQL 16, with S3 from LocalStack when LOCALSTACK_AUTH_TOKEN is set and
 # from moto otherwise.
 #   bin/test                  # the plugin's tests
@@ -16,47 +17,58 @@
 # shellcheck disable=SC2016
 set -euo pipefail
 cd "$(dirname "$0")/.."
-image=redmine-kit-aws-s3-test${REDMINE_BRANCH:+-$REDMINE_BRANCH}
-network=redmine-kit-aws-s3-test_default
-
+source bin/container_cli
+source bin/test_slot
+name=redmine-kit-aws-s3-test
 if [[ "${1:-}" == "system" ]]; then
   bin/services --system >/dev/null
 else
   bin/services >/dev/null
 fi
-# redmine_kit_aws, which the plugin requires: a checkout next to this one, or
-# REDMINE_KIT_AWS_DIR.
-aws_dir=${REDMINE_KIT_AWS_DIR:-../redmine_kit_aws}
-[[ -f "$aws_dir/init.rb" ]] || { echo "redmine_kit_aws is not in $aws_dir; set REDMINE_KIT_AWS_DIR" >&2; exit 1; }
-# test/Dockerfile on the Ruby of TEST_RUBY (default 4.0), whose image is
-# pinned in test/ruby-<version>.Dockerfile, in place of its FROM ruby line.
-ruby=$(sed -n 's/^FROM //p' "test/ruby-${TEST_RUBY:-4.0}.Dockerfile")
-dockerfile() {
-  sed "s|^FROM ruby:[^ ]*|FROM $ruby|" test/Dockerfile
-}
-dockerfile | docker buildx build --load -q -t "$image" --build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}" \
-  --build-context redmine_kit_aws="$aws_dir" -f - . >/dev/null
-workers="${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}"
+test_image_args=(--build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}")
+source bin/test_image
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
-  backend=localstack endpoint=http://localstack:4566
+  backend=localstack service=localstack port=4566
 else
-  backend=moto endpoint=http://moto:5000
+  backend=moto service=moto port=5000
+fi
+# The services by name in Docker; by address in Apple container, where
+# containers on a network of their own don't find each other by name, with
+# more memory than the 1 GB a container gets by default.
+if [[ "$cli" == docker ]]; then
+  endpoint=http://$service:$port
+  opts=(--network "${name}_default")
+  workers=${PARALLEL_WORKERS:-$(getconf _NPROCESSORS_ONLN)}
+else
+  endpoint=http://$(container_address "$name-$service"):$port
+  opts=(--network "$name" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
+  workers=${PARALLEL_WORKERS:-2}
 fi
 echo "S3 for the tests: $backend ($endpoint)"
+# A database of this run's own (test/database.yml), dropped when the tests end.
 run() {
-  docker run --rm --network "$network" -e PARALLEL_WORKERS="$workers" "${extra[@]}" \
-    -e S3_TEST_ENDPOINT="$endpoint" -e S3_TEST_BACKEND="$backend" -e AWS_REGION=us-east-1 \
-    -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test "$image" \
-    sh -c 'bin/rails db:drop db:create db:migrate db:schema:dump >/dev/null && "$@"' run "$@"
+  "$cli" run --rm "${opts[@]}" -e PARALLEL_WORKERS="$workers" ${extra[@]+"${extra[@]}"} \
+    -e TEST_DATABASE="redmine_test_$$" -e S3_TEST_ENDPOINT="$endpoint" -e S3_TEST_BACKEND="$backend" \
+    -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test "$image" \
+    sh -c '[ -z "${SELENIUM_REMOTE_URL:-}" ] ||
+        export CAPYBARA_APP_HOST="${CAPYBARA_APP_HOST:-http://$(hostname -i | cut -d" " -f1):3001}"
+      bin/rails db:drop db:create db:migrate db:schema:dump >/dev/null && "$@"
+      status=$?; bin/rails db:drop >/dev/null 2>&1; exit $status' run "$@"
 }
 
 extra=()
 if [[ "${1:-}" == "system" ]]; then
   shift
   # The browser in the chrome container opens the test server of this
-  # container by its network alias.
-  extra=(--network-alias redmine-test -e SELENIUM_REMOTE_URL=http://chrome:4444
-    -e CAPYBARA_SERVER_HOST=0.0.0.0 -e CAPYBARA_SERVER_PORT=3001 -e CAPYBARA_APP_HOST=http://redmine-test:3001)
+  # container: by its network alias in Docker, by its address in Apple
+  # container (run reads it inside the container).
+  if [[ "$cli" == docker ]]; then
+    extra=(--network-alias redmine-test -e SELENIUM_REMOTE_URL=http://chrome:4444
+      -e CAPYBARA_APP_HOST=http://redmine-test:3001)
+  else
+    extra=(-e SELENIUM_REMOTE_URL="http://$(container_address "$name-chrome"):4444")
+  fi
+  extra+=(-e CAPYBARA_SERVER_HOST=0.0.0.0 -e CAPYBARA_SERVER_PORT=3001)
   workers=1
   run bin/rails test plugins/redmine_kit_aws_s3/test/system "$@"
 elif [[ "${1:-}" == "core-s3" ]]; then

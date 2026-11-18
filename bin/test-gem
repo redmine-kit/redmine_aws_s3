@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The plugin as a gem, in Docker: builds the gems of this checkout and of
+# The plugin as a gem, in Apple container when it runs, else in Docker
+# (CONTAINER_CLI=container|docker chooses): builds the gems of this checkout and of
 # redmine_kit_aws, which it requires, installs them into Redmine 7.0.3 as
 # docs/setup.md#gem says (a gem line in Gemfile.local, then both plugins
 # linked into plugins/), and boots Redmine through zeitwerk:check and in the
@@ -12,15 +13,19 @@
 # shellcheck disable=SC2016
 set -euo pipefail
 cd "$(dirname "$0")/.."
-image=redmine-kit-aws-s3-test
+source bin/container_cli
+source bin/test_slot
+name=redmine-kit-aws-s3-test
 bin/services >/dev/null
-aws_dir=${REDMINE_KIT_AWS_DIR:-../redmine_kit_aws}
-[[ -f "$aws_dir/init.rb" ]] || { echo "redmine_kit_aws is not in $aws_dir; set REDMINE_KIT_AWS_DIR" >&2; exit 1; }
-# test/Dockerfile on the Ruby of TEST_RUBY, as bin/test builds it.
-ruby=$(sed -n 's/^FROM //p' "test/ruby-${TEST_RUBY:-4.0}.Dockerfile")
-sed "s|^FROM ruby:[^ ]*|FROM $ruby|" test/Dockerfile |
-  docker buildx build --load -q -t "$image" --build-context redmine_kit_aws="$aws_dir" -f - . >/dev/null
-docker run --rm --network redmine-kit-aws-s3-test_default "$image" sh -ec '
+# test/Dockerfile as bin/test builds it.
+source bin/test_image
+if [[ "$cli" == docker ]]; then
+  net=(--network "${name}_default")
+else
+  net=(--network "$name" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
+fi
+# A database of this run's own, dropped at the end.
+"$cli" run --rm "${net[@]}" -e TEST_DATABASE="redmine_test_$$" "$image" sh -ec '
   (cd plugins/redmine_kit_aws && gem build --quiet redmine_kit_aws.gemspec --output /tmp/redmine_kit_aws.gem)
   (cd plugins/redmine_kit_aws_s3 && gem build --quiet redmine_kit_aws_s3.gemspec --output /tmp/redmine_kit_aws_s3.gem)
   rm -rf plugins/redmine_kit_aws plugins/redmine_kit_aws_s3
@@ -33,11 +38,12 @@ docker run --rm --network redmine-kit-aws-s3-test_default "$image" sh -ec '
   bin/rails zeitwerk:check
   # The production environment, which loads every file at start-up
   # (eager_load), on the test database.
-  printf "%s\n" "production:" "  adapter: postgresql" "  host: postgres" "  database: redmine_test" \
+  printf "%s\n" "production:" "  adapter: postgresql" "  host: ${TEST_DATABASE_HOST:-postgres}" "  database: $TEST_DATABASE" \
     "  username: postgres" >> config/database.yml
   RAILS_ENV=production SECRET_KEY_BASE=test-gem bin/rails runner "
     plugin = Redmine::Plugin.find(:redmine_kit_aws_s3)
     dir = File.realpath(plugin.directory)
     abort %(redmine_kit_aws_s3 is not the installed gem: #{dir}) unless dir.start_with?(Gem.dir)
     abort %(not eager loaded) unless Rails.application.config.eager_load
-    puts %(redmine_kit_aws_s3 #{plugin.version} from #{dir}: #{RedmineKit::Aws::S3::Upload.name})"'
+    puts %(redmine_kit_aws_s3 #{plugin.version} from #{dir}: #{RedmineKit::Aws::S3::Upload.name})"
+  bin/rails db:drop >/dev/null'

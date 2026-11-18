@@ -1,0 +1,44 @@
+# shellcheck shell=bash
+# Sourced by the scripts in bin/: the container CLI to use in $cli, Apple
+# container when it is installed and running, else Docker (other machines,
+# CI); CONTAINER_CLI=container|docker chooses. With the helpers the scripts
+# share for both tools.
+if [[ -n "${CONTAINER_CLI:-}" ]]; then
+  cli=$CONTAINER_CLI
+elif command -v container >/dev/null && container system status >/dev/null 2>&1; then
+  cli=container
+else
+  cli=docker
+fi
+
+# build_image <tag> <Dockerfile> <context> [<options>…]: builds an image
+# quietly (options such as --build-arg go to the build), showing the build's
+# log only when it fails (`container build -q` doesn't return).
+build_image() {
+  local tag=$1 file=$2 context=$3
+  shift 3
+  if [[ "$cli" == docker ]]; then
+    docker buildx build --load -q -t "$tag" -f "$file" "$@" "$context" >/dev/null
+    return
+  fi
+  local log
+  log=$(mktemp)
+  container build --progress plain -t "$tag" -f "$file" "$@" "$context" >"$log" 2>&1 ||
+    { cat "$log" >&2; rm -f "$log"; return 1; }
+  rm -f "$log"
+}
+
+# container_address <name> [<network>]: the IPv4 address of a running Apple
+# container, on the network given or its first one. Containers on a network
+# of their own don't find each other by name there, so the scripts pass
+# addresses.
+container_address() {
+  container inspect "$1" | awk -v net="${2:-}" '
+    /"ipv4Address"/ { split($0, a, "\""); ip = a[4]; sub(/\/.*/, "", ip) }
+    /"network" :/ { split($0, b, "\""); if (ip != "" && (net == "" || b[4] == net)) { print ip; exit } }'
+}
+
+# container_running <name>: whether the Apple container runs.
+container_running() {
+  container inspect "$1" 2>/dev/null | grep -q '"state" : "running"'
+}

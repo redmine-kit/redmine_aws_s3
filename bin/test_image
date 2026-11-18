@@ -1,0 +1,32 @@
+# shellcheck shell=bash
+# Sourced by bin/test, bin/test-gem and bin/screenshots after bin/container_cli:
+# builds the test image ($image, per Ruby) from test/Dockerfile on the Ruby of
+# TEST_RUBY (default 4.0), pinned in test/ruby-<version>.Dockerfile. The build
+# context holds this checkout's run-time and test files in plugin/ and those of
+# redmine_kit_aws, which the plugin requires, in redmine_kit_aws/: a checkout
+# next to this one, or REDMINE_KIT_AWS_DIR. One context, so that Apple
+# container, which has no named build contexts, and Docker build the same
+# Dockerfile. Files that git tracks or would track, as they are in the working
+# tree. $test_image_args, when set, holds options for the build
+# (--build-arg).
+# $name: the base name of the tests' containers, set by the sourcing script.
+: "${name:?}"
+aws_dir=${REDMINE_KIT_AWS_DIR:-../redmine_kit_aws}
+[[ -f "$aws_dir/init.rb" ]] || { echo "redmine_kit_aws is not in $aws_dir; set REDMINE_KIT_AWS_DIR" >&2; exit 1; }
+ruby_version=${TEST_RUBY:-4.0}
+image=$name:ruby-$ruby_version${REDMINE_BRANCH:+-$REDMINE_BRANCH}
+# copy_plugin <checkout> <dir>: the files the plugin runs and tests with (not
+# docs/, nor a checkout of redmine_kit_aws that CI puts inside this one).
+copy_plugin() {
+  (cd "$1" && git ls-files -co --exclude-standard |
+    grep -E '^(init\.rb|Gemfile|[^/]*\.gemspec|LICENSE|(adapter|app|assets|boot|config|db|help|lib|test)/)' |
+    while IFS= read -r file; do [[ -e "$file" ]] && printf '%s\n' "$file"; done | tar -cf - -T -) | tar -xf - -C "$2"
+}
+context=$(mktemp -d)
+mkdir "$context/plugin" "$context/redmine_kit_aws"
+copy_plugin . "$context/plugin"
+copy_plugin "$aws_dir" "$context/redmine_kit_aws"
+sed "s|^FROM ruby:[^ ]*|FROM $(sed -n 's/^FROM //p' "test/ruby-$ruby_version.Dockerfile")|" test/Dockerfile >"$context/Dockerfile"
+# shellcheck disable=SC2154 # test_image_args: optional, set by the sourcing script
+build_image "$image" "$context/Dockerfile" "$context" ${test_image_args[@]+"${test_image_args[@]}"}
+rm -rf "$context"

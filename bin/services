@@ -1,24 +1,63 @@
 #!/usr/bin/env bash
-# Starts PostgreSQL 16 and moto for the tests, on their own Compose project,
-# and LocalStack when LOCALSTACK_AUTH_TOKEN is set.
-#   bin/services          # start and wait until they answer
-#   bin/services --down   # stop them
+# Starts the services of the tests (test/compose.yml), or stops them with
+# --down, in Apple container when it runs, else in Docker
+# (CONTAINER_CLI=container|docker chooses): PostgreSQL 16, moto, and
+# LocalStack when LOCALSTACK_AUTH_TOKEN is set. No host ports: the tests run
+# in a container on the same network.
+#   bin/services            # the services of bin/test
+#   bin/services --system   # also headless Chromium (system tests, screenshots)
+#   bin/services --down     # stops them
 set -euo pipefail
 cd "$(dirname "$0")/.."
-compose=(docker compose -f test/compose.yml -p redmine-kit-aws-s3-test)
-if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
-  compose+=(--profile localstack)
-fi
-# bin/services --system also starts Chromium for the system tests.
-if [[ "${1:-}" == "--system" ]]; then
-  compose+=(--profile system)
-  shift
-fi
-if [[ "${1:-}" == "--down" ]]; then
-  "${compose[@]}" down -v
+source bin/container_cli
+name=redmine-kit-aws-s3-test
+if [[ "$cli" == docker ]]; then
+  compose=(docker compose -f test/compose.yml -p "$name")
+  [[ -z "${LOCALSTACK_AUTH_TOKEN:-}" ]] || compose+=(--profile localstack)
+  case "${1:-}" in
+    --down) "${compose[@]}" --profile system --profile localstack down -v; exit 0 ;;
+    --system) compose+=(--profile system) ;;
+  esac
+  if ! "${compose[@]}" up -d --wait; then
+    "${compose[@]}" logs --tail 80
+    exit 1
+  fi
   exit 0
 fi
-if ! "${compose[@]}" up -d --wait; then
-  "${compose[@]}" logs --tail 80
-  exit 1
+
+# Apple container: the services of test/compose.yml, with the images it pins,
+# on the network $name. LocalStack checks its token on the internet, which
+# the network reaches.
+image() { sed -n "s/^    image: //p" test/compose.yml | grep "^$1" | head -1; }
+if [[ "${1:-}" == --down ]]; then
+  container rm -f "$name-postgres" "$name-moto" "$name-localstack" "$name-chrome" >/dev/null 2>&1 || true
+  container network rm "$name" >/dev/null 2>&1 || true
+  exit 0
 fi
+# start <service> <options…>: runs the service's container unless it runs.
+start() {
+  local service=$1
+  shift
+  container_running "$name-$service" && return
+  container rm -f "$name-$service" >/dev/null 2>&1 || true
+  container run -d --name "$name-$service" --network "$name" --progress none "$@" >/dev/null
+}
+container network inspect "$name" >/dev/null 2>&1 || container network create "$name" >/dev/null
+start postgres -m 1G -e POSTGRES_HOST_AUTH_METHOD=trust "$(image postgres)"
+start moto -m 1G "$(image motoserver/moto)"
+if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
+  start localstack -m 2G -e LOCALSTACK_AUTH_TOKEN -e SERVICES=s3 "$(image localstack/localstack)"
+fi
+[[ "${1:-}" != --system ]] || start chrome -m 3G --shm-size 2G "$(image selenium/standalone-chromium)"
+ready() {
+  container exec "$name-postgres" pg_isready -q -U postgres &&
+    container exec "$name-moto" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/moto-api/')" &&
+    { [[ -z "${LOCALSTACK_AUTH_TOKEN:-}" ]] || container exec "$name-localstack" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4566/_localstack/health')" >/dev/null 2>&1; } &&
+    { [[ "${1:-}" != --system ]] || container exec "$name-chrome" /opt/bin/check-grid.sh --host 0.0.0.0 --port 4444 >/dev/null 2>&1; }
+}
+for _ in $(seq 150); do
+  ready "${1:-}" 2>/dev/null && exit 0
+  sleep 2
+done
+echo "The services did not start: container logs $name-<service>" >&2
+exit 1

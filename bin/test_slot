@@ -1,0 +1,34 @@
+# shellcheck shell=bash
+# Sourced by bin/test and bin/test-gem: at most TEST_SLOTS runs at once on
+# this machine (default 2), counted together with the other redmine-kit
+# repositories' runs (the same slots as redmine_kit_ui's bin/test). Each run
+# starts a Redmine container with 4 GB; many at the same time overloaded the
+# Mac. A run waits for a free slot: a directory under the temp folder holding
+# its pid; a slot whose process is gone is taken over. Freed when the run
+# exits.
+test_slots=${TEST_SLOTS:-2}
+test_slot_root="${TMPDIR:-/tmp}/redmine-kit-ui-test-slots"
+mkdir -p "$test_slot_root"
+test_slot=
+test_slot_waited=
+while [[ -z "$test_slot" ]]; do
+  for ((i = 0; i < test_slots; i++)); do
+    candidate="$test_slot_root/slot-$i"
+    if mkdir "$candidate" 2>/dev/null; then
+      echo $$ >"$candidate/pid"
+      test_slot=$candidate
+      break
+    fi
+    holder=$(cat "$candidate/pid" 2>/dev/null || true)
+    if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then
+      rm -rf "$candidate" # left by a run that died
+    fi
+  done
+  if [[ -z "$test_slot" ]]; then
+    [[ -n "$test_slot_waited" ]] || echo "waiting for a free test slot ($test_slots runs at a time; TEST_SLOTS to change)" >&2
+    test_slot_waited=1
+    sleep 5
+  fi
+done
+release_test_slot() { rm -rf "$test_slot"; }
+trap release_test_slot EXIT

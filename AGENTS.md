@@ -13,7 +13,7 @@ Redmine Kit AWS S3 (`redmine_kit_aws_s3`) is a Redmine plugin that stores attach
 - **Replaced code:** when Redmine code is replaced, update the table of [replaced code](docs/attachments.md#replaced-code). When Redmine is upgraded, check that the original code in that table has not changed.
 - **Shared parts in redmine_kit_aws:** the administration menu, the connection check of the Status tab and the test support come from redmine_kit_aws ([its API](https://github.com/redmine-kit/redmine_aws/blob/main/docs/api.md)). What every AWS plugin needs goes there, not here.
 - **Code layout:** `lib/redmine_kit/aws/s3.rb` and `lib/redmine_kit/aws/s3/` hold `RedmineKit::Aws::S3`, in the namespace that redmine_kit_aws defines (Redmine autoloads them with Zeitwerk; `test/unit/namespace_test.rb` runs `bin/rails zeitwerk:check`). Inside it, the AWS SDK is written `::Aws::S3`, `::Aws::CloudFront`. `init.rb` calls `RedmineKit::Aws::S3.setup`.
-- **Tests:** replaced and added code has tests, run with Redmine's own mechanism (`rake redmine:plugins:test`; `bin/test` runs them in Docker with redmine_kit_aws from `../redmine_kit_aws` or `REDMINE_KIT_AWS_DIR`). What the tests check is in [setup.md](docs/setup.md#what-the-tests-check).
+- **Tests:** replaced and added code has tests, run with Redmine's own mechanism (`rake redmine:plugins:test`; `bin/test` runs them in a container (Apple container, else Docker) with redmine_kit_aws from `../redmine_kit_aws` or `REDMINE_KIT_AWS_DIR`). What the tests check is in [setup.md](docs/setup.md#what-the-tests-check).
 - **Keep digests SHA256:** attachment tokens, ETags, thumbnails and the sharing of identical content rely on them.
 - **No secrets in the repository.**
 
@@ -30,3 +30,9 @@ Redmine Kit AWS S3 (`redmine_kit_aws_s3`) is a Redmine plugin that stores attach
 - English, imperative mood, 72 characters or fewer in the first line, no trailing period.
 - One purpose per commit.
 - Do not rewrite pushed history.
+
+## Development environment
+
+- **Apple container first, Docker too** (a public repository). Scripts (`bin/test`, databases, emulators) use Apple container (`container`) when it is installed and running, else Docker (other machines, CI); `CONTAINER_CLI=docker|container` chooses. Docs give both, Apple container first. Images are built from the `Dockerfile` with either tool.
+- **Libraries at their latest versions.** Dependencies are kept at their latest stable releases, pinned exactly in the lockfiles; a version held back has its reason next to the pin.
+- Both are the organization's rules (`../AGENTS.md`, "Development environment").

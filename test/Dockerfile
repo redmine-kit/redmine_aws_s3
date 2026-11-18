@@ -1,8 +1,7 @@
 # syntax=docker/dockerfile:1
 # Redmine 7.0.3 with this plugin and redmine_kit_aws, which it requires, for the
-# tests (bin/test). Built from the repository root, with redmine_kit_aws as the
-# build context of that name:
-#   docker buildx build --build-context redmine_kit_aws=../redmine_kit_aws -f test/Dockerfile .
+# tests (bin/test). Built by bin/test_image from a context that holds this
+# plugin in plugin/ and redmine_kit_aws in redmine_kit_aws/.
 # REDMINE_BRANCH=master takes Redmine's master branch instead of the release.
 FROM ruby:4.0@sha256:a69f361db050bb2c65ec66ef75411bfc4ce2e1d993ba1179fac4e4ba6ecfe91f
 # Thumbnails (ImageMagick, Ghostscript), as in the Serverless image.
@@ -22,10 +21,10 @@ RUN if [ -n "$REDMINE_BRANCH" ]; then \
   fi \
   && rm /tmp/redmine.tar.gz
 WORKDIR /redmine
-COPY test/database.yml config/database.yml
+COPY plugin/test/database.yml config/database.yml
 # The plugin's Gemfile first, so that a change of the code does not install
 # the gems again. Redmine's Gemfile loads plugins/*/Gemfile.
-COPY Gemfile plugins/redmine_kit_aws_s3/Gemfile
+COPY plugin/Gemfile plugins/redmine_kit_aws_s3/Gemfile
 RUN bundle config set --local without development
 # Coverage in Cobertura for Codecov (test/test_helper.rb), for the tests only.
 # simplecov-cobertura 3.2.0 on Redmine 7.0.3, whose Gemfile pins simplecov
@@ -35,7 +34,7 @@ RUN if [ -n "$REDMINE_BRANCH" ]; then cobertura=4.0.0; else cobertura=3.2.0; fi 
 # Redmine's and the plugin's gems are resolved at build time, without a lock,
 # so the tests run with the newest versions the Gemfiles allow.
 RUN bundle install --jobs 4
-COPY --from=redmine_kit_aws . plugins/redmine_kit_aws/
-COPY . plugins/redmine_kit_aws_s3/
-COPY test/core/additional_environment.rb config/additional_environment.rb
+COPY redmine_kit_aws plugins/redmine_kit_aws/
+COPY plugin plugins/redmine_kit_aws_s3/
+COPY plugin/test/core/additional_environment.rb config/additional_environment.rb
 ENV RAILS_ENV=test
