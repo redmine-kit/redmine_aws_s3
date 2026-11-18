@@ -6,9 +6,9 @@
 # LocalStack or moto and a CloudFront key pair made for the run.
 if ENV['REDMINE_S3_TEST_CORE'] == '1'
   require 'openssl'
-  ENV['REDMINE_CLOUDFRONT_DOMAIN'] ||= 'redmine.example.test'
-  ENV['REDMINE_CLOUDFRONT_KEY_PAIR_ID'] ||= 'KTESTKEYPAIR'
-  ENV['REDMINE_CLOUDFRONT_PRIVATE_KEY'] ||= OpenSSL::PKey::RSA.new(2048).to_pem
+  ENV['REDMINE_S3_CLOUDFRONT_DOMAIN'] ||= 'redmine.example.test'
+  ENV['REDMINE_S3_CLOUDFRONT_KEY_PAIR_ID'] ||= 'KTESTKEYPAIR'
+  ENV['REDMINE_S3_CLOUDFRONT_PRIVATE_KEY'] ||= OpenSSL::PKey::RSA.new(2048).to_pem
 
   create_bucket = lambda do |client|
     client.create_bucket(bucket: ENV.fetch('REDMINE_S3_BUCKET'))

@@ -74,9 +74,9 @@ bundle install
 | --- | --- | --- |
 | `REDMINE_S3_BUCKET` | 添付ファイルのバケット。これでプラグインが有効になる。なければ、Redmine は標準のとおりに動く | 必須 |
 | `REDMINE_S3_REGION` | バケットのリージョン | 省略可。デフォルトは `AWS_REGION`、次に `AWS_DEFAULT_REGION` |
-| `REDMINE_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/tmp/thumbnails/`、`/tmp/bulk/`、`/tmp/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
-| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | ディストリビューションの信頼されたキーグループの公開鍵の ID | 必須 |
-| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | CloudFront の URL に署名する PEM の秘密鍵。ファイルやログには書かず、管理画面にも出さない | 必須。秘密の値。Serverless では SSM の SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
+| `REDMINE_S3_CLOUDFRONT_DOMAIN` | Redmine のディストリビューションのドメイン。`/files/`、`/tmp/thumbnails/`、`/tmp/bulk/`、`/tmp/incoming/` の下の署名付き URL に使う | 必須。例: `redmine.example.com` |
+| `REDMINE_S3_CLOUDFRONT_KEY_PAIR_ID` | ディストリビューションの信頼されたキーグループの公開鍵の ID | 必須 |
+| `REDMINE_S3_CLOUDFRONT_PRIVATE_KEY` | CloudFront の URL に署名する PEM の秘密鍵。ファイルやログには書かず、管理画面にも出さない | 必須。秘密の値。Serverless では SSM の SecureString `/<instance>/env/REDMINE_S3_CLOUDFRONT_PRIVATE_KEY` |
 | `REDMINE_S3_MALWARE_SCAN` | アップロードとインポートのファイルを使う前に、GuardDuty Malware Protection for S3 の結果を待つ ([attachments.md](attachments.md#malware-scan)) | 省略可。`true` で有効。ほかの値やないときは無効 |
 
 | 項目 | 説明 | 変える場所 |

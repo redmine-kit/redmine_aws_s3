@@ -28,7 +28,7 @@ module RedmineKit
             assert_response :success
             assert_select 'table.list.values.environment tr', text: /redmine-files/
             assert_select 'table.list.values.environment tr', text: /#{Regexp.escape(DOMAIN)}/
-            assert_select 'table.list.values.environment tr', text: /Set\s*REDMINE_CLOUDFRONT_PRIVATE_KEY/
+            assert_select 'table.list.values.environment tr', text: /Set\s*REDMINE_S3_CLOUDFRONT_PRIVATE_KEY/
             assert_not_includes response.body, 'PRIVATE KEY'
             assert_select 'table.list.values.environment tr', text: /GuardDuty malware scan\s*Disabled/
           end

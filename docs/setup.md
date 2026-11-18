@@ -64,9 +64,9 @@ bundle install
 | --- | --- | --- |
 | `REDMINE_S3_BUCKET` | The attachment bucket. Turns the plugin on; without it, Redmine behaves as standard | Required |
 | `REDMINE_S3_REGION` | The bucket's Region | Optional. Default: `AWS_REGION`, then `AWS_DEFAULT_REGION` |
-| `REDMINE_CLOUDFRONT_DOMAIN` | The domain of Redmine's distribution, for signed URLs under `/files/`, `/tmp/thumbnails/`, `/tmp/bulk/` and `/tmp/incoming/` | Required. Example: `redmine.example.com` |
-| `REDMINE_CLOUDFRONT_KEY_PAIR_ID` | The ID of the public key in the distribution's trusted key group | Required |
-| `REDMINE_CLOUDFRONT_PRIVATE_KEY` | The private key in PEM that signs the CloudFront URLs. Never written to files or logs, and not shown on the administration page | Required. A secret. On Serverless, the SSM SecureString `/<instance>/env/REDMINE_CLOUDFRONT_PRIVATE_KEY` |
+| `REDMINE_S3_CLOUDFRONT_DOMAIN` | The domain of Redmine's distribution, for signed URLs under `/files/`, `/tmp/thumbnails/`, `/tmp/bulk/` and `/tmp/incoming/` | Required. Example: `redmine.example.com` |
+| `REDMINE_S3_CLOUDFRONT_KEY_PAIR_ID` | The ID of the public key in the distribution's trusted key group | Required |
+| `REDMINE_S3_CLOUDFRONT_PRIVATE_KEY` | The private key in PEM that signs the CloudFront URLs. Never written to files or logs, and not shown on the administration page | Required. A secret. On Serverless, the SSM SecureString `/<instance>/env/REDMINE_S3_CLOUDFRONT_PRIVATE_KEY` |
 | `REDMINE_S3_MALWARE_SCAN` | Waits for GuardDuty Malware Protection for S3 before using uploads and import files ([attachments.md](attachments.md#malware-scan)) | Optional. `true` turns it on; anything else, or not set: off |
 
 | Item | Description | Where to change |
