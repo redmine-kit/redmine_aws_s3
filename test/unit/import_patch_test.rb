@@ -2,92 +2,94 @@
 
 require_relative '../test_helper'
 
-module RedmineAws
-  module S3
-    class ImportPatchTest < ActiveSupport::TestCase
-      include S3::TestHelper
+module RedmineKit
+  module Aws
+    module S3
+      class ImportPatchTest < ActiveSupport::TestCase
+        include S3::TestHelper
 
-      fixtures :users
+        fixtures :users
 
-      def new_import
-        import = IssueImport.new(user: User.find(2))
-        import.file = uploaded_test_file('import_issues.csv', 'text/csv')
-        import.save!
-        import
-      end
-
-      def test_the_file_is_stored_in_s3
-        with_s3(stub_client) do |client|
-          import = new_import
-          put = client.api_requests.find { |request| request[:operation_name] == :put_object }
-
-          assert_equal "imports/#{import.filename}", put[:params][:key]
-          assert File.exist?(import.filepath)
+        def new_import
+          import = IssueImport.new(user: User.find(2))
+          import.file = uploaded_test_file('import_issues.csv', 'text/csv')
+          import.save!
+          import
         end
-      end
 
-      def test_a_file_not_in_this_environment_is_fetched
-        with_s3(stub_client(get_object: { body: "subject\nfrom s3\n" })) do
-          import = new_import
-          FileUtils.rm_f(import.filepath)
-
-          assert Import.find(import.id).file_exists?
-          assert_equal "subject\nfrom s3\n", File.read(import.filepath)
-        end
-      end
-
-      def test_a_file_in_neither_place
-        with_s3(stub_client(get_object: 'NoSuchKey')) do
-          import = new_import
-          FileUtils.rm_f(import.filepath)
-
-          assert_not Import.find(import.id).file_exists?
-        end
-      end
-
-      def test_destroying_the_import_deletes_the_object
-        with_s3(stub_client) do |client|
-          import = new_import
-          import.destroy
-
-          assert_equal "imports/#{import.filename}", deleted_keys(client).first
-          assert_not File.exist?(import.filepath)
-        end
-      end
-
-      def test_the_file_is_read_after_a_clean_scan
-        with_s3(stub_client(get_object_tagging: [scan_tag(nil), scan_tag('NO_THREATS_FOUND')])) do
-          with_malware_scan do
+        def test_the_file_is_stored_in_s3
+          with_s3(stub_client) do |client|
             import = new_import
+            put = client.api_requests.find { |request| request[:operation_name] == :put_object }
 
-            assert_not Import.find(import.id).file_exists?
-            assert Import.find(import.id).file_exists?
+            assert_equal "imports/#{import.filename}", put[:params][:key]
+            assert File.exist?(import.filepath)
           end
         end
-      end
 
-      def test_a_threat_in_an_import_file
-        with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do
-          with_malware_scan do
+        def test_a_file_not_in_this_environment_is_fetched
+          with_s3(stub_client(get_object: { body: "subject\nfrom s3\n" })) do
             import = new_import
+            FileUtils.rm_f(import.filepath)
+
+            assert Import.find(import.id).file_exists?
+            assert_equal "subject\nfrom s3\n", File.read(import.filepath)
+          end
+        end
+
+        def test_a_file_in_neither_place
+          with_s3(stub_client(get_object: 'NoSuchKey')) do
+            import = new_import
+            FileUtils.rm_f(import.filepath)
 
             assert_not Import.find(import.id).file_exists?
+          end
+        end
+
+        def test_destroying_the_import_deletes_the_object
+          with_s3(stub_client) do |client|
+            import = new_import
+            import.destroy
+
+            assert_equal "imports/#{import.filename}", deleted_keys(client).first
             assert_not File.exist?(import.filepath)
           end
         end
-      ensure
-        Setting.plugin_redmine_aws_s3 = {}
-      end
 
-      def test_off_without_the_bucket
-        client = stub_client
-        RedmineAws::S3.client = client
-        import = new_import
-        import.destroy
+        def test_the_file_is_read_after_a_clean_scan
+          with_s3(stub_client(get_object_tagging: [scan_tag(nil), scan_tag('NO_THREATS_FOUND')])) do
+            with_malware_scan do
+              import = new_import
 
-        assert_empty client.api_requests
-      ensure
-        RedmineAws::S3.client = nil
+              assert_not Import.find(import.id).file_exists?
+              assert Import.find(import.id).file_exists?
+            end
+          end
+        end
+
+        def test_a_threat_in_an_import_file
+          with_s3(stub_client(get_object_tagging: scan_tag('THREATS_FOUND'))) do
+            with_malware_scan do
+              import = new_import
+
+              assert_not Import.find(import.id).file_exists?
+              assert_not File.exist?(import.filepath)
+            end
+          end
+        ensure
+          Setting.plugin_redmine_kit_aws_s3 = {}
+        end
+
+        def test_off_without_the_bucket
+          client = stub_client
+          RedmineKit::Aws::S3.client = client
+          import = new_import
+          import.destroy
+
+          assert_empty client.api_requests
+        ensure
+          RedmineKit::Aws::S3.client = nil
+        end
       end
     end
   end

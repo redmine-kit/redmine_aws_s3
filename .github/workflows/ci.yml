@@ -66,18 +66,18 @@ jobs:
       # The plugin's coverage (bin/test), on the leg whose report is uploaded.
       COVERAGE: ${{ matrix.redmine != 'master' && matrix.ruby == '4.0' && '1' || '' }}
       TEST_RUBY: ${{ matrix.ruby }}
-      # The checkout of redmine_aws below.
-      REDMINE_AWS_DIR: redmine_aws
+      # The checkout of redmine_kit_aws below.
+      REDMINE_KIT_AWS_DIR: redmine_kit_aws
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      # redmine_aws, which the plugin requires, until the tests install its
+      # redmine_kit_aws, which the plugin requires, until the tests install its
       # gem. The plugin's .dockerignore keeps it out of the plugin's image.
       - uses: actions/checkout@v7.0.1
         with:
           repository: redmine-kit/redmine_aws
-          path: redmine_aws
+          path: redmine_kit_aws
           persist-credentials: false
       # LocalStack when the organization's token is available, moto otherwise
       # (pull requests from forks); bin/test prints which one ran.
@@ -107,7 +107,7 @@ jobs:
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
 
-  # The plugin as a gem, with redmine_aws as a gem, built, installed, linked
+  # The plugin as a gem, with redmine_kit_aws as a gem, built, installed, linked
   # into plugins/ and booted with eager_load, as adopters install them
   # (bin/test-gem).
   gem:
@@ -120,21 +120,21 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           repository: redmine-kit/redmine_aws
-          path: redmine_aws
+          path: redmine_kit_aws
           persist-credentials: false
       - run: bin/test-gem
         env:
-          REDMINE_AWS_DIR: redmine_aws
+          REDMINE_KIT_AWS_DIR: redmine_kit_aws
       - if: always()
         run: bin/services --down
 
-  # The tests against the latest release of redmine_aws (its newest v0.*
+  # The tests against the latest release of redmine_kit_aws (its newest v0.*
   # tag, the source of the published gem; the gemspec allows ~> 0.1, so 0.2
   # and later too), as well as against its main above: adapters install the
   # release. Skipped until there is one.
   release:
     needs: static
-    name: test (redmine_aws release)
+    name: test (redmine_kit_aws release)
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7.0.1
@@ -145,19 +145,19 @@ jobs:
           tag=$(git ls-remote --tags --refs https://github.com/redmine-kit/redmine_aws.git 'v0.*' |
             sed 's|.*refs/tags/||' | sort -V | tail -n 1)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          [[ -n "$tag" ]] || echo "::notice::redmine_aws has no v0.* release yet; not tested against one"
+          [[ -n "$tag" ]] || echo "::notice::redmine_kit_aws has no v0.* release yet; not tested against one"
       - if: steps.release.outputs.tag != ''
         uses: actions/checkout@v7.0.1
         with:
           repository: redmine-kit/redmine_aws
           ref: ${{ steps.release.outputs.tag }}
-          path: redmine_aws
+          path: redmine_kit_aws
           persist-credentials: false
       - if: steps.release.outputs.tag != ''
         run: bin/test
         env:
           LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
-          REDMINE_AWS_DIR: redmine_aws
+          REDMINE_KIT_AWS_DIR: redmine_kit_aws
       - if: always() && steps.release.outputs.tag != ''
         run: bin/services --down
         env:

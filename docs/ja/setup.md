@@ -1,13 +1,13 @@
 # 導入
 
-Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール、設定、バケット、CloudFront のディストリビューション、IAM 権限、ネットワーク) です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手動で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、CI では LocalStack で、LocalStack のトークンがないとき (フォークからの Pull Request、ローカルでの実行) は moto でテストしています。実際の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
+Redmine Kit AWS S3 を使う Redmine サーバーに要るもの (インストール、設定、バケット、CloudFront のディストリビューション、IAM 権限、ネットワーク) です。AWS Lambda でも、ふつうのサーバーでも同じです。[Serverless](https://redmine-kit.github.io/serverless/ja/) は、これを CloudFormation でまとめて作ります。このページは、手動で用意するときや、Serverless が作るものを確認するときのためのものです。プラグインは開発の初期の段階です。下のコードは作ってあり、CI では LocalStack で、LocalStack のトークンがないとき (フォークからの Pull Request、ローカルでの実行) は moto でテストしています。実際の CloudFront のディストリビューションが要る部分は、[未確認の事項](#to-verify)にあります。
 
 <a id="requirements"></a>
 
 ## 動作環境
 
 - Redmine 7.0 以降。
-- [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_aws`) 0.1 以降。「AWS」の管理メニューがあります (gem の依存です。チェックアウトでは、これもクローンします)。
+- [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_kit_aws`) 0.1 以降。「AWS」の管理メニューがあります (gem の依存です。チェックアウトでは、これもクローンします)。
 - AWS の認証情報で S3 に届くプロセス (Lambda では実行ロール、ほかではインスタンスプロファイルやタスクロール)。Redmine にアクセスキーは置きません。
 - Redmine を CloudFront のディストリビューションで配信していること。ブラウザーは、ファイルのアップロードとダウンロードも、これを通して行い、S3 のドメインには触れません ([attachments.md](attachments.md#upload))。
 
@@ -15,7 +15,7 @@ Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール
 
 ## インストール
 
-1. プラグインを `plugins/redmine_aws_s3` に、これが必要とする [Redmine AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。Redmine はプラグインをアルファベット順に読み込むので、`redmine_aws` が先になります。
+1. プラグインを `plugins/redmine_kit_aws_s3` に、これが必要とする [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_kit_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。Redmine はプラグインをアルファベット順に読み込むので、`redmine_kit_aws` が先になります。
 2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム (`ChecksumType`) と `CopyObject` の条件付き書き込みを持つ 1.202 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 3. migration は不要です。
 4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配信するために、アセットをビルドします (Redmine のいつものアセットの手順でもかまいません)。
@@ -30,31 +30,39 @@ Redmine AWS S3 を使う Redmine サーバーに要るもの (インストール
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
+バージョンのタグごとに、プラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_kit_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
+
+Bundler は、それぞれのリポジトリからもプラグインをインストールできます。この場合、トークンは不要です。`plugins/` へのリンクは上と同じです。
+
+```ruby
+# Redmine の Gemfile.local
+gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', tag: 'v0.1.0', require: false
+gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', tag: 'v0.1.0', require: false
+```
 
 ```ruby
 # Redmine の Gemfile.local
 source 'https://rubygems.pkg.github.com/redmine-kit' do
-  gem 'redmine_aws_s3'
+  gem 'redmine_kit_aws_s3'
 end
 ```
 
 ```sh
 bundle config set --global rubygems.pkg.github.com <ユーザー>:<トークン>   # か、変数 BUNDLE_RUBYGEMS__PKG__GITHUB__COM
 bundle install
-ln -s "$(bundle info --path redmine_aws)" plugins/redmine_aws
-ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
+ln -s "$(bundle info --path redmine_kit_aws)" plugins/redmine_kit_aws
+ln -s "$(bundle info --path redmine_kit_aws_s3)" plugins/redmine_kit_aws_s3
 ```
 
 <a id="without-the-gem"></a>
 
 ### gem を使わないとき
 
-リポジトリを `plugins/redmine_aws` と `plugins/redmine_aws_s3` にクローンし、gem をインストールします。Rails の起動前に読み込むものがないので、`Gemfile.local` に行を追加する必要はありません。
+リポジトリを `plugins/redmine_kit_aws` と `plugins/redmine_kit_aws_s3` にクローンし、gem をインストールします。Rails の起動前に読み込むものがないので、`Gemfile.local` に行を追加する必要はありません。
 
 ```sh
-git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws
-git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_aws_s3
+git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_kit_aws
+git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_kit_aws_s3
 bundle install
 ```
 
@@ -78,9 +86,9 @@ bundle install
 | `attachments_storage_path` | ローカルキャッシュのディレクトリ。Lambda では `/tmp` の下 (例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルサイズの上限 | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある ([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
-Serverless では、[Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクロールです。プラグインが自分でアクセスキーを読むことはありません。
+Serverless では、[Redmine Kit AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/ja/) が、`/<instance>/env/` の下のパラメーターを環境変数に読み込みます。S3 のクライアントは、SDK の標準の方法で認証情報を探します。Lambda では実行ロール、ほかではインスタンスプロファイルやタスクロールです。プラグインが自分でアクセスキーを読むことはありません。
 
-管理画面の整合性チェックは、Active Job の `AwsS3ReconcileJob` として動きます。[Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/ja/setup.html) は、デフォルトでこのクラスを実行します。実行してよいジョブのクラスを一覧で決めるほかのキューでは、このクラスを一覧に追加します。
+管理画面の整合性チェックは、Active Job の `AwsS3ReconcileJob` として動きます。[Redmine Kit AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/ja/setup.html) は、デフォルトでこのクラスを実行します。実行してよいジョブのクラスを一覧で決めるほかのキューでは、このクラスを一覧に追加します。
 
 すでに添付ファイルがある Redmine では、`REDMINE_S3_BUCKET` を設定する前に、今のファイルをバケットにコピーします (`files/<ディレクトリ>/<ファイル名>`。`attachments_storage_path` の下と同じパス)。バケットを設定すると、Redmine は添付ファイルを S3 から読むためです。手順全体は [Serverless の migration.md](https://redmine-kit.github.io/serverless/ja/migration.html) にあります。そのあと、管理画面の整合性チェックで、足りないファイルがないかを確認できます。
 
@@ -146,7 +154,7 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 ## テスト
 
-Redmine の標準のプラグインのテストです。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine AWS は、隣のチェックアウト (`../redmine_aws`) か、`REDMINE_AWS_DIR` のディレクトリから使います。
+Redmine の標準のプラグインのテストです。Docker の中で、Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine Kit AWS は、隣のチェックアウト (`../redmine_kit_aws`) か、`REDMINE_KIT_AWS_DIR` のディレクトリから使います。
 
 ```sh
 bin/test                 # プラグインのテスト
@@ -156,10 +164,10 @@ bin/test core-s3         # プラグインを有効にして、Redmine の添付
 bin/test system          # システムテスト。ヘッドレスの Chromium で
 bin/test <ファイル...>    # プラグインのテストの一部
 REDMINE_BRANCH=master bin/test   # Redmine の master ブランチで (7.1、アバターあり)
-REDMINE_AWS_DIR=<dir> bin/test   # <dir> の Redmine AWS で
+REDMINE_KIT_AWS_DIR=<dir> bin/test   # <dir> の Redmine Kit AWS で
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
-bin/test-gem             # プラグインと Redmine AWS の gem をビルド・インストールし、plugins/ にリンクして起動する
+bin/test-gem             # プラグインと Redmine Kit AWS の gem をビルド・インストールし、plugins/ にリンクして起動する
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
 node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確認処理
 ```
@@ -196,7 +204,7 @@ node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確�
 | `download`<br>`download_all` | Redmine の権限の確認のあと、`response-content-disposition` (日本語の名前) と `response-content-type` 付きの署名付き URL にリダイレクトする。inline は PDF だけ (Redmine 7.1 では `?disposition=inline` のときだけで、PDF 互換のファイルは `application/pdf`)。zip は 1 ファイルずつ `/tmp` に書き、`tmp/bulk/` に置き、同じ組み合わせなら使い回す | スタブ、LocalStack か moto |
 | CSV のインポート | ファイルを `imports/` に置き、持っていない実行環境では取ってくる。マルウェアスキャンでは、問題がないときだけ読む | スタブ、LocalStack か moto |
 | 管理画面のタブ | 設定、読み書きテスト、配信テスト (CSP と `nosniff` のヘッダー、署名のない URL が拒否されること)、整合性チェックのジョブ、マルウェアスキャンでブロックしたファイル。システム管理者だけ。「設定」でタブが開く | スタブ、LocalStack か moto |
-| コードの読み込み | Zeitwerk が `lib/redmine_aws/s3/` のすべてのファイルを Redmine AWS の名前空間 `RedmineAws` の下に読み込み (`bin/rails zeitwerk:check`)、両方のプラグインがバージョンと「S3」のタブとともに起動する。新しいプロセスで確認する | — |
+| コードの読み込み | Zeitwerk が `lib/redmine_kit/aws/s3/` のすべてのファイルを Redmine Kit AWS の名前空間 `RedmineKit::Aws` の下に読み込み (`bin/rails zeitwerk:check`)、両方のプラグインがバージョンと「S3」のタブとともに起動する。新しいプロセスで確認する | — |
 | 差し替える Redmine のコード | 差し替えたりコピーしたりしたメソッドと `uploadBlob` の SHA256 が、Redmine 7.0.3 と等しい。master が変更したメソッドは master と等しくてもよい。master では `AvatarsController#update`、`#show`、`User#update_avatar`、`Attachment#set_content_type` も | — |
 | ブラウザー (システムテスト) | ヘッドレスの Chromium (Selenium、別のコンテナー) で確認する。CloudFront を通したアップロードで、プログレスバーが 100 まで進み、フォームにトークンが入り、S3 にファイルがある。マルウェアスキャンの結果がないあいだは `202` で、そのあとアップロードが終わる。リダイレクトをたどったダウンロードで、sandbox の CSP と `nosniff` 付きのファイルが返る。アップロードした画像のサムネイルが出る。Redmine 7.1 では、1 MB を超えるアバターが CloudFront を通り、フォームがファイルを含めずにチケットを付けて Redmine に届き、アップロードのエラーがフォームの上に出る。CloudFront は、テストのサーバーの小さな Rack アプリケーションで置き換える。署名付き URL を公開鍵で確認し、テストの S3 に PUT と GET をし、ディストリビューションのレスポンスヘッダーを付ける (`test/system/fake_cloudfront.rb`) | LocalStack か moto |
 | ブラウザーのスクリプト | `complete` は `202` のあいだ送り直し、`200` の応答のスクリプトを実行し、サーバーのエラーを返し、最後の再試行のあとに諦める。アバターの `check` も同じ | Node.js |

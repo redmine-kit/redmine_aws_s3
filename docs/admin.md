@@ -1,6 +1,6 @@
 # Administration page
 
-This is the administration page of Redmine AWS S3. Only Redmine administrators can open it (`require_admin`). The page is the "S3" tab under the "AWS" item of Redmine's administration menu, which [Redmine AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds and all the Redmine AWS plugins share.
+This is the administration page of Redmine Kit AWS S3. Only Redmine administrators can open it (`require_admin`). The page is the "S3" tab under the "AWS" item of Redmine's administration menu, which [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds and all the Redmine Kit AWS plugins share.
 
 <a id="attachments-in-s3"></a>
 
@@ -10,7 +10,7 @@ This is the administration page of Redmine AWS S3. Only Redmine administrators c
 
 | Section | Contents | Source |
 | --- | --- | --- |
-| Environment variables | "Bucket", "Region", "CloudFront domain", "CloudFront key pair ID", "CloudFront private key" ("Set" or "Not set"), "GuardDuty malware scan" ("Enabled" or "Disabled") and "Local cache". Each value has the name of its environment variable next to it, and "Local cache" has `attachments_storage_path`. Values that the page does not edit (these, the results of the connection tests and of the consistency check) are a list without a header row, as on Administration › Information (the partial `aws_admin/values` of [Redmine AWS](https://redmine-kit.github.io/redmine_aws/api.html#values)) | Environment variables ([setup.md](setup.md#configuration)) and `config/configuration.yml`, display only. The private key itself is not shown |
+| Environment variables | "Bucket", "Region", "CloudFront domain", "CloudFront key pair ID", "CloudFront private key" ("Set" or "Not set"), "GuardDuty malware scan" ("Enabled" or "Disabled") and "Local cache". Each value has the name of its environment variable next to it, and "Local cache" has `attachments_storage_path`. Values that the page does not edit (these, the results of the connection tests and of the consistency check) are a list without a header row, as on Administration › Information (the partial `aws_admin/values` of [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/api.html#values)) | Environment variables ([setup.md](setup.md#configuration)) and `config/configuration.yml`, display only. The private key itself is not shown |
 | Connection tests | "Read/write test" puts a test object (`tmp/healthcheck/<UUID>`), reads it and deletes it. "Delivery test" puts a test object, makes a signed URL for it under `/tmp/bulk/`, and requests it through CloudFront, with and without the signature. Each result is a row with the name, Redmine's OK or failed icon, and the details ([below](#connection-tests)) | Text links. The delivery test deletes its object afterwards |
 | Files blocked by malware scan | The last 20 files that the malware scan blocked, with the columns "Time", "Scan result", "File" and "User" (a link to the Redmine user). Shown when "GuardDuty malware scan" is "Enabled" or a blocked file is recorded | Kept in the plugin settings ([attachments.md](attachments.md#malware-scan)) |
 | Consistency check | "Run consistency check" starts the job `AwsS3ReconcileJob`, which lists `files/` and compares it with the attachments in the database. While it runs, the list shows "Status: Running" and "Started at". When the job fails (for example without `s3:ListBucket`), it shows "Status: Failed" with the class of the error in "Details", and the job logs the message; a run not finished an hour after it started (a timeout of the worker) shows "Timed out" there. When it is done, it shows "Last run", "Attachments", "S3 objects" (under `files/`), "Files missing in S3" and "Unused objects", then the lists under those two names (the first 100 of each) | A text link. The result is kept in the plugin settings, so every environment shows the latest one |
@@ -29,10 +29,10 @@ The results of the connection tests:
 | Unsigned URL denied | Delivery test | The same URL without the signature returns 401 or 403 |
 | Delivery | Delivery test | Shown only when the test stops with an error |
 
-- **Failed calls:** A call that fails shows only the class of the error in the details (for example `Aws::S3::Errors::AccessDenied`), as the "Status" tab of Redmine AWS does. The error's message, which may name hosts, accounts or resources, is not shown on the page; Redmine's log has the test's name with the class and the message (`[redmine_aws_s3] connection test PutObject failed: …`).
+- **Failed calls:** A call that fails shows only the class of the error in the details (for example `Aws::S3::Errors::AccessDenied`), as the "Status" tab of Redmine Kit AWS does. The error's message, which may name hosts, accounts or resources, is not shown on the page; Redmine's log has the test's name with the class and the message (`[redmine_kit_aws_s3] connection test PutObject failed: …`).
 
 - **Use:** After moving attachments from an older Redmine ([migration.md](https://redmine-kit.github.io/serverless/migration.html)), the consistency check lets you check that nothing is missing.
-- **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
+- **Status tab:** When the bucket is set, the "Connection test" on the "Status" tab of Redmine Kit AWS has an "S3" row. It calls `HeadBucket` on the attachment bucket and shows the bucket name.
 - **No secrets shown:** AWS credentials and the CloudFront private key are not shown. AWS APIs are called only when a link is clicked.
 - **Without the bucket:** The tab still opens and shows the warning "REDMINE_S3_BUCKET is not set, so attachments are stored on the local disk." It shows the environment variables and the settings; the connection tests, the blocked files and the consistency check are not shown.
 - **Operations are logged:** Changing the settings (the names of the settings, not their values), the connection tests and the consistency check are written to Redmine's log with the administrator's login.
@@ -41,7 +41,7 @@ The results of the connection tests:
 
 ## The AWS menu
 
-[Redmine AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds the "AWS" item of Redmine's administration menu (`/admin/aws`, which opens the first tab), and each Redmine AWS plugin registers its tab there (`RedmineAws::Admin`). This plugin registers its tab, "S3", at position 50, and, when the bucket is set, the "S3" row (`HeadBucket`) for the "Connection test" of the "Status" tab.
+[Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/admin.html#the-aws-menu) adds the "AWS" item of Redmine's administration menu (`/admin/aws`, which opens the first tab), and each Redmine Kit AWS plugin registers its tab there (`RedmineKit::Aws::Admin`). This plugin registers its tab, "S3", at position 50, and, when the bucket is set, the "S3" row (`HeadBucket`) for the "Connection test" of the "Status" tab.
 
 - **Configure:** "Configure" of the plugin in Redmine's plugin list opens the "S3" tab.
 

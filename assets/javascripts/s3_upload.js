@@ -1,5 +1,5 @@
 /*
- * Redmine AWS S3: uploads attachments from the browser through
+ * Redmine Kit AWS S3: uploads attachments from the browser through
  * Redmine's CloudFront distribution to S3 (docs/attachments.md#upload).
  *
  * Why a script: Redmine's attachments.js sends each file in the body of

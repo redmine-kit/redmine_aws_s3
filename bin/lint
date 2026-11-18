@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 version=${TEST_RUBY:-4.0}
 ruby=$(sed -n 's/^FROM //p' "test/ruby-$version.Dockerfile")
 # Bundler 4 for --cooldown: Ruby 3.2 comes with Bundler 2.4.
-docker run --rm -v "$PWD:/work" -w /work -v "redmine-aws-s3-bundle-$version:/usr/local/bundle" \
+docker run --rm -v "$PWD:/work" -w /work -v "redmine-kit-aws-s3-bundle-$version:/usr/local/bundle" \
   -e BUNDLE_GEMFILE=Gemfile.lint -e BUNDLER_VERSION=4.0.20 "$ruby" \
   sh -c 'gem install bundler -v "$BUNDLER_VERSION" --conservative --silent --no-document &&
     bundle update --quiet --cooldown=3 && bundle exec rubocop "$@"' rubocop "$@"

@@ -1,12 +1,12 @@
 /*
- * Redmine AWS S3: a note next to "Maximum attachment size" on
+ * Redmine Kit AWS S3: a note next to "Maximum attachment size" on
  * Administration › Settings › Files (docs/admin.md#maximum-attachment-size).
  *
  * Why a script: Redmine's settings/_attachments.html.erb has no hook, and the
  * note belongs next to the field it is about, as the em.info notes of that
  * tab are. It works with that view only (the field
  * #settings_attachment_max_size); the text comes from the plugin's locale,
- * in the <meta> tag that RedmineAws::S3::Hooks adds with this script.
+ * in the <meta> tag that RedmineKit::Aws::S3::Hooks adds with this script.
  */
 (function() {
   'use strict';

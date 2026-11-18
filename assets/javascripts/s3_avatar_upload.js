@@ -1,5 +1,5 @@
 /*
- * Redmine AWS S3: the avatar form of Redmine 7.1 (/my/avatar and
+ * Redmine Kit AWS S3: the avatar form of Redmine 7.1 (/my/avatar and
  * /users/:id/avatar) sends the image through Redmine's CloudFront
  * distribution to S3 (docs/attachments.md#avatars).
  *

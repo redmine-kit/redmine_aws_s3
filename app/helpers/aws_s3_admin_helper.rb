@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-# The rows of the values that the "S3" tab shows, for redmine_aws's partial
+# The rows of the values that the "S3" tab shows, for redmine_kit_aws's partial
 # aws_admin/values (as Administration › Information shows values).
 module AwsS3AdminHelper
   # The environment variables, each with the variable as its note.
   def aws_s3_environment_rows
-    s3 = RedmineAws::S3
+    s3 = RedmineKit::Aws::S3
     [[:bucket, s3::ENV_BUCKET, s3.bucket], [:region, s3::ENV_REGION, s3.region],
      [:domain, s3::ENV_DOMAIN, s3.cloudfront_domain], [:key_pair_id, s3::ENV_KEY_PAIR_ID, s3.key_pair_id],
      [:private_key, s3::ENV_PRIVATE_KEY, l(s3.private_key? ? :label_aws_s3_set : :label_aws_s3_not_set)],
@@ -21,7 +21,7 @@ module AwsS3AdminHelper
 
   # The last consistency check, running or finished.
   def aws_s3_reconciliation_rows(result)
-    case RedmineAws::S3::Reconciliation.state(result)
+    case RedmineKit::Aws::S3::Reconciliation.state(result)
     when :running then aws_s3_running_rows(result)
     when :failed then aws_s3_failed_rows(result)
     else aws_s3_finished_rows(result)
@@ -50,7 +50,7 @@ module AwsS3AdminHelper
   end
 
   def aws_s3_started_row(result)
-    started = RedmineAws::S3::Reconciliation.started_at(result)
+    started = RedmineKit::Aws::S3::Reconciliation.started_at(result)
     { name: l(:field_aws_s3_started_at), value: started ? format_time(started) : '-' }
   end
 end

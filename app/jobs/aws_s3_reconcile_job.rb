@@ -5,10 +5,10 @@
 # the error) and logged with its message, and the job still fails.
 class AwsS3ReconcileJob < ApplicationJob
   def perform
-    RedmineAws::S3::Reconciliation.run
+    RedmineKit::Aws::S3::Reconciliation.run
   rescue StandardError => e
-    Rails.logger.error("[redmine_aws_s3] consistency check failed: #{e.class}: #{e.message}")
-    RedmineAws::S3::Reconciliation.failed(e)
+    Rails.logger.error("[redmine_kit_aws_s3] consistency check failed: #{e.class}: #{e.message}")
+    RedmineKit::Aws::S3::Reconciliation.failed(e)
     raise
   end
 end

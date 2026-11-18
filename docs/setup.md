@@ -1,17 +1,17 @@
 # Setup
 
-What a Redmine server needs to use Redmine AWS S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against LocalStack in CI, and against moto where there is no LocalStack token (pull requests from forks, local runs), and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
+What a Redmine server needs to use Redmine Kit AWS S3: installation, configuration, the bucket, the CloudFront distribution, IAM permissions and network access. It works on AWS Lambda and on an ordinary server alike. [Serverless](https://redmine-kit.github.io/serverless/) sets all of this up with CloudFormation; this page is for setting it up by hand, or for checking what Serverless creates. The plugin is in early development: the code below is built and tested against LocalStack in CI, and against moto where there is no LocalStack token (pull requests from forks, local runs), and the parts that need a real CloudFront distribution are listed in [To verify](#to-verify).
 
 ## Requirements
 
 - Redmine 7.0 or later.
-- [Redmine AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_aws`) 0.1 or later, which has the "AWS" administration menu (a dependency of the gem; with a checkout, it is cloned too).
+- [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_kit_aws`) 0.1 or later, which has the "AWS" administration menu (a dependency of the gem; with a checkout, it is cloned too).
 - A process that can reach S3 with AWS credentials (an execution role on Lambda, an instance profile or a task role elsewhere). No access keys are stored in Redmine.
 - Redmine is served through a CloudFront distribution. Browsers upload and download files through it, never through the S3 domain ([attachments.md](attachments.md#upload)).
 
 ## Installation
 
-1. Put the plugin in `plugins/redmine_aws_s3`, and [Redmine AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). Redmine loads plugins in alphabetical order, so `redmine_aws` comes first.
+1. Put the plugin in `plugins/redmine_kit_aws_s3`, and [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_kit_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). Redmine loads plugins in alphabetical order, so `redmine_kit_aws` comes first.
 2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.202 or later (which has the full-object checksums, `ChecksumType`, and the conditional writes of `CopyObject`) and `aws-sdk-cloudfront` 1.x.
 3. No migrations are needed.
 4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
@@ -24,29 +24,37 @@ What a Redmine server needs to use Redmine AWS S3: installation, configuration, 
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
+Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_kit_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
+
+Bundler can also install the plugins from their repositories, which needs no token; link them into `plugins/` as above:
+
+```ruby
+# Redmine's Gemfile.local
+gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', tag: 'v0.1.0', require: false
+gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', tag: 'v0.1.0', require: false
+```
 
 ```ruby
 # Redmine's Gemfile.local
 source 'https://rubygems.pkg.github.com/redmine-kit' do
-  gem 'redmine_aws_s3'
+  gem 'redmine_kit_aws_s3'
 end
 ```
 
 ```sh
 bundle config set --global rubygems.pkg.github.com <user>:<token>   # or the variable BUNDLE_RUBYGEMS__PKG__GITHUB__COM
 bundle install
-ln -s "$(bundle info --path redmine_aws)" plugins/redmine_aws
-ln -s "$(bundle info --path redmine_aws_s3)" plugins/redmine_aws_s3
+ln -s "$(bundle info --path redmine_kit_aws)" plugins/redmine_kit_aws
+ln -s "$(bundle info --path redmine_kit_aws_s3)" plugins/redmine_kit_aws_s3
 ```
 
 ### Without the gem
 
-Clone the repositories into `plugins/redmine_aws` and `plugins/redmine_aws_s3` and install the gems. Nothing of the plugin has to load before Rails starts, so it needs no line in `Gemfile.local`:
+Clone the repositories into `plugins/redmine_kit_aws` and `plugins/redmine_kit_aws_s3` and install the gems. Nothing of the plugin has to load before Rails starts, so it needs no line in `Gemfile.local`:
 
 ```sh
-git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_aws
-git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_aws_s3
+git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_kit_aws
+git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_kit_aws_s3
 bundle install
 ```
 
@@ -68,9 +76,9 @@ bundle install
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
 | Maximum attachment size | Can still be changed; the CloudFront Function on `/tmp/*` must use the same limit for uploads ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 
-On Serverless, [Redmine AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
+On Serverless, [Redmine Kit AWS SSM](https://redmine-kit.github.io/redmine_aws_ssm/) reads the parameters under `/<instance>/env/` into the environment. The S3 client uses the SDK's standard credential chain: the execution role on Lambda, an instance profile or a task role elsewhere. The plugin reads no access keys of its own.
 
-The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. [Redmine AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/setup.html) allows it by default; another queue that runs only listed job classes needs it in its list.
+The consistency check on the administration page runs as the Active Job `AwsS3ReconcileJob`. [Redmine Kit AWS SQS](https://redmine-kit.github.io/redmine_aws_sqs/setup.html) allows it by default; another queue that runs only listed job classes needs it in its list.
 
 On a Redmine that already has attachments, copy the existing files to the bucket (`files/<directory>/<file name>`, the same paths as under `attachments_storage_path`) before setting `REDMINE_S3_BUCKET`: with the bucket set, Redmine reads attachments from S3. [Serverless's migration.md](https://redmine-kit.github.io/serverless/migration.html) has the full steps; the consistency check on the administration page then shows whether anything is missing.
 
@@ -124,7 +132,7 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 
 ## Tests
 
-Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_aws`) or from the directory in `REDMINE_AWS_DIR`:
+Redmine's standard plugin tests, in Docker with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine Kit AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_kit_aws`) or from the directory in `REDMINE_KIT_AWS_DIR`:
 
 ```sh
 bin/test                 # the plugin's tests
@@ -134,10 +142,10 @@ bin/test core-s3         # Redmine's attachment tests with the plugin on
 bin/test system          # the system tests, in headless Chromium
 bin/test <files...>      # some of the plugin's tests
 REDMINE_BRANCH=master bin/test   # on Redmine's master branch (7.1, with avatars)
-REDMINE_AWS_DIR=<dir> bin/test   # Redmine AWS from <dir>
+REDMINE_KIT_AWS_DIR=<dir> bin/test   # Redmine Kit AWS from <dir>
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
-bin/test-gem             # the gems of the plugin and Redmine AWS: built, installed, linked into plugins/, booted
+bin/test-gem             # the gems of the plugin and Redmine Kit AWS: built, installed, linked into plugins/, booted
 node test/javascripts/complete_test.mjs # the upload script's complete step
 node test/javascripts/avatar_check_test.mjs # the avatar script's check step
 ```
@@ -168,7 +176,7 @@ Every piece of replaced code has tests, and every call to AWS is tested in this 
 | `download`<br>`download_all` | Redmine's permission checks, then a redirect to a signed URL with `response-content-disposition` (Japanese names) and `response-content-type`; only PDFs inline (on Redmine 7.1, only with `?disposition=inline`, and a PDF compatible file as `application/pdf`). The zip is written to `/tmp` one file at a time, put to `tmp/bulk/` and reused for the same set | Stubs, LocalStack or moto |
 | CSV import | The file is put to `imports/` and fetched in an environment that does not have it; with the malware scan, read only when clean | Stubs, LocalStack or moto |
 | Administration tab | Settings, read/write test, delivery test (the CSP and `nosniff` headers, the unsigned URL denied), consistency check job, files blocked by the malware scan; administrators only; "Configure" opens the tab | Stubs, LocalStack or moto |
-| Code loading | Zeitwerk loads every file of `lib/redmine_aws/s3/` under the `RedmineAws` namespace of Redmine AWS (`bin/rails zeitwerk:check`), and both plugins start with their versions and the "S3" tab, in new processes | — |
+| Code loading | Zeitwerk loads every file of `lib/redmine_kit/aws/s3/` under the `RedmineKit::Aws` namespace of Redmine Kit AWS (`bin/rails zeitwerk:check`), and both plugins start with their versions and the "S3" tab, in new processes | — |
 | Replaced Redmine code | The SHA256 of each replaced or copied method and of `uploadBlob` equals Redmine 7.0.3's, or master's for the methods master has changed. On master, also `AvatarsController#update`, `#show`, `User#update_avatar` and `Attachment#set_content_type` | — |
 | Browser (system tests) | In headless Chromium (Selenium, in its own container): an upload through CloudFront with the progress bar going up to 100, the token in the form and the file in S3; `202` while the malware scan has no result, then the upload completes; a download following the redirect gets the file with the sandbox CSP and `nosniff`; the thumbnail of an uploaded image is shown; on Redmine 7.1, an avatar over 1 MB goes through CloudFront, the form reaches Redmine with the ticket and without the file, and an upload error is shown above the form. CloudFront is replaced by a small Rack application on the test server that checks the signed URL with the public key, PUTs to and GETs from the S3 of the tests and adds the distribution's response headers (`test/system/fake_cloudfront.rb`) | LocalStack or moto |
 | Browser script | `complete` sent again on `202`, the script of a `200` answer run, the server's error passed on, and given up after the last retry; the same for the avatar's `check` | Node.js |

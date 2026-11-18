@@ -1,7 +1,7 @@
 *
 !init.rb
 !Gemfile
-!redmine_aws_s3.gemspec
+!redmine_kit_aws_s3.gemspec
 !LICENSE
 !app/
 !assets/

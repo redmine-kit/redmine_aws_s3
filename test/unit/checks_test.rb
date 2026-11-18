@@ -2,80 +2,82 @@
 
 require_relative '../test_helper'
 
-module RedmineAws
-  module S3
-    class ChecksTest < ActiveSupport::TestCase
-      include S3::TestHelper
+module RedmineKit
+  module Aws
+    module S3
+      class ChecksTest < ActiveSupport::TestCase
+        include S3::TestHelper
 
-      def response(klass, code, headers = {})
-        res = klass.new('1.1', code, '')
-        headers.each { |name, value| res[name] = value }
-        res
-      end
-
-      # The answers of a distribution with the headers: the object for the
-      # signed URL, 403 for the unsigned one. Returns the URLs requested.
-      def stub_distribution
-        signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineAws::S3::ATTACHMENT_CSP,
-                                              'X-Content-Type-Options' => 'nosniff')
-        urls = []
-        RedmineAws::S3::Checks.stubs(:get).with { |url| urls << url }
-                              .returns(signed, response(Net::HTTPForbidden, '403'))
-        urls
-      end
-
-      def test_delivery_with_the_headers_of_the_distribution
-        with_s3(stub_client) do
-          stub_distribution
-          results = RedmineAws::S3::Checks.delivery
-
-          assert(results.all? { |_, ok, _| ok }, results.inspect)
+        def response(klass, code, headers = {})
+          res = klass.new('1.1', code, '')
+          headers.each { |name, value| res[name] = value }
+          res
         end
-      end
 
-      def test_delivery_requests_a_check_object_and_deletes_it
-        with_s3(stub_client) do |client|
-          urls = stub_distribution
-          RedmineAws::S3::Checks.delivery
-          key = api_request(client, :put_object)[:params][:key]
-
-          assert_match %r{\Atmp/bulk/healthcheck-}, key
-          assert_equal key, deleted_keys(client).first
-          verify_signed_url(urls.first)
-          assert_equal "https://#{DOMAIN}/#{key}", urls.second
+        # The answers of a distribution with the headers: the object for the
+        # signed URL, 403 for the unsigned one. Returns the URLs requested.
+        def stub_distribution
+          signed = response(Net::HTTPOK, '200', 'Content-Security-Policy' => RedmineKit::Aws::S3::ATTACHMENT_CSP,
+                                                'X-Content-Type-Options' => 'nosniff')
+          urls = []
+          RedmineKit::Aws::S3::Checks.stubs(:get).with { |url| urls << url }
+                                     .returns(signed, response(Net::HTTPForbidden, '403'))
+          urls
         end
-      end
 
-      def test_delivery_without_the_csp
-        with_s3(stub_client) do
-          RedmineAws::S3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
-          results = RedmineAws::S3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
+        def test_delivery_with_the_headers_of_the_distribution
+          with_s3(stub_client) do
+            stub_distribution
+            results = RedmineKit::Aws::S3::Checks.delivery
 
-          assert results['Signed URL']
-          assert_not results['CSP sandbox']
-          assert_not results['nosniff']
-          assert_not results['Unsigned URL denied']
-        end
-      end
-
-      # The screen shows the class of the error, never its message; the log
-      # has both.
-      def test_delivery_reports_errors
-        log = capture_log do
-          with_s3(stub_client(put_object: 'AccessDenied')) do
-            assert_equal [['Delivery', false, 'Aws::S3::Errors::AccessDenied']], RedmineAws::S3::Checks.delivery
+            assert(results.all? { |_, ok, _| ok }, results.inspect)
           end
         end
 
-        assert_includes log,
-                        'connection test Delivery failed: Aws::S3::Errors::AccessDenied: stubbed-response-error-message'
-      end
+        def test_delivery_requests_a_check_object_and_deletes_it
+          with_s3(stub_client) do |client|
+            urls = stub_distribution
+            RedmineKit::Aws::S3::Checks.delivery
+            key = api_request(client, :put_object)[:params][:key]
 
-      def test_read_write_reports_the_classes_of_errors
-        with_s3(stub_client(put_object: 'AccessDenied', get_object: 'NoSuchKey')) do
-          assert_equal [['PutObject', false, 'Aws::S3::Errors::AccessDenied'],
-                        ['GetObject', false, 'Aws::S3::Errors::NoSuchKey'], ['DeleteObject', true, '']],
-                       RedmineAws::S3::Checks.read_write
+            assert_match %r{\Atmp/bulk/healthcheck-}, key
+            assert_equal key, deleted_keys(client).first
+            verify_signed_url(urls.first)
+            assert_equal "https://#{DOMAIN}/#{key}", urls.second
+          end
+        end
+
+        def test_delivery_without_the_csp
+          with_s3(stub_client) do
+            RedmineKit::Aws::S3::Checks.stubs(:get).returns(response(Net::HTTPOK, '200'), response(Net::HTTPOK, '200'))
+            results = RedmineKit::Aws::S3::Checks.delivery.to_h { |name, ok, _| [name, ok] }
+
+            assert results['Signed URL']
+            assert_not results['CSP sandbox']
+            assert_not results['nosniff']
+            assert_not results['Unsigned URL denied']
+          end
+        end
+
+        # The screen shows the class of the error, never its message; the log
+        # has both.
+        def test_delivery_reports_errors
+          log = capture_log do
+            with_s3(stub_client(put_object: 'AccessDenied')) do
+              assert_equal [['Delivery', false, 'Aws::S3::Errors::AccessDenied']], RedmineKit::Aws::S3::Checks.delivery
+            end
+          end
+
+          assert_includes log, 'connection test Delivery failed: ' \
+                               'Aws::S3::Errors::AccessDenied: stubbed-response-error-message'
+        end
+
+        def test_read_write_reports_the_classes_of_errors
+          with_s3(stub_client(put_object: 'AccessDenied', get_object: 'NoSuchKey')) do
+            assert_equal [['PutObject', false, 'Aws::S3::Errors::AccessDenied'],
+                          ['GetObject', false, 'Aws::S3::Errors::NoSuchKey'], ['DeleteObject', true, '']],
+                         RedmineKit::Aws::S3::Checks.read_write
+          end
         end
       end
     end

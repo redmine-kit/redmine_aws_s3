@@ -1,18 +1,18 @@
 # frozen_string_literal: true
 
-# The "S3" tab of the "AWS" administration page of redmine_aws
+# The "S3" tab of the "AWS" administration page of redmine_kit_aws
 # (docs/admin.md). AWS is called only when a button is pressed.
 class AwsS3AdminController < ApplicationController
-  include RedmineAws::AdminTab
+  include RedmineKit::Aws::AdminTab
 
   helper :aws_s3_admin
 
   before_action :require_s3, except: %i[show update]
 
   def show
-    @settings = RedmineAws::S3::DEFAULT_SETTINGS.keys.index_with { |name| RedmineAws::S3.setting(name) }
-    @reconciliation = RedmineAws::S3::Reconciliation.result
-    @findings = RedmineAws::S3::MalwareScan.findings
+    @settings = RedmineKit::Aws::S3::DEFAULT_SETTINGS.keys.index_with { |name| RedmineKit::Aws::S3.setting(name) }
+    @reconciliation = RedmineKit::Aws::S3::Reconciliation.result
+    @findings = RedmineKit::Aws::S3::MalwareScan.findings
     # The users of the findings by login, in one query.
     @finding_users = User.where(login: @findings.filter_map { |finding| finding['user'].presence }).index_by(&:login)
   end
@@ -24,7 +24,7 @@ class AwsS3AdminController < ApplicationController
     errors = settings_errors(values)
     return render_invalid_settings(values, errors) if errors.any?
 
-    RedmineAws::S3.update_settings(values)
+    RedmineKit::Aws::S3.update_settings(values)
     log("changed the settings #{values.keys.join(', ')}")
     flash[:notice] = l(:notice_successful_update)
     redirect_to aws_s3_admin_path
@@ -32,19 +32,19 @@ class AwsS3AdminController < ApplicationController
 
   def read_write
     log('ran the read/write check')
-    flash[:aws_s3_checks] = RedmineAws::S3::Checks.read_write
+    flash[:aws_s3_checks] = RedmineKit::Aws::S3::Checks.read_write
     redirect_to aws_s3_admin_path
   end
 
   def delivery
     log('ran the delivery check')
-    flash[:aws_s3_checks] = RedmineAws::S3::Checks.delivery
+    flash[:aws_s3_checks] = RedmineKit::Aws::S3::Checks.delivery
     redirect_to aws_s3_admin_path
   end
 
   def reconcile
     log('started the reconciliation')
-    RedmineAws::S3::Reconciliation.started
+    RedmineKit::Aws::S3::Reconciliation.started
     AwsS3ReconcileJob.perform_later
     flash[:notice] = l(:notice_aws_s3_reconciliation_started)
     redirect_to aws_s3_admin_path
@@ -53,7 +53,7 @@ class AwsS3AdminController < ApplicationController
   private
 
   def settings_params
-    params.fetch(:settings, {}).permit(*RedmineAws::S3::DEFAULT_SETTINGS.keys).to_h
+    params.fetch(:settings, {}).permit(*RedmineKit::Aws::S3::DEFAULT_SETTINGS.keys).to_h
   end
 
   # The names of the values that are not positive whole numbers.
@@ -74,7 +74,7 @@ class AwsS3AdminController < ApplicationController
   end
 
   def over_maximum(name, value)
-    max = RedmineAws::S3::SettingLimits::MAXIMA.fetch(name)
+    max = RedmineKit::Aws::S3::SettingLimits::MAXIMA.fetch(name)
     return if value <= max
 
     ::I18n.t('errors.format', attribute: l(:"field_aws_s3_#{name}"),
@@ -89,10 +89,10 @@ class AwsS3AdminController < ApplicationController
   end
 
   def require_s3
-    render_404 unless RedmineAws::S3.enabled?
+    render_404 unless RedmineKit::Aws::S3.enabled?
   end
 
   def log(message)
-    logger&.info("[redmine_aws_s3] #{User.current.login} #{message}")
+    logger&.info("[redmine_kit_aws_s3] #{User.current.login} #{message}")
   end
 end

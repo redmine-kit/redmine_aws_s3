@@ -5,8 +5,8 @@
 # linked into Redmine's plugins/ (docs/setup.md#installation). The plugin's
 # Gemfile is not in it: Redmine's Gemfile would load it again.
 Gem::Specification.new do |spec|
-  spec.name = 'redmine_aws_s3'
-  spec.version = File.read(File.join(__dir__, 'lib/redmine_aws/s3.rb'))[/VERSION = '([^']+)'/, 1]
+  spec.name = 'redmine_kit_aws_s3'
+  spec.version = File.read(File.join(__dir__, 'lib/redmine_kit/aws/s3.rb'))[/VERSION = '([^']+)'/, 1]
   spec.summary = 'Stores Redmine attachments in Amazon S3'
   spec.authors = ['Redmine Kit']
   spec.license = 'GPL-2.0-or-later'
@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'aws-sdk-cloudfront', '~> 1.0'
   spec.add_dependency 'aws-sdk-s3', '~> 1.202'
   # The AWS item of the administration menu, where the S3 tab is.
-  spec.add_dependency 'redmine_aws', '~> 0.1'
+  spec.add_dependency 'redmine_kit_aws', '~> 0.1'
   spec.metadata['github_repo'] = 'ssh://github.com/redmine-kit/redmine_aws_s3'
   spec.metadata['rubygems_mfa_required'] = 'true'
 end

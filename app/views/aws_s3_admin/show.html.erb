@@ -1,15 +1,15 @@
 <%= render partial: 'aws_admin/tabs', locals: { selected: 's3' } %>
 <%= render_error_messages(@errors) %>
 
-<% unless RedmineAws::S3.enabled? %>
-<p class="warning"><%= l(:text_aws_s3_off, name: RedmineAws::S3::ENV_BUCKET) %></p>
+<% unless RedmineKit::Aws::S3.enabled? %>
+<p class="warning"><%= l(:text_aws_s3_off, name: RedmineKit::Aws::S3::ENV_BUCKET) %></p>
 <% end %>
 
 <h3><%= l(:label_aws_s3_environment) %></h3>
 
 <%= render partial: 'aws_admin/values', locals: { rows: aws_s3_environment_rows, css: 'environment' } %>
 
-<% if RedmineAws::S3.enabled? %>
+<% if RedmineKit::Aws::S3.enabled? %>
 <h3><%= l(:label_aws_s3_checks) %></h3>
 
 <p>
@@ -21,7 +21,7 @@
 <%= render partial: 'aws_admin/values', locals: { rows: aws_s3_check_rows(results), css: 'checks' } %>
 <% end %>
 
-<% if RedmineAws::S3.malware_scan? || @findings.any? %>
+<% if RedmineKit::Aws::S3.malware_scan? || @findings.any? %>
 <h3><%= l(:label_aws_s3_malware_findings) %></h3>
 
 <% if @findings.any? %>
@@ -38,7 +38,7 @@
 <% user = @finding_users[finding['user']] %>
 <tr>
     <td><%= finding['time'].present? ? format_time(Time.iso8601(finding['time'])) : '' %></td>
-    <td><%= RedmineAws::S3::MalwareScan.status_label(finding['status']) %></td>
+    <td><%= RedmineKit::Aws::S3::MalwareScan.status_label(finding['status']) %></td>
     <td class="name"><%= finding['filename'] %></td>
     <td class="name"><%= user ? link_to_user(user) : finding['user'] %></td>
 </tr>

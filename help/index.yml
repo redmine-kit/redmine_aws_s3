@@ -2,5 +2,5 @@
 # (https://github.com/redmine-kit/redmine_help, docs/extending.md).
 sections:
   - id: aws-s3
-    title: Redmine AWS S3
+    title: Redmine Kit AWS S3
     topics: [aws-s3/attachments]
