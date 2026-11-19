@@ -20,6 +20,10 @@ Gem::Specification.new do |spec|
   # every 1.x.
   spec.add_dependency 'aws-sdk-cloudfront', '~> 1.0'
   spec.add_dependency 'aws-sdk-s3', '~> 1.202'
+  # rubyzip writes the zip of "Download all attachments" (BulkDownload).
+  # Redmine 7.0.3 has it in its default group (~> 3.4.0); Redmine's master
+  # moved it to the test group, so the plugin names it itself.
+  spec.add_dependency 'rubyzip', '~> 3.4'
   # The AWS item of the administration menu, where the S3 tab is.
   spec.add_dependency 'redmine_kit_aws', '~> 0.1'
   spec.metadata['github_repo'] = 'ssh://github.com/redmine-kit/redmine_aws_s3'
