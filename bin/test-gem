@@ -22,7 +22,7 @@ source bin/test_image
 if [[ "$cli" == docker ]]; then
   net=(--network "${name}_default")
 else
-  net=(--network "$name" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
+  net=(--network "$kit_test_network" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
 fi
 # A database of this run's own, dropped at the end.
 "$cli" run --rm "${net[@]}" -e TEST_DATABASE="redmine_test_$$" "$image" sh -ec '
