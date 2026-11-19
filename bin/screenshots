@@ -30,7 +30,7 @@ if [[ "$cli" == docker ]]; then
   opts=(--network "${name}_default" --network-alias redmine-screenshots)
   chrome=http://chrome:4444 moto=http://moto:5000 app_host=redmine-screenshots
 else
-  opts=(--network "$name" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
+  opts=(--network "$kit_test_network" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
   chrome="http://$(container_address "$name-chrome"):4444" moto="http://$(container_address "$name-moto"):5000" app_host=
 fi
 "$cli" run --rm "${opts[@]}" -e TEST_DATABASE="redmine_test_$$" \

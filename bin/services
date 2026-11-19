@@ -26,12 +26,11 @@ if [[ "$cli" == docker ]]; then
 fi
 
 # Apple container: the services of test/compose.yml, with the images it pins,
-# on the network $name. LocalStack checks its token on the internet, which
-# the network reaches.
+# on the network the tests of every repository share (bin/container_cli).
+# LocalStack checks its token on the internet, which the network reaches.
 image() { sed -n "s/^    image: //p" test/compose.yml | grep "^$1" | head -1; }
 if [[ "${1:-}" == --down ]]; then
   container rm -f "$name-postgres" "$name-moto" "$name-localstack" "$name-chrome" >/dev/null 2>&1 || true
-  container network rm "$name" >/dev/null 2>&1 || true
   exit 0
 fi
 # start <service> <options…>: runs the service's container unless it runs.
@@ -40,9 +39,9 @@ start() {
   shift
   container_running "$name-$service" && return
   container rm -f "$name-$service" >/dev/null 2>&1 || true
-  container run -d --name "$name-$service" --network "$name" --progress none "$@" >/dev/null
+  container run -d --name "$name-$service" --network "$kit_test_network" --progress none "$@" >/dev/null
 }
-container network inspect "$name" >/dev/null 2>&1 || container network create "$name" >/dev/null
+ensure_shared_network "$kit_test_network"
 start postgres -m 1G -e POSTGRES_HOST_AUTH_METHOD=trust "$(image postgres)"
 start moto -m 1G "$(image motoserver/moto)"
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
