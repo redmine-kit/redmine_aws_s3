@@ -1,4 +1,7 @@
 en:
+  # The plugin's name and description (Administration › Plugins; redmine_kit_ui's docs/plugin-names.md)
+  plugin_name_redmine_kit_aws_s3: Redmine Kit AWS S3
+  plugin_description_redmine_kit_aws_s3: Stores attachments in Amazon S3
   label_aws_s3_admin: S3
   label_aws_s3_check: S3
   label_aws_s3_environment: Environment variables

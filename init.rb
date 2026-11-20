@@ -10,7 +10,7 @@ Redmine::Plugin.register :redmine_kit_aws_s3 do
   requires_redmine version_or_higher: '7.0.0'
   name 'Redmine Kit AWS S3'
   author 'Redmine Kit'
-  description 'Stores attachments in Amazon S3, uploaded and downloaded through CloudFront'
+  description 'Stores attachments in Amazon S3'
   version RedmineKit::Aws::S3::VERSION
   url 'https://github.com/redmine-kit/redmine_aws_s3'
   author_url 'https://github.com/redmine-kit'
