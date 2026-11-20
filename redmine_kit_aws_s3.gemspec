@@ -7,7 +7,7 @@
 Gem::Specification.new do |spec|
   spec.name = 'redmine_kit_aws_s3'
   spec.version = File.read(File.join(__dir__, 'lib/redmine_kit/aws/s3.rb'))[/VERSION = '([^']+)'/, 1]
-  spec.summary = 'Stores Redmine attachments in Amazon S3'
+  spec.summary = 'Stores attachments in Amazon S3'
   spec.authors = ['Redmine Kit']
   spec.license = 'GPL-2.0-or-later'
   spec.homepage = 'https://github.com/redmine-kit/redmine_aws_s3'
