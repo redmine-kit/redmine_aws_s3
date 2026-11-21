@@ -107,19 +107,24 @@ check_network() {
 }
 
 # network_problem <network>: what is wrong with the network now, read again on
-# each call (the host's interfaces, and a short-lived container that must reach
-# the network's anchor, a few seconds); nothing when it works.
+# each call; nothing when it works. The symptom is a new short-lived container
+# that can't reach the network's anchor (a few seconds); only then is the
+# host's view of the gateway read, to say why. ifconfig's output depends on
+# the caller's environment (a sandboxed shell may list no bridges), so a
+# gateway it doesn't list is never a failure by itself, and an empty or failed
+# ifconfig says nothing.
 network_problem() {
-  local gateway anchor_address
-  gateway=$(container network inspect "$1" 2>/dev/null | sed -n 's/.*"ipv4Gateway" : "\([0-9.]*\)".*/\1/p' | head -1)
-  if [[ -n "$gateway" ]] && ! ifconfig | grep -q "inet $gateway "; then
-    echo "its gateway $gateway is on no host interface"
-    return 0
-  fi
+  local anchor_address gateway interfaces
   anchor_address=$(container inspect "anchor-$1" 2>/dev/null | sed -n 's/.*"ipv4Address" : "\([0-9.]*\)\/.*/\1/p' | head -1)
-  if [[ -n "$anchor_address" ]] &&
-    ! container run --rm --network "$1" -m 256M --progress none docker.io/library/alpine:3.22 \
-      sh -c "for i in 1 2 3 4 5; do ping -c 1 -W 1 $anchor_address >/dev/null && exit 0; sleep 1; done; exit 1" >/dev/null 2>&1; then
+  [[ -n "$anchor_address" ]] || return 0
+  container run --rm --network "$1" -m 256M --progress none docker.io/library/alpine:3.22 \
+    sh -c "for i in 1 2 3 4 5; do ping -c 1 -W 1 $anchor_address >/dev/null && exit 0; sleep 1; done; exit 1" \
+    >/dev/null 2>&1 && return 0
+  gateway=$(container network inspect "$1" 2>/dev/null | sed -n 's/.*"ipv4Gateway" : "\([0-9.]*\)".*/\1/p' | head -1)
+  interfaces=$(ifconfig 2>/dev/null) || interfaces=
+  if [[ -n "$gateway" && -n "$interfaces" ]] && ! grep -q "inet $gateway " <<<"$interfaces"; then
+    echo "a new container on it reaches nothing, and its gateway $gateway is on no host interface"
+  else
     echo "a new container on it reaches nothing"
   fi
 }
