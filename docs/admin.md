@@ -65,16 +65,16 @@ The screenshot on this page is taken with `bin/screenshots` (headless Chromium i
 
 The screen's terms follow the Japanese of the AWS documentation where AWS has one (checked on 2026-11-10). The Japanese GuardDuty documentation is a machine translation.
 
-| Screen (en / ja) | AWS term | Source | Status |
-| --- | --- | --- | --- |
-| GuardDuty malware scan / GuardDuty マルウェアスキャン | Malware scan (「マルウェアスキャン」) | https://docs.aws.amazon.com/ja_jp/guardduty/latest/ug/monitoring-malware-protection-s3-scans-gdu.html | Documentation |
-| Scan result / スキャン結果 | Scan result (「スキャン結果」), the tag `GuardDutyMalwareScanStatus` | Same page | Documentation |
-| Threats found / 脅威を検出 | `THREATS_FOUND` | Same page. The values stay in English. Our Japanese is made from the description 「潜在する脅威を検出しました」 | To recheck in the console |
-| Unsupported / サポート対象外 | `UNSUPPORTED` | Same page. Made from the description (the scan is skipped for files that are not supported) | To recheck in the console |
-| Access denied / アクセス拒否 | `ACCESS_DENIED` | Same page. Made from the description 「GuardDuty はこのオブジェクトにアクセスできず」 | To recheck in the console |
-| Failed / 失敗 | `FAILED` | Same page. Made from the scan status 「失敗」 | To recheck in the console |
-| Unknown / 不明 | Any other value | A value that GuardDuty may add later is shown with this label, not as the raw value | Product term |
-| Bucket / バケット, S3 objects / S3 オブジェクト数 | Bucket (「バケット」), object (「オブジェクト」) | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | Documentation |
-| CloudFront key pair ID / CloudFront キーペア ID | Key pair ID (「キーペア ID」) | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | Documentation |
-| Consistency check / 整合性チェック | — | The product's own term; AWS has no term for it | Product term |
-| Files blocked by malware scan / マルウェアスキャンでブロックしたファイル | — | "Blocked" (「ブロック」) is the product's own term for a file Redmine does not accept after the scan; GuardDuty only tags the object | Product term |
+| English | Japanese | AWS term | Source | Status |
+| --- | --- | --- | --- | --- |
+| GuardDuty malware scan | GuardDuty マルウェアスキャン | Malware scan (「マルウェアスキャン」) | https://docs.aws.amazon.com/ja_jp/guardduty/latest/ug/monitoring-malware-protection-s3-scans-gdu.html | Documentation |
+| Scan result | スキャン結果 | Scan result (「スキャン結果」), the tag `GuardDutyMalwareScanStatus` | Same page | Documentation |
+| Threats found | 脅威を検出 | `THREATS_FOUND` | Same page. The values stay in English. Our Japanese is made from the description 「潜在する脅威を検出しました」 | To recheck in the console |
+| Unsupported | サポート対象外 | `UNSUPPORTED` | Same page. Made from the description (the scan is skipped for files that are not supported) | To recheck in the console |
+| Access denied | アクセス拒否 | `ACCESS_DENIED` | Same page. Made from the description 「GuardDuty はこのオブジェクトにアクセスできず」 | To recheck in the console |
+| Failed | 失敗 | `FAILED` | Same page. Made from the scan status 「失敗」 | To recheck in the console |
+| Unknown | 不明 | Any other value | A value that GuardDuty may add later is shown with this label, not as the raw value | Product term |
+| Bucket, S3 objects | バケット, S3 オブジェクト数 | Bucket (「バケット」), object (「オブジェクト」) | https://docs.aws.amazon.com/ja_jp/AmazonS3/latest/userguide/Welcome.html | Documentation |
+| CloudFront key pair ID | CloudFront キーペア ID | Key pair ID (「キーペア ID」) | https://docs.aws.amazon.com/ja_jp/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html | Documentation |
+| Consistency check | 整合性チェック | — | The product's own term; AWS has no term for it | Product term |
+| Files blocked by malware scan | マルウェアスキャンでブロックしたファイル | — | "Blocked" (「ブロック」) is the product's own term for a file Redmine does not accept after the scan; GuardDuty only tags the object | Product term |
