@@ -101,17 +101,11 @@ module RedmineKit
           assert_default_expiries
         end
 
-        def test_update_ignores_settings_that_are_not_strings
-          patch :update, params: { settings: { download_url_expiry: ['120'], upload_url_expiry: { a: '1' } } }
-
-          assert_redirected_to '/admin/aws/s3'
-          assert_default_expiries
-        end
-
-        # settings of another shape than a hash changes nothing and doesn't
-        # fail.
-        def test_update_ignores_settings_that_are_not_a_hash
-          [{ settings: 'a string' }, { settings: %w[120 600] }, {}].each do |params|
+        # settings, or a value in it, of another shape changes nothing and
+        # doesn't fail.
+        def test_update_ignores_parameters_of_another_shape
+          [{ settings: { download_url_expiry: ['120'], upload_url_expiry: { a: '1' } } },
+           { settings: 'a string' }, { settings: %w[120 600] }, {}].each do |params|
             patch :update, params: params
 
             assert_redirected_to '/admin/aws/s3', params.inspect

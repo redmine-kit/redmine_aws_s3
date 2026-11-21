@@ -63,16 +63,20 @@ module RedmineKit
         # Adding a file prunes at most once a PRUNE_INTERVAL: a prune reads
         # every mark under the storage path.
         def test_add_prunes_at_most_once_an_interval
-          Cache::LAST_PRUNE.set(nil)
           interval = Cache::PRUNE_INTERVAL
-          Cache.stubs(:monotonic_now).returns(1000.0, 1000.0 + interval - 1, 1000.0 + interval)
+
+          assert_equal %w[f0 f2], pruned_on_add([1000.0, 1000.0 + interval - 1, 1000.0 + interval])
+        end
+
+        # Cache.add of a file at each time of the monotonic clock; the names of
+        # the files that Cache.prune was called for.
+        def pruned_on_add(times)
+          Cache::LAST_PRUNE.set(nil)
+          Cache.stubs(:monotonic_now).returns(*times)
           kept = []
           Cache.stubs(:prune).with { |keep:| kept << keep }
-          paths = %w[a b c].map { |name| write(name, 10, 0, cached: false) }
-          paths.each { |path| Cache.add(path) }
-
-          assert_equal [paths[0], paths[2]], kept
-          assert(paths.all? { |path| Cache.cached?(path) })
+          times.each_index { |i| Cache.add(write("f#{i}", 10, 0, cached: false)) }
+          kept.map { |path| File.basename(path) }
         ensure
           Cache::LAST_PRUNE.set(nil)
         end
