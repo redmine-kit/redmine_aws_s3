@@ -41,7 +41,7 @@ No plugin stating support for 7.0 was found in the range searched (GitHub, and a
 
 ## Options considered
 
-| Option | Decision |
+| Option | Use |
 | --- | --- |
 | Read and write through the S3 API (the plugins' approach) | Used |
 | Mount an S3 bucket on `files/` with S3 Files | Not used. With uploads and downloads going between the browser and S3, the only remaining benefit is server-side processing (thumbnails and so on). For that, it would bring synchronization between the file system and S3 (about 60 seconds from a write until it appears in S3) and extra charges (0.36 USD per GB of stored data per month) |
