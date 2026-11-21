@@ -86,16 +86,37 @@ fi
 # named volume to one container only): runs of this plugin wait for each other.
 gems_volume=$name-gems-ruby-$ruby_version
 gems_lock="${TMPDIR:-/tmp}/$gems_volume.lock"
-until [[ "$(cat "$gems_lock/pid" 2>/dev/null)" == "$$" ]] || mkdir "$gems_lock" 2>/dev/null; do
-  holder=$(cat "$gems_lock/pid" 2>/dev/null || true)
-  if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$gems_lock"; else sleep 3; fi
-done
-echo $$ >"$gems_lock/pid"
+# A script that sources this file again while its caller holds the lock (as
+# bin/update-schema does under redmine_kit_aws_dsql's bin/test) uses the
+# caller's lock: GEMS_LOCK_OWNER names the process that took it, and only that
+# process releases it. Waiting for its own caller would never end.
+gems_lock_owned=""
+if [[ -z "${GEMS_LOCK_OWNER:-}" || "$(cat "$gems_lock/pid" 2>/dev/null)" != "$GEMS_LOCK_OWNER" ]]; then
+  # Another run of these tests: wait for it, at most GEMS_LOCK_TIMEOUT seconds
+  # (default 3600), then stop with a message.
+  gems_lock_waited=0
+  until [[ "$(cat "$gems_lock/pid" 2>/dev/null)" == "$$" ]] || mkdir "$gems_lock" 2>/dev/null; do
+    holder=$(cat "$gems_lock/pid" 2>/dev/null || true)
+    if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then
+      rm -rf "$gems_lock"
+    elif ((gems_lock_waited >= ${GEMS_LOCK_TIMEOUT:-3600})); then
+      echo "The gems volume of these tests is still in use by process ${holder:-?} (another run) after" \
+        "${gems_lock_waited}s. Wait for it or stop it, then run again (GEMS_LOCK_TIMEOUT sets the wait)." >&2
+      exit 1
+    else
+      sleep 3
+      gems_lock_waited=$((gems_lock_waited + 3))
+    fi
+  done
+  echo $$ >"$gems_lock/pid"
+  export GEMS_LOCK_OWNER=$$
+  gems_lock_owned=1
+fi
 # After the script's own clean-up (bin/test_slot's, the services'): `trap -p`
 # quotes it, so that it is read back as it was.
 eval "previous_exit_trap=($(trap -p EXIT))"
 # shellcheck disable=SC2064,SC2154 # the variables at exit; the earlier clean-up as it is now
-trap "rm -rf \"\$test_context\" \"\$gems_lock\"${previous_exit_trap[2]:+; ${previous_exit_trap[2]}}" EXIT
+trap "rm -rf \"\$test_context\"${gems_lock_owned:+ \"\$gems_lock\"}${previous_exit_trap[2]:+; ${previous_exit_trap[2]}}" EXIT
 run_opts=(-v "$test_context/plugins:/src/plugins" -v "$gems_volume:/extra-gems")
 # The gems, on the network that reaches the internet (bin/services makes the
 # tests' networks).
