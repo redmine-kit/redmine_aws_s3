@@ -108,6 +108,17 @@ module RedmineKit
           assert_default_expiries
         end
 
+        # settings of another shape than a hash changes nothing and doesn't
+        # fail.
+        def test_update_ignores_settings_that_are_not_a_hash
+          [{ settings: 'a string' }, { settings: %w[120 600] }, {}].each do |params|
+            patch :update, params: params
+
+            assert_redirected_to '/admin/aws/s3', params.inspect
+            assert_default_expiries
+          end
+        end
+
         def test_blocked_files_use_the_aws_terms_and_redmine_users
           save_finding('time' => '2026-11-06T22:44:01Z', 'status' => 'THREATS_FOUND', 'filename' => 'bad.exe',
                        'key' => 'k', 'user' => 'jsmith')

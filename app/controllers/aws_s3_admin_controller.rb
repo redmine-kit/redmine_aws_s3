@@ -52,8 +52,11 @@ class AwsS3AdminController < ApplicationController
 
   private
 
+  # The plugin's settings, each a single value; a parameter of another shape
+  # (a string, an array) is ignored.
   def settings_params
-    params.fetch(:settings, {}).permit(*RedmineKit::Aws::S3::DEFAULT_SETTINGS.keys).to_h
+    values = params[:settings]
+    values.is_a?(ActionController::Parameters) ? values.permit(*RedmineKit::Aws::S3::DEFAULT_SETTINGS.keys).to_h : {}
   end
 
   # The names of the values that are not positive whole numbers.
