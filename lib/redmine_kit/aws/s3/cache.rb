@@ -13,6 +13,12 @@ module RedmineKit
       module Cache
         MARK = '.s3cache'
         PART_LIMIT = 1.hour
+        # Adding a file prunes at most once in this many seconds, because a
+        # prune reads every mark under the storage path; the cache can exceed
+        # its limit by what is fetched in between.
+        PRUNE_INTERVAL = 60
+        # The monotonic clock's time of the last prune by add, in this process.
+        LAST_PRUNE = Concurrent::AtomicReference.new
 
         module_function
 
@@ -29,12 +35,27 @@ module RedmineKit
           path
         end
 
-        # Marks the file at path, which is in S3, as cached, and prunes.
+        # Marks the file at path, which is in S3, as cached, and prunes when
+        # the last prune is PRUNE_INTERVAL ago.
         def add(path)
           FileUtils.touch("#{path}#{MARK}")
-          prune(keep: path)
+          prune(keep: path) if prune_due?
         rescue SystemCallError
           nil
+        end
+
+        # Whether this caller is the one to prune now: true for one thread at
+        # most per PRUNE_INTERVAL (compare and set of LAST_PRUNE).
+        def prune_due?
+          now = monotonic_now
+          last = LAST_PRUNE.get
+          return false if last && now - last < PRUNE_INTERVAL
+
+          LAST_PRUNE.compare_and_set(last, now)
+        end
+
+        def monotonic_now
+          Process.clock_gettime(Process::CLOCK_MONOTONIC)
         end
 
         def cached?(path)

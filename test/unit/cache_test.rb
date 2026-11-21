@@ -60,6 +60,23 @@ module RedmineKit
           assert_not File.exist?("#{cached}#{RedmineKit::Aws::S3::Cache::MARK}")
         end
 
+        # Adding a file prunes at most once a PRUNE_INTERVAL: a prune reads
+        # every mark under the storage path.
+        def test_add_prunes_at_most_once_an_interval
+          Cache::LAST_PRUNE.set(nil)
+          interval = Cache::PRUNE_INTERVAL
+          Cache.stubs(:monotonic_now).returns(1000.0, 1000.0 + interval - 1, 1000.0 + interval)
+          kept = []
+          Cache.stubs(:prune).with { |keep:| kept << keep }
+          paths = %w[a b c].map { |name| write(name, 10, 0, cached: false) }
+          paths.each { |path| Cache.add(path) }
+
+          assert_equal [paths[0], paths[2]], kept
+          assert(paths.all? { |path| Cache.cached?(path) })
+        ensure
+          Cache::LAST_PRUNE.set(nil)
+        end
+
         def test_fetch_touches_a_cached_file
           path = write('a', 10, 3600)
           client = stub_client
