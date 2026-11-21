@@ -57,7 +57,7 @@ For the consistency check job, the role that runs jobs gets permission to list t
 
 The page has Redmine functional tests; system tests are not written yet ([testing.md](https://redmine-kit.github.io/serverless/testing.html#administration-pages)).
 
-The screenshot on this page is taken with `bin/screenshots` (headless Chromium in Docker, with Redmine's test data and the S3 of the tests; the bucket, the CloudFront values, the blocked file and the consistency check are examples). Run it after changing the page.
+The screenshot on this page is taken with `bin/screenshots` (headless Chromium in Apple container when it runs, else in Docker, with Redmine's test data and the S3 of the tests; the bucket, the CloudFront values, the blocked file and the consistency check are examples). Run it after changing the page.
 
 <a id="terms"></a>
 

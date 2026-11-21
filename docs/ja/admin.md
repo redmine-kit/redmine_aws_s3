@@ -63,7 +63,7 @@ Redmine の「添付ファイルサイズの上限」(`attachment_max_size`、�
 
 画面には Redmine の機能テストがあります。システムテストはまだ書いていません ([testing.md](https://redmine-kit.github.io/serverless/ja/testing.html#administration-pages))。
 
-このページの画面のスクリーンショットは、`bin/screenshots` で撮ります (Docker の中のヘッドレスの Chromium と、Redmine のテストデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
+このページの画面のスクリーンショットは、`bin/screenshots` で撮ります (Apple container が動いていれば Apple container、そうでなければ Docker の中のヘッドレスの Chromium と、Redmine のテストデータと、テストの S3。バケット、CloudFront の値、ブロックしたファイル、整合性チェックは例)。画面を変えたら実行します。
 
 <a id="terms"></a>
 
