@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Copied to Redmine's config/additional_environment.rb in the test image
-# (test/Dockerfile). Only `bin/test core-s3` sets REDMINE_S3_TEST_CORE: it
+# Copied to Redmine's config/additional_environment.rb by bin/test before each
+# run. Only `bin/test core-s3` sets REDMINE_S3_TEST_CORE: it
 # turns the plugin on for Redmine's own attachment tests, with S3 from
 # LocalStack or moto and a CloudFront key pair made for the run.
 if ENV['REDMINE_S3_TEST_CORE'] == '1'

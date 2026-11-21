@@ -25,7 +25,6 @@ if [[ "${1:-}" == "system" ]]; then
 else
   bin/services >/dev/null
 fi
-test_image_args=(--build-arg REDMINE_BRANCH="${REDMINE_BRANCH:-}")
 source bin/test_image
 if [[ -n "${LOCALSTACK_AUTH_TOKEN:-}" ]]; then
   backend=localstack service=localstack port=4566
@@ -47,10 +46,11 @@ fi
 echo "S3 for the tests: $backend ($endpoint)"
 # A database of this run's own (test/database.yml), dropped when the tests end.
 run() {
-  "$cli" run --rm "${opts[@]}" -e PARALLEL_WORKERS="$workers" ${extra[@]+"${extra[@]}"} \
+  "$cli" run --rm "${run_opts[@]}" "${opts[@]}" -e PARALLEL_WORKERS="$workers" ${extra[@]+"${extra[@]}"} \
     -e TEST_DATABASE="redmine_test_$$" -e S3_TEST_ENDPOINT="$endpoint" -e S3_TEST_BACKEND="$backend" \
     -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test "$image" \
-    sh -c '[ -z "${SELENIUM_REMOTE_URL:-}" ] ||
+    sh -c 'cp plugins/redmine_kit_aws_s3/test/core/additional_environment.rb config/
+      [ -z "${SELENIUM_REMOTE_URL:-}" ] ||
         export CAPYBARA_APP_HOST="${CAPYBARA_APP_HOST:-http://$(hostname -i | cut -d" " -f1):3001}"
       bin/rails db:drop db:create db:migrate db:schema:dump >/dev/null && "$@"
       status=$?; bin/rails db:drop >/dev/null 2>&1; exit $status' run "$@"

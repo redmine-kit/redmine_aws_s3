@@ -25,7 +25,7 @@ else
   net=(--network "$kit_test_network" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
 fi
 # A database of this run's own, dropped at the end.
-"$cli" run --rm "${net[@]}" -e TEST_DATABASE="redmine_test_$$" "$image" sh -ec '
+"$cli" run --rm "${run_opts[@]}" "${net[@]}" -e TEST_DATABASE="redmine_test_$$" "$image" sh -ec '
   (cd plugins/redmine_kit_aws && gem build --quiet redmine_kit_aws.gemspec --output /tmp/redmine_kit_aws.gem)
   (cd plugins/redmine_kit_aws_s3 && gem build --quiet redmine_kit_aws_s3.gemspec --output /tmp/redmine_kit_aws_s3.gem)
   rm -rf plugins/redmine_kit_aws plugins/redmine_kit_aws_s3
