@@ -16,6 +16,14 @@ A Redmine plugin that stores attachments in Amazon S3: uploads and downloads thr
 - Website: https://redmine-kit.github.io/redmine_aws_s3/ ([日本語](https://redmine-kit.github.io/redmine_aws_s3/ja/))
 - Markdown: [docs/README.md](docs/README.md) ([日本語](docs/ja/README.md)), with [setup](docs/setup.md), [IAM permissions](docs/iam.md), [attachments and S3](docs/attachments.md) and the [administration page](docs/admin.md)
 
+## Help
+
+With [Redmine Kit Help](https://github.com/redmine-kit/redmine_help) installed, the plugin's help is in `help/`: the topic Attachments in Amazon S3 (English and Japanese), and sections in the guide's topics Redmine Attached Files (after File storage) and Application Settings (after Attachment max. size), labelled with the plugin's name. The S3 tab and the plugin's Configure open the topic from the Help panel (`help/map.yml`). Check it against the installed guide from Redmine's folder:
+
+```sh
+bin/rails redmine_kit:help:check PLUGIN=redmine_kit_aws_s3
+```
+
 ## Sponsors
 
 <a href="https://www.keyselect.co.jp/">

@@ -1,5 +1,5 @@
-# The sidebar section of this plugin's help, read by redmine_help
-# (https://github.com/redmine-kit/redmine_help, docs/extending.md).
+# The sidebar section of this plugin's help, read by Redmine Kit Help
+# (redmine_kit_help's docs/extending.md).
 sections:
   - id: aws-s3
     title: Redmine Kit AWS S3

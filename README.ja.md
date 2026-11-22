@@ -18,6 +18,16 @@
 - Web サイト: https://redmine-kit.github.io/redmine_aws_s3/ja/ (English: https://redmine-kit.github.io/redmine_aws_s3/)
 - Markdown: [docs/ja/README.md](docs/ja/README.md) (English: [docs/README.md](docs/README.md))。[導入](docs/ja/setup.md)、[IAM 権限](docs/ja/iam.md)、[添付ファイルと S3](docs/ja/attachments.md)、[管理画面](docs/ja/admin.md)があります。
 
+<a id="help"></a>
+
+## ヘルプ
+
+[Redmine Kit Help](https://github.com/redmine-kit/redmine_help) をインストールしていれば、プラグインのヘルプは `help/` にあります。トピック「Amazon S3 の添付ファイル」(英語と日本語) と、ガイドのトピック「添付ファイル」(「ファイルの保存先」のあと) と「設定」(「添付ファイルサイズの上限」のあと) のセクション (プラグインの名前のラベル付き) です。「S3」タブとプラグインの「設定」で、ヘルプのパネルがこのトピックを開きます (`help/map.yml`)。Redmine のディレクトリで、インストールされたガイドに対してチェックできます。
+
+```sh
+bin/rails redmine_kit:help:check PLUGIN=redmine_kit_aws_s3
+```
+
 <a id="sponsors"></a>
 
 ## スポンサー

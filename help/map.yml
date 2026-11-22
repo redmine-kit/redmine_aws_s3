@@ -1,2 +1,4 @@
-# This plugin's screens -> help topics, read by redmine_help (docs/mapping.md).
-aws_s3_admin: aws-s3/attachments
+# This plugin's screens -> help topics, read by Redmine Kit Help (redmine_kit_help's docs/mapping.md). The plugin has
+# no screen in the new UI; the same keys would serve it. Configure in Administration › Plugins opens the S3 tab.
+aws_s3_admin: aws-s3/attachments#The-S3-tab
+settings#plugin?id=redmine_kit_aws_s3: aws-s3/attachments#The-S3-tab
