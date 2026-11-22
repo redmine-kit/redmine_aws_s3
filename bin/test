@@ -20,6 +20,7 @@ cd "$(dirname "$0")/.."
 source bin/container_cli
 source bin/test_slot
 name=redmine-kit-aws-s3-test
+stop_services_at_exit "$name"
 if [[ "${1:-}" == "system" ]]; then
   bin/services --system >/dev/null
 else

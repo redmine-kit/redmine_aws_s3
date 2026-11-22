@@ -128,3 +128,81 @@ network_problem() {
     echo "a new container on it reaches nothing"
   fi
 }
+
+# stop_services_at_exit <prefix>: when the calling script ends, however it
+# ends (success, failure, Ctrl-C, a closed terminal), stops (does not remove)
+# the containers named <prefix>-* that were not running when it called this,
+# so that test services don't keep running after the tests (each is a VM with
+# its memory in Apple container). A container that ran before (kept by
+# KEEP_SERVICES, or started by hand) is left as it is. Runs of the same
+# repository that overlap (two agents, a script that calls another) share the
+# services: they are stopped when the last of these runs ends. With
+# KEEP_SERVICES=1 nothing is stopped, and what is running stays running. Call
+# it before the script starts any service. Anchors, the dev Redmine server and
+# other repositories' containers have other names and are never touched.
+# The stop runs in a process of its own that waits for the script to end,
+# since the scripts replace each other's EXIT traps (bin/test_slot,
+# bin/test_image) and a trap doesn't run when the script is killed.
+stop_services_at_exit() {
+  local prefix=$1 state run=$$
+  state=${TMPDIR:-/tmp}/redmine-kit-services/$prefix
+  mkdir -p "$state/runs"
+  services_lock "$state"
+  service_containers "$prefix" >"$state/runs/$run"
+  services_unlock "$state"
+  (
+    trap '' INT TERM HUP
+    while kill -0 "$run" 2>/dev/null; do sleep 1; done
+    release_services "$prefix" "$state" "$run"
+  ) </dev/null >/dev/null 2>&1 &
+}
+
+# service_containers <prefix>: the names of the running containers <prefix>-*.
+service_containers() {
+  if [[ "$cli" == docker ]]; then
+    docker ps --format '{{.Names}}' 2>/dev/null
+  else
+    container ls -q 2>/dev/null
+  fi | awk -v prefix="$1-" 'index($0, prefix) == 1' || true
+}
+
+# release_services <prefix> <state> <pid>: the end of the run <pid>. Adds the
+# containers it started to those to stop, and stops them when no other run
+# of these services is still running.
+release_services() {
+  local prefix=$1 state=$2 before=$2/runs/$3 file
+  services_lock "$state"
+  if [[ -n "${KEEP_SERVICES:-}" ]]; then
+    rm -f "$state/started"
+  elif [[ -f "$before" ]]; then
+    service_containers "$prefix" | grep -vxF -f "$before" >>"$state/started" || true
+  fi
+  rm -f "$before"
+  for file in "$state"/runs/*; do
+    [[ -e "$file" ]] || continue
+    if kill -0 "${file##*/}" 2>/dev/null; then
+      services_unlock "$state"
+      return 0
+    fi
+    rm -f "$file" # a run that ended without its release
+  done
+  if [[ -s "$state/started" ]]; then
+    sort -u "$state/started" | while IFS= read -r file; do "$cli" stop "$file" >/dev/null 2>&1 || true; done
+  fi
+  rm -f "$state/started"
+  services_unlock "$state"
+}
+
+# services_lock <state> / services_unlock <state>: one run at a time changes
+# the state of a repository's services. A lock whose process is gone is taken
+# over.
+services_lock() {
+  local me holder
+  me=${BASHPID:-$(exec sh -c 'echo $PPID')}
+  until mkdir "$1/lock" 2>/dev/null; do
+    holder=$(cat "$1/lock/pid" 2>/dev/null || true)
+    if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$1/lock"; else sleep 1; fi
+  done
+  echo "$me" >"$1/lock/pid"
+}
+services_unlock() { rm -rf "$1/lock"; }

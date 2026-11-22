@@ -14,8 +14,9 @@ source bin/container_cli
 source bin/test_slot
 plugin=redmine_kit_aws_s3
 name=redmine-kit-aws-s3-test
+stop_services_at_exit "$name"
 bin/services --system >/dev/null
-# Chromium is stopped afterwards; the other services stay for bin/test.
+# Chromium is stopped afterwards; the other services stop when the run ends, unless they ran before it (stop_services_at_exit).
 if [[ "$cli" == docker ]]; then
   trap 'release_test_slot; docker compose -f test/compose.yml -p "$name" stop chrome >/dev/null 2>&1' EXIT
 else

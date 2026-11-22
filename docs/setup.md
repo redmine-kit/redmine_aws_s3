@@ -134,6 +134,8 @@ The permissions the plugin needs, with an example policy, are in [iam.md](iam.md
 
 Redmine's standard plugin tests, in Apple container when it is installed and running, else in Docker (`CONTAINER_CLI=container` or `docker` chooses; at most two test runs of the redmine-kit repositories at once on a machine, `TEST_SLOTS`), with Redmine 7.0.3 (or Redmine's master branch with `REDMINE_BRANCH=master`), PostgreSQL 16, and S3 from LocalStack when `LOCALSTACK_AUTH_TOKEN` is set or from moto otherwise (`bin/test` prints which). Redmine Kit AWS, which the plugin requires, comes from a checkout next to this one (`../redmine_kit_aws`) or from the directory in `REDMINE_KIT_AWS_DIR`:
 
+A run stops the service containers it started (it doesn't remove them) when it ends, whether the tests pass, fail or are interrupted. Containers that were running before the run, or that another run of this repository still uses, are left running. `KEEP_SERVICES=1` keeps them running after the run.
+
 ```sh
 bin/test                 # the plugin's tests
 COVERAGE=1 bin/test      # with the coverage in coverage/coverage.xml

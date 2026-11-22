@@ -156,6 +156,8 @@ sandbox の CSP は外さないでください。添付ファイルは Redmine �
 
 Redmine の標準のプラグインのテストです。Apple container がインストールされて動いていれば Apple container で、そうでなければ Docker で実行します (`CONTAINER_CLI=container` または `docker` で選べます。1 台のマシンで同時に実行する redmine-kit のリポジトリのテストは 2 つまで、`TEST_SLOTS`)。Redmine 7.0.3 (`REDMINE_BRANCH=master` なら Redmine の master ブランチ)、PostgreSQL 16 と、`LOCALSTACK_AUTH_TOKEN` があれば LocalStack、なければ moto の S3 を使います。プラグインが必要とする Redmine Kit AWS は、隣のチェックアウト (`../redmine_kit_aws`) か、`REDMINE_KIT_AWS_DIR` のディレクトリから使います。
 
+実行は、終わったときに (テストの成功、失敗、中断のいずれでも)、自分が起動したサービスのコンテナを停止します (削除はしません)。実行の前から動いていたコンテナと、このリポジトリの別の実行がまだ使っているコンテナは、そのまま動かしておきます。`KEEP_SERVICES=1` を指定すると、実行の後も動かしたままにします。
+
 ```sh
 bin/test                 # プラグインのテスト
 COVERAGE=1 bin/test      # カバレッジを coverage/coverage.xml に出力する
