@@ -7,8 +7,6 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'codecov/codecov-action@v7.1.1'
     '.github/workflows/docs.yml': []
-    '.github/workflows/gem.yml':
-        - 'actions/checkout@v7.0.1'
     '.github/workflows/verify-lockfile.yml':
         - 'actions/checkout@v7.0.1'
 dependencies:
