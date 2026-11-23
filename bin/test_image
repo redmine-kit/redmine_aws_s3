@@ -33,6 +33,17 @@ copy_plugin() {
 test_context=$(mktemp -d)
 copy_plugin . "$test_context/plugins/redmine_kit_aws_s3"
 copy_plugin "$aws_dir" "$test_context/plugins/redmine_kit_aws"
+# redmine_kit_ui, for the tests of the new UI's tab (test/integration/
+# kit_test.rb: the manifest it takes, the JSON of kit requests), not its app
+# (frontend/: the tests need no build of it): REDMINE_KIT_UI=<dir>, default
+# ../redmine_kit_ui, the checkout next to this one; REDMINE_KIT_UI_REF=<commit>,
+# default HEAD. bin/test runs the plugin's tests with it and without it.
+kit_ui=${REDMINE_KIT_UI:-../redmine_kit_ui}
+kit_ui_ref=${REDMINE_KIT_UI_REF:-HEAD}
+[[ -f "$kit_ui/init.rb" ]] || { echo "redmine_kit_ui is not in $kit_ui; set REDMINE_KIT_UI" >&2; exit 1; }
+mkdir -p "$test_context/plugins/redmine_kit_ui"
+git -C "$kit_ui" archive "$kit_ui_ref" init.rb Gemfile app assets config db lib test |
+  tar -xf - -C "$test_context/plugins/redmine_kit_ui"
 # Redmine from its repository instead of the 7.0.3 release: REDMINE_BRANCH=
 # <branch> (master) at the branch's current commit, or REDMINE_COMMIT=<sha>;
 # a base image of its own, tagged with the commit.

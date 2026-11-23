@@ -53,4 +53,32 @@ module AwsS3AdminHelper
     started = RedmineKit::Aws::S3::Reconciliation.started_at(result)
     { name: l(:field_aws_s3_started_at), value: started ? format_time(started) : '-' }
   end
+
+  # What the "S3" tab shows, as the new UI's JSON (GET admin/aws/s3.json),
+  # formatted as Redmine's page formats it (the controller's @settings,
+  # @reconciliation, @findings and @finding_users): whether S3 is on, the
+  # environment, the malware findings (when the scan is on or there are
+  # findings), the last consistency check and the settings.
+  def aws_s3_admin_json
+    s3 = RedmineKit::Aws::S3
+    {
+      enabled: s3.enabled?,
+      bucket_variable: s3::ENV_BUCKET,
+      environment: aws_s3_environment_rows,
+      findings: (@findings.map { |finding| aws_s3_finding_json(finding) } if s3.malware_scan? || @findings.any?),
+      reconciliation: @reconciliation.presence && aws_s3_reconciliation_json(@reconciliation),
+      settings: @settings.transform_values(&:to_s)
+    }
+  end
+
+  def aws_s3_finding_json(finding)
+    user = @finding_users[finding['user']]
+    { time: finding['time'].present? ? format_time(Time.iso8601(finding['time'])) : '',
+      result: RedmineKit::Aws::S3::MalwareScan.status_label(finding['status']), filename: finding['filename'],
+      user: user ? { id: user.id, name: user.name } : nil, login: user ? nil : finding['user'] }
+  end
+
+  def aws_s3_reconciliation_json(result)
+    { rows: aws_s3_reconciliation_rows(result), missing: Array(result['missing']), unused: Array(result['unused']) }
+  end
 end

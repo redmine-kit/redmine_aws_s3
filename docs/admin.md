@@ -37,6 +37,12 @@ The results of the connection tests:
 - **Without the bucket:** The tab still opens and shows the warning "REDMINE_S3_BUCKET is not set, so attachments are stored on the local disk." It shows the environment variables and the settings; the connection tests, the blocked files and the consistency check are not shown.
 - **Operations are logged:** Changing the settings (the names of the settings, not their values), the connection tests and the consistency check are written to Redmine's log with the administrator's login.
 
+### In the new UI
+
+With [Redmine Kit UI](https://github.com/redmine-kit/redmine_kit_ui) installed, the new UI draws the S3 tab itself, as a tab of Redmine Kit AWS's page "AWS" (`config/kit_ui.yml`, the component `AwsS3Admin` built from `frontend/` into `assets/javascripts/kit/s3.js`; [Redmine Kit AWS's api.md](https://redmine-kit.github.io/redmine_aws/api.html#the-new-ui)). It shows the same values and allows the same, through the same actions behind `require_admin`, which answer JSON as well as Redmine's page: the sections as on Redmine's page, the values as label and value pairs with their variables, "Read/write test" and "Delivery test" in the heading of Connection test with each step's result under it, the blocked files as a table, "Run consistency check" in its section's heading with the last check's values and keys, and the settings saved with "Save", Redmine's errors above them.
+
+The JSON, for the browser's session (kit requests): `GET /admin/aws/s3.json` gives `enabled`, `environment` (the rows of the page), `findings`, `reconciliation` and `settings`, formatted with Redmine's helpers and without the private key; `PATCH /admin/aws/s3.json` (`settings`) and `POST …/reconcile.json` give `{ notice, errors }` (422 with the errors when the settings are refused); `POST …/read_write.json` and `…/delivery.json` give `{ results }`, each step's `name`, `ok` and `value`. The plugin's settings stay on this tab in the new UI too.
+
 <a id="the-aws-menu"></a>
 
 ## The AWS menu

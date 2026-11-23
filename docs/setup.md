@@ -22,6 +22,7 @@ Without it, Redmine stops at boot and names it. Installed as a gem, this plugin 
 | Plugin | With it |
 | --- | --- |
 | [Redmine Kit Help](https://github.com/redmine-kit/redmine_help) | this plugin's help in the Help panel |
+| [Redmine Kit UI](https://github.com/redmine-kit/redmine_kit_ui) | the new UI's screen of the S3 tab ([admin.md](admin.md#in-the-new-ui)) |
 
 ## Installation
 
@@ -151,7 +152,7 @@ Redmine's standard plugin tests, in Apple container when it is installed and run
 A run stops the service containers it started (it doesn't remove them) when it ends, whether the tests pass, fail or are interrupted. Containers that were running before the run, or that another run of this repository still uses, are left running. `KEEP_SERVICES=1` keeps them running after the run.
 
 ```sh
-bin/test                 # the plugin's tests
+bin/test                 # the plugin's tests with Redmine Kit UI (../redmine_kit_ui, or REDMINE_KIT_UI), then without it
 COVERAGE=1 bin/test      # with the coverage in coverage/coverage.xml
 bin/test core            # Redmine's own tests with the plugin installed (off)
 bin/test core-s3         # Redmine's attachment tests with the plugin on
@@ -164,6 +165,15 @@ bin/lint                 # RuboCop
 bin/test-gem             # the gems of the plugin and Redmine Kit AWS: built, installed, linked into plugins/, booted
 node test/javascripts/complete_test.mjs # the upload script's complete step
 node test/javascripts/avatar_check_test.mjs # the avatar script's check step
+```
+
+The new UI's module is checked in `frontend/` with Node.js (the version in `frontend/.nvmrc`); `.npmrc` has `ignore-scripts=true`, and `@redmine-kit/ui` and `@redmine-kit/plugin` come from the checkout of the ui repository next to this one (`../../ui/packages/…`):
+
+```sh
+cd frontend
+npm install
+npm run check       # type check, the components' tests (vitest), the build, kit-check-ui, the Storybook's build
+npm run storybook   # the Storybook of the tab's states, on port 6008
 ```
 
 ### How AWS is tested

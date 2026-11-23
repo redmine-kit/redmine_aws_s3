@@ -7,3 +7,4 @@ requires:
   redmine_kit_aws: "~> 0.1"
 suggests:
   - redmine_kit_help
+  - redmine_kit_ui

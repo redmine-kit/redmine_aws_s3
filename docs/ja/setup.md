@@ -27,6 +27,7 @@ Redmine Kit AWS S3 を使う Redmine サーバーに要るもの (インスト�
 | プラグイン | 使える機能 |
 | --- | --- |
 | [Redmine Kit Help](https://github.com/redmine-kit/redmine_help) | ヘルプのパネルに表示するこのプラグインのヘルプ |
+| [Redmine Kit UI](https://github.com/redmine-kit/redmine_kit_ui) | 新しい UI の「S3」タブの画面 ([admin.md](admin.md#in-the-new-ui)) |
 
 <a id="installation"></a>
 
@@ -176,7 +177,7 @@ Redmine の標準のプラグインのテストです。Apple container がイ�
 実行は、終わったときに (テストの成功、失敗、中断のいずれでも)、自分が起動したサービスのコンテナを停止します (削除はしません)。実行の前から動いていたコンテナと、このリポジトリの別の実行がまだ使っているコンテナは、そのまま動かしておきます。`KEEP_SERVICES=1` を指定すると、実行の後も動かしたままにします。
 
 ```sh
-bin/test                 # プラグインのテスト
+bin/test                 # Redmine Kit UI (../redmine_kit_ui、または REDMINE_KIT_UI) ありと、なしのプラグインのテスト
 COVERAGE=1 bin/test      # カバレッジを coverage/coverage.xml に出力する
 bin/test core            # プラグインをインストールした (無効の) 状態で、Redmine 本体のテスト
 bin/test core-s3         # プラグインを有効にして、Redmine の添付ファイルのテスト
@@ -189,6 +190,15 @@ bin/lint                 # RuboCop
 bin/test-gem             # プラグインと Redmine Kit AWS の gem をビルド・インストールし、plugins/ にリンクして起動する
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
 node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確認処理
+```
+
+新しい UI のモジュールは、`frontend/` で Node.js (バージョンは `frontend/.nvmrc`) を使って確認します。`.npmrc` には `ignore-scripts=true` があり、`@redmine-kit/ui` と `@redmine-kit/plugin` は、隣にある ui リポジトリのチェックアウト (`../../ui/packages/…`) から取得します。
+
+```sh
+cd frontend
+npm install
+npm run check       # 型チェック、コンポーネントのテスト (vitest)、ビルド、kit-check-ui、Storybook のビルド
+npm run storybook   # タブの状態の Storybook (ポート 6008)
 ```
 
 <a id="how-aws-is-tested"></a>

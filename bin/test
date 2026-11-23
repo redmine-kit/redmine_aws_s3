@@ -3,13 +3,14 @@
 # (CONTAINER_CLI=container|docker chooses): Redmine 7.0.3 with this plugin, on
 # PostgreSQL 16, with S3 from LocalStack when LOCALSTACK_AUTH_TOKEN is set and
 # from moto otherwise.
-#   bin/test                  # the plugin's tests
+#   bin/test                  # the plugin's tests with redmine_kit_ui, then without it
+#   REDMINE_KIT_UI=<dir> REDMINE_KIT_UI_REF=<commit> bin/test   # redmine_kit_ui from that checkout and commit
 #   COVERAGE=1 bin/test       # with the coverage in coverage/coverage.xml, as the CI does
 #   bin/test core             # Redmine's own tests with the plugin installed (off)
 #   bin/test system           # the plugin's system tests, in headless Chromium
 #   bin/test core-s3          # Redmine's attachment tests with the plugin on
 #                             # (test/core/s3_exclusions.txt lists those left out)
-#   bin/test <files...>       # some of the plugin's tests
+#   bin/test <files...>       # some of the plugin's tests, with redmine_kit_ui
 #   PARALLEL_WORKERS=1 bin/test
 #   REDMINE_BRANCH=master bin/test   # on Redmine's master branch
 #   REDMINE_KIT_AWS_DIR=<dir> bin/test   # redmine_kit_aws from <dir> (default ../redmine_kit_aws)
@@ -46,11 +47,17 @@ else
 fi
 echo "S3 for the tests: $backend ($endpoint)"
 # A database of this run's own (test/database.yml), dropped when the tests end.
+# Without redmine_kit_ui: its folder moved away, its Gemfile kept (the
+# installed gems stay the bundle's), so that the plugin boots alone. Redmine's
+# own tests and the system tests run without it.
+without_kit_ui='mv plugins/redmine_kit_ui /tmp/ && mkdir plugins/kit_ui_gems && cp /tmp/redmine_kit_ui/Gemfile plugins/kit_ui_gems/'
+prepare=$without_kit_ui
 run() {
   "$cli" run --rm "${run_opts[@]}" "${opts[@]}" -e PARALLEL_WORKERS="$workers" ${extra[@]+"${extra[@]}"} \
     -e TEST_DATABASE="redmine_test_$$" -e S3_TEST_ENDPOINT="$endpoint" -e S3_TEST_BACKEND="$backend" \
-    -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test "$image" \
-    sh -c 'cp plugins/redmine_kit_aws_s3/test/core/additional_environment.rb config/
+    -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=test -e AWS_SECRET_ACCESS_KEY=test -e PREPARE="$prepare" "$image" \
+    sh -c 'eval "$PREPARE"
+      cp plugins/redmine_kit_aws_s3/test/core/additional_environment.rb config/
       [ -z "${SELENIUM_REMOTE_URL:-}" ] ||
         export CAPYBARA_APP_HOST="${CAPYBARA_APP_HOST:-http://$(hostname -i | cut -d" " -f1):3001}"
       bin/rails db:drop db:create db:migrate db:schema:dump >/dev/null && "$@"
@@ -90,7 +97,7 @@ elif [[ "${1:-}" == "core" ]]; then
   shift
   run bin/rails test "$@"
 elif (($#)); then
-  run bin/rails test "$@"
+  prepare='' run bin/rails test "$@"
 else
   # With COVERAGE set: one process, so that SimpleCov sees every test
   # (Redmine's helper starts it when COVERAGE is set).
@@ -99,5 +106,10 @@ else
     workers=1
     extra=(-e COVERAGE=1 -v "$PWD/coverage:/redmine/plugins/redmine_kit_aws_s3/coverage")
   fi
-  run bin/rails test plugins/redmine_kit_aws_s3/test/{unit,functional,integration}
+  # with redmine_kit_ui, then without it
+  echo '== with redmine_kit_ui' >&2
+  prepare='' run bin/rails test plugins/redmine_kit_aws_s3/test/{unit,functional,integration}
+  echo '== without redmine_kit_ui' >&2
+  extra=()
+  prepare=$without_kit_ui run bin/rails test plugins/redmine_kit_aws_s3/test/{unit,functional,integration}
 fi

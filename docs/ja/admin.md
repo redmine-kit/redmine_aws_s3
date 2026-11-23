@@ -37,6 +37,14 @@ Redmine Kit AWS S3 の管理画面です。システム管理者だけが開け�
 - **バケットがないとき:** タブは開き、「REDMINE_S3_BUCKET が未設定のため、添付ファイルはローカルディスクに保存します。」と出します。環境変数と設定は出し、接続テスト、ブロックしたファイル、整合性チェックは出しません。
 - **操作の記録:** 設定の変更 (値ではなく設定の名前)、接続テスト、整合性チェックは、システム管理者のログイン名とともに Redmine のログに書きます。
 
+<a id="in-the-new-ui"></a>
+
+### 新しい UI
+
+[Redmine Kit UI](https://github.com/redmine-kit/redmine_kit_ui) をインストールしていれば、「S3」タブは、Redmine Kit AWS のページ「AWS」のタブとして、新しい UI が描画します (`config/kit_ui.yml`。`frontend/` から `assets/javascripts/kit/s3.js` にビルドするコンポーネント `AwsS3Admin`。[Redmine Kit AWS の api.md](https://redmine-kit.github.io/redmine_aws/ja/api.html#the-new-ui))。`require_admin` 付きの同じアクションが Redmine の画面と JSON の両方に応答し、同じ値を表示して、同じ操作ができます。項目は Redmine の画面と同じで、値は環境変数を添えたラベルと値の組です。接続テストの見出しに「読み書きテスト」と「配信テスト」があり、その下にステップごとの結果を表示します。ブロックしたファイルは表、整合性チェックは見出しに「整合性チェックを実行」があり、最後のチェックの値とキーを表示します。設定は「保存」で保存し、Redmine のエラーをその上に表示します。
+
+JSON はブラウザーのセッション (kit リクエスト) で使います。`GET /admin/aws/s3.json` は、Redmine のヘルパーで整形した `enabled`、`environment` (画面の行)、`findings`、`reconciliation`、`settings` を返し、秘密鍵は含みません。`PATCH /admin/aws/s3.json` (`settings`) と `POST …/reconcile.json` は `{ notice, errors }` を返します (設定を拒否したときは 422 とエラー)。`POST …/read_write.json` と `…/delivery.json` は、ステップごとの `name`、`ok`、`value` を `{ results }` で返します。新しい UI でも、プラグインの設定はこのタブにあります。
+
 <a id="the-aws-menu"></a>
 
 ## AWS メニュー

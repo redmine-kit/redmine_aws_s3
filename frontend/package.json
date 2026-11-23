@@ -1,0 +1,35 @@
+{
+  "name": "redmine-kit-aws-s3-frontend",
+  "private": true,
+  "type": "module",
+  "description": "The source of Redmine Kit AWS S3's module for the new UI (../assets/javascripts/kit/s3.js)",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "check:ui": "kit-check-ui",
+    "storybook": "storybook dev -p 6008",
+    "build-storybook": "storybook build -o storybook-static --quiet",
+    "check": "npm run typecheck && npm test && npm run build && npm run check:ui && npm run build-storybook"
+  },
+  "peerDependencies": {
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@redmine-kit/plugin": "file:../../ui/packages/plugin",
+    "@redmine-kit/ui": "file:../../ui/packages/ui",
+    "@tanstack/react-query": "5.107.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.10",
+    "@types/react": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "jsdom": "31.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.5.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}

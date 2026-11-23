@@ -1,0 +1,9 @@
+# What Redmine Kit AWS S3 adds to Redmine Kit's new UI (redmine_kit_ui's docs/plugins-kit.md, "The manifest"): the tab S3
+# of Administration › AWS (AwsS3Admin, at the route of Redmine's tab), on the page of redmine_kit_aws's admin menu item
+# aws, at the position of its register_tab (docs/api.md of redmine_kit_aws, "The new UI"). The plugin's settings are on
+# that tab, as on Redmine's page (Configure opens the tab). Who may open it is the controller's (require_admin).
+api_version: 1
+module: kit/s3.js
+stylesheet: kit/s3.css
+screens:
+  - { path: /admin/aws/s3, component: AwsS3Admin, layout: admin, menu_item: aws, title: label_aws, tab: label_aws_s3_admin, position: 50 }
