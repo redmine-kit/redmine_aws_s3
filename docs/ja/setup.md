@@ -7,15 +7,32 @@ Redmine Kit AWS S3 を使う Redmine サーバーに要るもの (インスト�
 ## 動作環境
 
 - Redmine 7.0 以降。
-- [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_kit_aws`) 0.1 以降。「AWS」の管理メニューがあります (gem の依存です。チェックアウトでは、これもクローンします)。
 - AWS の認証情報で S3 に届くプロセス (Lambda では実行ロール、ほかではインスタンスプロファイルやタスクロール)。Redmine にアクセスキーは置きません。
 - Redmine を CloudFront のディストリビューションで配信していること。ブラウザーは、ファイルのアップロードとダウンロードも、これを通して行い、S3 のドメインには触れません ([attachments.md](attachments.md#upload))。
+
+<a id="required-plugins"></a>
+
+### 必須プラグイン
+
+| プラグイン | 用途 |
+| --- | --- |
+| [Redmine Kit AWS](https://github.com/redmine-kit/redmine_aws) | 「AWS」の管理メニューと、AWS のプラグインが共有する設定 |
+
+ないときは、Redmine が起動時に停止し、そのプラグインの名前を示します。gem としてインストールすると、このプラグインがそれもインストールします ([インストール](#installation))。
+
+<a id="optional-plugins"></a>
+
+### オプションのプラグイン
+
+| プラグイン | 使える機能 |
+| --- | --- |
+| [Redmine Kit Help](https://github.com/redmine-kit/redmine_help) | ヘルプのパネルに表示するこのプラグインのヘルプ |
 
 <a id="installation"></a>
 
 ## インストール
 
-1. プラグインを `plugins/redmine_kit_aws_s3` に、これが必要とする [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_kit_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。Redmine はプラグインをアルファベット順に読み込むので、`redmine_kit_aws` が先になります。
+1. プラグインを `plugins/redmine_kit_aws_s3` に、これが必要とする [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_kit_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。順序は問いません。`redmine_kit_aws` がないときは、Redmine が起動時に停止し、その名前を示します ([必須プラグイン](#required-plugins))。
 2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム (`ChecksumType`) と `CopyObject` の条件付き書き込みを持つ 1.202 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 3. migration は不要です。
 4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配信するために、アセットをビルドします (Redmine のいつものアセットの手順でもかまいません)。
@@ -30,7 +47,7 @@ Redmine Kit AWS S3 を使う Redmine サーバーに要るもの (インスト�
 
 ### gem
 
-バージョンのタグごとに、プラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_kit_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
+`bin/release` が、各バージョンのプラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`。[リリース](#releasing)) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_kit_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
 
 Bundler は、それぞれのリポジトリからもプラグインをインストールできます。この場合、トークンは不要です。`plugins/` へのリンクは上と同じです。
 
@@ -224,6 +241,11 @@ LocalStack では、`ChecksumAlgorithm` に `SHA256` を指定したコピーに
 `bin/test core` は、プラグインをインストールして無効にした状態で、Redmine のテストを実行します。2026-11-10 にすべて (5,832 件) を実行したとき、7 件の失敗は、Serverless に一覧がある gem によるもの (rails-dom-testing の `:match`) でした。8 件のエラーは、Redmine 自身のテストの順番によるものです。`Redmine::PluginTest` がプラグインのディレクトリを戻さないので、`RoutingPluginsTest` のあとは、インストールしたプラグインのルートが消え、メニューの項目だけが残ります。この 8 件は、単独で実行すると通ります (2026-11-10)。
 
 `bin/test core-s3` は、Redmine の添付ファイルのテスト (`test/unit/attachment_test.rb`、`test/unit/attachment_transaction_test.rb`、`test/functional/attachments_controller_test.rb`、`test/functional/attachments_visibility_test.rb`、`test/integration/attachments_test.rb`、`test/integration/api_test/attachments_test.rb`) を、プラグインを有効にして、LocalStack か moto で実行します。138 件が通ります (2026-11-10)。除いた 17 件は、Redmine がファイルそのものを返すこと (ダウンロード、サムネイル、一括ダウンロード、`X-Sendfile`) を前提にしたもの (プラグインはこれをリダイレクトに置き換えます) か、前のテストが S3 に置いたサムネイルが使われるものです。Redmine の master ブランチ (7519645) では 149 件が通り、同じ理由でさらに 5 件を除きます (Redmine 7.1 の inline の PDF と、サムネイルのタイムアウトのテスト)。並列のワーカーは、添付ファイルのディレクトリと同じく、それぞれ別のバケットを使います。[`test/core/s3_exclusions.txt`](../../test/core/s3_exclusions.txt) に、それぞれの理由があります。
+
+<a id="releasing"></a>
+## リリース
+
+`bin/release` は、gemspec のバージョンの gem を GitHub Packages の Redmine Kit のレジストリに公開します。実行できるのは変更のない `main` からだけで、バージョンが最後のタグ `v<version>` より新しいこと、必須プラグインがレジストリから範囲どおりに解決できること (`config/dependencies.yml`)、`bin/lint`、`bin/test`、`bin/test-gem` が成功することが条件です。公開には `~/.gem/credentials` のキー `github` (`:github: Bearer <token>`。`write:packages` を持つトークン) を使い、レジストリの読み取りには `BUNDLE_RUBYGEMS__PKG__GITHUB__COM` を使います。トークンはリポジトリにも出力にも含めません。署名付きのタグ `v<version>` を作り、それをプッシュするコマンドを表示します。バージョンはセマンティックバージョニングに従います。このプラグインを使うプラグインが動かなくなる変更ではメジャーバージョン (1.0 より前はマイナーバージョン) を上げ、それを必要とするプラグインの範囲も変えます。
 
 <a id="to-verify"></a>
 

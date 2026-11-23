@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Releases the plugin's gem to Redmine Kit's registry, GitHub Packages
+# (https://rubygems.pkg.github.com/redmine-kit), from the developer's machine
+# (README.md, "Releasing"). In order, it stops at the first failure:
+#   1. the branch is main and the tree is clean (no change, no untracked file);
+#   2. the version (the gemspec's) is newer than the last tag v<version> and has no tag yet;
+#   3. the required plugins (config/dependencies.yml) resolve from the registry at their ranges;
+#   4. bin/lint, bin/test and bin/test-gem pass;
+#   5. the gem is built and pushed, with the key `github` of ~/.gem/credentials
+#      (`:github: Bearer <token with write:packages>`);
+#   6. the signed tag v<version> is made here; pushing it is left to the developer.
+# Step 3 reads the registry with BUNDLE_RUBYGEMS__PKG__GITHUB__COM (<user>:<token with read:packages>), as an adopter's
+# Bundler does. Tokens stay in ~/.gem/credentials and the environment: they reach the container through a file of
+# mode 600 that is removed afterwards, never its arguments or the output. Ruby runs in Apple container when it runs,
+# else in Docker (CONTAINER_CLI=container|docker chooses). The same file in every plugin of Redmine Kit (copied from
+# redmine_kit_ui/examples/redmine_kit_example).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REGISTRY=https://rubygems.pkg.github.com/redmine-kit
+RUBY=ruby:4.0@sha256:a69f361db050bb2c65ec66ef75411bfc4ce2e1d993ba1179fac4e4ba6ecfe91f
+source bin/container_cli
+die() { echo "release: $*" >&2; exit 1; }
+
+gemspec=$(ls ./*.gemspec)
+[[ $(git symbolic-ref --short HEAD) == main ]] || die "release from main"
+[[ -z $(git status --porcelain) ]] || die "the tree has changes; commit or remove them first"
+grep -q '^:github:' "$HOME/.gem/credentials" 2>/dev/null ||
+  die "no key github in ~/.gem/credentials (\":github: Bearer <token with write:packages>\", mode 600)"
+
+ruby_run() { # ruby_run <env file> <command…>: in Ruby's image, this folder at /work and ~/.gem read-only
+  "$cli" run --rm -v "$PWD:/work" -w /work -v "$HOME/.gem:/root/.gem:ro" --env-file "$1" "$RUBY" "${@:2}"
+}
+env_file=$(mktemp)
+chmod 600 "$env_file"
+trap 'rm -f "$env_file"' EXIT
+[[ -n ${BUNDLE_RUBYGEMS__PKG__GITHUB__COM:-} ]] &&
+  printf 'BUNDLE_RUBYGEMS__PKG__GITHUB__COM=%s\n' "$BUNDLE_RUBYGEMS__PKG__GITHUB__COM" >"$env_file"
+
+version=$(ruby_run "$env_file" ruby -e 'puts Gem::Specification.load(ARGV[0]).version' "$gemspec")
+tag=v$version
+git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "$tag exists: raise the version first"
+last=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+if [[ -n $last ]]; then
+  ruby_run "$env_file" ruby -e 'exit(Gem::Version.new(ARGV[0]) > Gem::Version.new(ARGV[1]))' "$version" "${last#v}" ||
+    die "the version $version is not newer than the last release $last"
+fi
+
+# The required plugins, at their ranges, from the registry only (a scoped source, as in an adopter's Gemfile.local).
+ruby_run "$env_file" ruby -ryaml -e '
+  requires = YAML.safe_load_file("config/dependencies.yml")["requires"] || {}
+  exit if requires.empty?
+  abort "release: set BUNDLE_RUBYGEMS__PKG__GITHUB__COM=<user>:<token with read:packages>" unless
+    ENV["BUNDLE_RUBYGEMS__PKG__GITHUB__COM"]
+  Dir.mkdir("/tmp/deps")
+  File.write("/tmp/deps/Gemfile", "source \"https://rubygems.org\"\nsource \"#{ARGV[0]}\" do\n" +
+    requires.map { |name, range| "  gem #{name.dump}, #{range.dump}\n" }.join + "end\n")
+  Dir.chdir("/tmp/deps") { system("bundle", "lock", "--quiet") or abort "release: the required plugins (config/dependencies.yml) are not in the registry at their ranges" }
+' "$REGISTRY"
+
+bin/lint
+bin/test
+bin/test-gem
+
+ruby_run "$env_file" sh -c 'gem build --quiet "$1" -o "/tmp/$2.gem" && gem push --key github --host "$3" "/tmp/$2.gem"' \
+  release "$gemspec" "$(basename "$gemspec" .gemspec)-$version" "$REGISTRY"
+git tag -s "$tag" -m "$(basename "$gemspec" .gemspec) $version"
+echo "Released $(basename "$gemspec" .gemspec) $version to $REGISTRY. Push the tag: git push origin $tag"

@@ -21,7 +21,7 @@ The plugin works in any Redmine that can reach S3 and is served through CloudFro
 
 ## Gems and database
 
-The plugin depends on `aws-sdk-s3` and `aws-sdk-cloudfront`. They are listed in the plugin's `Gemfile` and in the gem's dependencies, and Redmine's `Gemfile` also loads `plugins/*/Gemfile`. It also requires the plugin [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_kit_aws`), which holds the "AWS" administration menu: the gem depends on it, and `init.rb` checks that it is installed (`requires_redmine_plugin`). The plugin adds no database tables, so there are no migrations to run.
+The plugin depends on `aws-sdk-s3` and `aws-sdk-cloudfront`. They are listed in the plugin's `Gemfile` and in the gem's dependencies, and Redmine's `Gemfile` also loads `plugins/*/Gemfile`. It also requires the plugin [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_kit_aws`), which holds the "AWS" administration menu: the gem depends on it, and `init.rb` checks that it is installed (`config/dependencies.yml`). The plugin adds no database tables, so there are no migrations to run.
 
 ## Tests
 

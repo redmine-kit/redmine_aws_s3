@@ -27,7 +27,7 @@ S3 に届き、CloudFront で配信している Redmine なら、どこでも動
 
 ## gem とデータベース
 
-依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。また、「AWS」の管理メニューを持つプラグイン [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_kit_aws`) を必要とします。gem はこれに依存し、`init.rb` はインストールされていることを確認します (`requires_redmine_plugin`)。データベースのテーブルを追加しないので、実行するマイグレーションはありません。
+依存する gem は `aws-sdk-s3` と `aws-sdk-cloudfront` です。プラグインの `Gemfile` と gem の依存に書いてあり、Redmine の `Gemfile` は `plugins/*/Gemfile` も読み込みます。また、「AWS」の管理メニューを持つプラグイン [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) (`redmine_kit_aws`) を必要とします。gem はこれに依存し、`init.rb` はインストールされていることを確認します (`config/dependencies.yml`)。データベースのテーブルを追加しないので、実行するマイグレーションはありません。
 
 <a id="tests"></a>
 

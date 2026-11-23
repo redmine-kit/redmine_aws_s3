@@ -5,13 +5,27 @@ What a Redmine server needs to use Redmine Kit AWS S3: installation, configurati
 ## Requirements
 
 - Redmine 7.0 or later.
-- [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/) (`redmine_kit_aws`) 0.1 or later, which has the "AWS" administration menu (a dependency of the gem; with a checkout, it is cloned too).
 - A process that can reach S3 with AWS credentials (an execution role on Lambda, an instance profile or a task role elsewhere). No access keys are stored in Redmine.
 - Redmine is served through a CloudFront distribution. Browsers upload and download files through it, never through the S3 domain ([attachments.md](attachments.md#upload)).
 
+### Required plugins
+
+| Plugin | Used for |
+| --- | --- |
+| [Redmine Kit AWS](https://github.com/redmine-kit/redmine_aws) | the AWS administration menu and the settings shared by the AWS plugins |
+
+Without it, Redmine stops at boot and names it. Installed as a gem, this plugin installs it
+([Installation](#installation)).
+
+### Optional plugins
+
+| Plugin | With it |
+| --- | --- |
+| [Redmine Kit Help](https://github.com/redmine-kit/redmine_help) | this plugin's help in the Help panel |
+
 ## Installation
 
-1. Put the plugin in `plugins/redmine_kit_aws_s3`, and [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_kit_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). Redmine loads plugins in alphabetical order, so `redmine_kit_aws` comes first.
+1. Put the plugin in `plugins/redmine_kit_aws_s3`, and [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_kit_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). The order doesn't matter: at boot, Redmine stops and names `redmine_kit_aws` when it is missing ([Required plugins](#required-plugins)).
 2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.202 or later (which has the full-object checksums, `ChecksumType`, and the conditional writes of `CopyObject`) and `aws-sdk-cloudfront` 1.x.
 3. No migrations are needed.
 4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
@@ -24,7 +38,7 @@ What a Redmine server needs to use Redmine Kit AWS S3: installation, configurati
 
 ### Gem
 
-Each version tag publishes the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_kit_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
+`bin/release` publishes each version of the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`, [Releasing](#releasing)). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_kit_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
 
 Bundler can also install the plugins from their repositories, which needs no token; link them into `plugins/` as above:
 
@@ -192,6 +206,16 @@ On LocalStack, the tests check that a copy with `ChecksumAlgorithm` `SHA256` get
 `bin/test core` runs Redmine's tests with the plugin installed and off. In the full run on 2026-11-10 (5,832 tests), the 7 failures were the gem-related ones listed in Serverless (`:match` in rails-dom-testing). The 8 errors came from the order of Redmine's own tests: `Redmine::PluginTest` does not restore the plugin directory, so after `RoutingPluginsTest` the installed plugins' routes are gone while their menu items stay. These 8 tests pass when run on their own (2026-11-10).
 
 `bin/test core-s3` runs Redmine's attachment tests (`test/unit/attachment_test.rb`, `test/unit/attachment_transaction_test.rb`, `test/functional/attachments_controller_test.rb`, `test/functional/attachments_visibility_test.rb`, `test/integration/attachments_test.rb`, `test/integration/api_test/attachments_test.rb`) with the plugin on, against LocalStack or moto. 138 tests pass (2026-11-10). The 17 left out expect Redmine to send the file itself (downloads, thumbnails, "download all", `X-Sendfile`), which the plugin replaces with redirects, or a thumbnail that an earlier test already stored in S3. On Redmine's master branch (7519645), 149 pass and 5 more are left out for the same reasons (Redmine 7.1's tests of the inline PDF and of a thumbnail timeout). Each parallel worker uses its own bucket, as it has its own attachments directory. [`test/core/s3_exclusions.txt`](../test/core/s3_exclusions.txt) gives the reason for each.
+
+## Releasing
+
+`bin/release` publishes the gem of the gemspec's version to Redmine Kit's registry on GitHub Packages, from a clean
+`main` only: the version must be newer than the last tag `v<version>`, the required plugins must resolve from the
+registry at their ranges (`config/dependencies.yml`), and `bin/lint`, `bin/test` and `bin/test-gem` must pass. It
+pushes with the key `github` of `~/.gem/credentials` (`:github: Bearer <token>`, a token with `write:packages`) and
+reads the registry with `BUNDLE_RUBYGEMS__PKG__GITHUB__COM`; no token goes into the repository or the output. It makes
+the signed tag `v<version>` and prints the command that pushes it. Versions are semantic: a change that breaks a plugin
+using this one raises the major version (the minor one before 1.0), and the ranges in the plugins that require it.
 
 ## To verify
 
