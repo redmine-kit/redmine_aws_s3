@@ -97,7 +97,7 @@ module RedmineKit
 
           assert_response :unprocessable_content
           assert_select '#errorExplanation li', text: 'Download URL expiry must be less than or equal to 604800'
-          assert_select '#errorExplanation li', text: 'Local cache size limit must be less than or equal to 10240'
+          assert_select '#errorExplanation li', text: 'Cache size limit must be less than or equal to 10240'
           assert_default_expiries
         end
 

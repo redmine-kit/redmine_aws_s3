@@ -83,7 +83,7 @@ Nothing of the plugin has to load before Rails starts, so it needs no line in `G
 | Item | Description | Where to change |
 | --- | --- | --- |
 | Download URL expiry, Upload URL expiry | Default: 300 seconds for downloads and thumbnails, 900 seconds for uploads ([attachments.md](attachments.md#upload)) | Plugin settings ([administration page](admin.md#attachments-in-s3)) |
-| Local cache size limit | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
+| Cache size limit | Default: 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | Plugin settings (administration page) |
 | `attachments_storage_path` | The local cache directory. On Lambda, under `/tmp` (for example `/tmp/redmine/files`) | `config/configuration.yml` |
 | Maximum attachment size | Can still be changed; the CloudFront Function on `/tmp/*` must use the same limit for uploads ([admin.md](admin.md#maximum-attachment-size)) | Redmine's settings |
 

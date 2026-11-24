@@ -47,7 +47,7 @@ ja:
   field_aws_s3_storage_path: ローカルキャッシュ
   field_aws_s3_download_url_expiry: ダウンロード URL の有効期限
   field_aws_s3_upload_url_expiry: アップロード URL の有効期限
-  field_aws_s3_cache_size_mb: ローカルキャッシュサイズの上限
+  field_aws_s3_cache_size_mb: キャッシュサイズの上限
   label_aws_s3_seconds: 秒
   field_aws_s3_started_at: 開始日時
   field_aws_s3_finished_at: 最終実行

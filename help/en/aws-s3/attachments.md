@@ -18,6 +18,6 @@ The attach files form works as in Redmine, with its progress bar. When the Guard
 - **Connection tests**: **Read/write test** puts, reads and deletes a test object in the bucket; **Delivery test** fetches a test object through CloudFront with a signed URL and checks that the unsigned URL is denied. A failed call shows only the class of the error.
 - **Files blocked by malware scan**: the last 20 blocked files, with **Time**, **Scan result**, the file name and the **User**.
 - **Consistency check**: **Run consistency check** compares the attachments in the database with the objects in the bucket, in a background job, and shows **Attachments**, **S3 objects**, **Files missing in S3** and **Unused objects**.
-- **Settings**: **Download URL expiry** and **Upload URL expiry** (seconds) and **Local cache size limit** (MB), positive whole numbers. **Save** saves them.
+- **Settings**: **Download URL expiry** and **Upload URL expiry** (seconds) and **Cache size limit** (MB), positive whole numbers. **Save** saves them.
 
 Without the bucket, the tab shows a warning, the environment variables and the settings only. **Configure** of Redmine Kit AWS S3 in **Administration** › **Plugins** opens this tab.

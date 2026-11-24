@@ -47,7 +47,7 @@ en:
   field_aws_s3_storage_path: Local cache
   field_aws_s3_download_url_expiry: Download URL expiry
   field_aws_s3_upload_url_expiry: Upload URL expiry
-  field_aws_s3_cache_size_mb: Local cache size limit
+  field_aws_s3_cache_size_mb: Cache size limit
   label_aws_s3_seconds: seconds
   field_aws_s3_started_at: Started at
   field_aws_s3_finished_at: Last run

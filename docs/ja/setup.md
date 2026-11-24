@@ -96,7 +96,7 @@ Rails の起動前に読み込むものがないので、`Gemfile.local` に行�
 | 項目 | 説明 | 変える場所 |
 | --- | --- | --- |
 | ダウンロード URL の有効期限、アップロード URL の有効期限 | デフォルトは、ダウンロードとサムネイルが 300 秒、アップロードが 900 秒 ([attachments.md](attachments.md#upload)) | プラグインの設定 ([管理画面](admin.md#attachments-in-s3)) |
-| ローカルキャッシュサイズの上限 | デフォルトは 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定 (管理画面) |
+| キャッシュサイズの上限 | デフォルトは 256 MB ([attachments.md](attachments.md#the-tmp-cache)) | プラグインの設定 (管理画面) |
 | `attachments_storage_path` | ローカルキャッシュのディレクトリ。Lambda では `/tmp` の下 (例: `/tmp/redmine/files`) | `config/configuration.yml` |
 | 添付ファイルサイズの上限 | これまでどおり変えられる。`/tmp/*` の CloudFront Functions は、アップロードに同じ上限を使う必要がある ([admin.md](admin.md#maximum-attachment-size)) | Redmine の設定 |
 
