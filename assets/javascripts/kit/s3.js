@@ -254,19 +254,22 @@ function SettingsForm({ settings }) {
 				})
 			}, name))
 		}),
-		/* @__PURE__ */ jsxs(FormActions, { children: [/* @__PURE__ */ jsx(Button, {
-			"data-form-cancel": true,
-			variant: "ghost",
-			disabled: !form.dirty || save.isPending,
-			onClick: () => setValues(form.saved),
-			children: t("button_cancel")
-		}), /* @__PURE__ */ jsx(Button, {
-			submit: "primary",
-			variant: "primary",
-			disabled: !form.dirty || save.isPending,
-			onClick: () => save.mutate({ settings: values }, { onSuccess: () => form.markSaved() }),
-			children: t("button_save")
-		})] })
+		/* @__PURE__ */ jsxs(FormActions, {
+			edge: true,
+			children: [/* @__PURE__ */ jsx(Button, {
+				"data-form-cancel": true,
+				variant: "ghost",
+				disabled: !form.dirty || save.isPending,
+				onClick: () => setValues(form.saved),
+				children: t("button_cancel")
+			}), /* @__PURE__ */ jsx(Button, {
+				submit: "primary",
+				variant: "primary",
+				disabled: !form.dirty || save.isPending,
+				onClick: () => save.mutate({ settings: values }, { onSuccess: () => form.markSaved() }),
+				children: t("button_save")
+			})]
+		})
 	] });
 }
 export { AwsS3Admin };

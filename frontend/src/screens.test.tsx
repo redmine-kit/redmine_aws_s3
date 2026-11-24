@@ -52,6 +52,10 @@ describe('AwsS3Admin', () => {
       responses: { [ADMIN]: admin, 'PATCH /admin/aws/s3.json': new ApiError(422, ['正の整数を入力してください: ダウンロード URL の有効期限']) },
     });
     const field = await screen.findByRole('textbox', { name: 'ダウンロード URL の有効期限' });
+    // the actions' row brings its own gutter (the tab's body has none): never pulled out to the card's edge
+    const row = screen.getByRole('button', { name: /^保存/ }).closest('.px-gutter');
+    expect(row).not.toBeNull();
+    expect(row).not.toHaveClass('-mx-gutter');
     await user.clear(field);
     await user.type(field, '0');
     await user.click(screen.getByRole('button', { name: /^保存/ }));
