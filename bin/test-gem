@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# The plugin as a gem, in Apple container when it runs, else in Docker
-# (CONTAINER_CLI=container|docker chooses): builds the gems of this checkout and of
-# redmine_kit_aws, which it requires, installs them into Redmine 7.0.3 as
-# docs/setup.md#gem says (a gem line in Gemfile.local, then both plugins
-# linked into plugins/), and boots Redmine through zeitwerk:check and in the
-# production environment, which loads every file at start-up (eager_load).
-# It fails when the gem misses a file that the checkout has.
+# The plugin as a gem (docs/setup.md#installation), in Apple container when it
+# runs, else in Docker (CONTAINER_CLI=container|docker chooses), as
+# redmine_kit_ui's template checks its own (examples/redmine_kit_example). In
+# the image of bin/test, without redmine_kit_ui, it builds the gems of this
+# checkout and of Redmine Kit AWS, takes both checkouts out of plugins/,
+# installs the gems and adds this one to Gemfile.local, then migrates and boots
+# Redmine through zeitwerk:check and in the production environment, which loads
+# every file at start-up (eager_load). It fails when the gem misses a file that
+# the checkout has, or when Redmine doesn't take the plugin from the gem's
+# folder (its directory, code, boot file, routes, migrations and assets). Then
+# once more with the checkouts back in plugins/ and the gem still in
+# Gemfile.local: the checkouts win.
 #   bin/test-gem
 #   TEST_RUBY=3.2 bin/test-gem   # on Ruby 3.2 (default 4.0)
 #   REDMINE_KIT_AWS_DIR=<dir> bin/test-gem   # redmine_kit_aws from <dir> (default ../redmine_kit_aws)
@@ -15,7 +20,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source bin/container_cli
 source bin/test_slot
+plugin=redmine_kit_aws_s3
 name=redmine-kit-aws-s3-test
+# A path of the plugin's routes (config/routes.rb), which Redmine must route to
+# the plugin; empty when the plugin has no routes.
+route=/admin/aws/s3
 stop_services_at_exit "$name"
 bin/services >/dev/null
 # test/Dockerfile as bin/test builds it.
@@ -23,30 +32,69 @@ source bin/test_image
 if [[ "$cli" == docker ]]; then
   net=(--network "${name}_default")
 else
-  net=(--network "$kit_test_network" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres")")
+  net=(--network "$kit_test_network" -m 4G -e TEST_DATABASE_HOST="$(container_address "$name-postgres" "$kit_test_network")")
 fi
+
+# The checks, in Ruby, run by `bin/rails runner` in the production environment.
+# $1: where the plugins must come from (gem or plugins).
+check='
+  expected, plugin_id, route = ARGV
+  [plugin_id, "redmine_kit_aws"].uniq.each do |id|
+    plugin = Redmine::Plugin.find(id)
+    dir = File.realpath(plugin.directory)
+    from = dir.start_with?(File.realpath(Gem.dir)) ? "gem" : "plugins"
+    abort "#{id} is from #{from} (#{dir}), not #{expected}" unless from == expected
+    namespace = id.delete_prefix("redmine_kit_").split("_").map(&:camelize).join("::")
+    abort "RedmineKit::#{namespace}::VERSION is not the plugin version" unless "RedmineKit::#{namespace}::VERSION".constantize == plugin.version
+    if File.directory?(File.join(dir, "assets"))
+      abort "#{id}: no asset paths" if plugin.asset_paths.blank?
+    end
+    unless plugin.latest_migration.nil? || Redmine::Plugin::Migrator.current_version(plugin) == plugin.latest_migration
+      abort "#{id}: not migrated"
+    end
+    # Bundler loaded the boot file (it ignores a missing one)
+    boot = "/boot/#{id}.rb"
+    abort "#{id}: #{boot} not loaded" unless $LOADED_FEATURES.any? { |feature| feature.end_with?(boot) }
+  end
+  abort "not eager loaded" unless Rails.application.config.eager_load
+  if route.present?
+    controller = Rails.application.routes.recognize_path(route)[:controller].to_s
+    dir = Redmine::Plugin.find(plugin_id).directory
+    unless File.file?(File.join(dir, "app/controllers/#{controller}_controller.rb"))
+      abort "#{route} is not routed to a controller of the plugin (#{controller})"
+    end
+  end
+  
+  puts "#{plugin_id} #{Redmine::Plugin.find(plugin_id).version} from #{expected}: #{File.realpath(Redmine::Plugin.find(plugin_id).directory)}"'
 # A database of this run's own, dropped at the end.
-"$cli" run --rm "${run_opts[@]}" "${net[@]}" -e TEST_DATABASE="redmine_test_$$" "$image" sh -ec '
-  # without redmine_kit_ui, which bin/test_image adds for bin/test: the gem alone
+"$cli" run --rm "${run_opts[@]}" "${net[@]}" -e TEST_DATABASE="redmine_test_$$" \
+  -e PLUGIN="$plugin" -e ROUTE="$route" -e CHECK="$check" "$image" sh -ec '
+  # without redmine_kit_ui, which bin/test_image adds for bin/test: the gems alone
   mv plugins/redmine_kit_ui /tmp/ && mkdir plugins/kit_ui_gems && cp /tmp/redmine_kit_ui/Gemfile plugins/kit_ui_gems/
-  (cd plugins/redmine_kit_aws && gem build --quiet redmine_kit_aws.gemspec --output /tmp/redmine_kit_aws.gem)
-  (cd plugins/redmine_kit_aws_s3 && gem build --quiet redmine_kit_aws_s3.gemspec --output /tmp/redmine_kit_aws_s3.gem)
-  rm -rf plugins/redmine_kit_aws plugins/redmine_kit_aws_s3
-  gem install --local --no-document --quiet /tmp/redmine_kit_aws.gem /tmp/redmine_kit_aws_s3.gem
-  printf "%s\n" "gem '\''redmine_kit_aws_s3'\''" "gem '\''simplecov-cobertura'\'', group: :test" > Gemfile.local
-  bundle install --prefer-local --quiet
-  ln -s "$(bundle info --path redmine_kit_aws)" plugins/redmine_kit_aws
-  ln -s "$(bundle info --path redmine_kit_aws_s3)" plugins/redmine_kit_aws_s3
-  bin/rails db:drop db:create db:migrate redmine:plugins:migrate >/dev/null
-  bin/rails zeitwerk:check
-  # The production environment, which loads every file at start-up
-  # (eager_load), on the test database.
+  # the gems of Redmine Kit AWS (which the plugin requires) and of the plugin, built from their checkouts, which
+  # leave plugins/
+  plugins=$(printf "%s\n" redmine_kit_aws "$PLUGIN" | uniq)
+  for dir in $plugins; do
+    (cd "plugins/$dir" && gem build --quiet "$dir.gemspec" --output "/tmp/$dir.gem")
+    mv "plugins/$dir" "/tmp/checkout-$dir"
+  done
+  gem install --local --no-document --quiet $(for dir in $plugins; do echo "/tmp/$dir.gem"; done)
   printf "%s\n" "production:" "  adapter: postgresql" "  host: ${TEST_DATABASE_HOST:-postgres}" "  database: $TEST_DATABASE" \
     "  username: postgres" >> config/database.yml
-  RAILS_ENV=production SECRET_KEY_BASE=test-gem bin/rails runner "
-    plugin = Redmine::Plugin.find(:redmine_kit_aws_s3)
-    dir = File.realpath(plugin.directory)
-    abort %(redmine_kit_aws_s3 is not the installed gem: #{dir}) unless dir.start_with?(Gem.dir)
-    abort %(not eager loaded) unless Rails.application.config.eager_load
-    puts %(redmine_kit_aws_s3 #{plugin.version} from #{dir}: #{RedmineKit::Aws::S3::Upload.name})"
+  printf "%s\n" "gem '\''$PLUGIN'\''" "gem '\''simplecov-cobertura'\'', group: :test" > Gemfile.local
+  bundle install --prefer-local --quiet
+  for from in gem plugins; do
+    echo "== $from"
+    if [ "$from" = plugins ]; then
+      for dir in $plugins; do mv "/tmp/checkout-$dir" "plugins/$dir"; done
+      # a checkout'"'"'s Gemfile names Redmine Kit AWS by its path
+      bundle install --prefer-local --quiet
+    fi
+    # A new database each time: without the schema the last migration dumped,
+    # which db:migrate would load into the empty database, with the plugin tables.
+    rm -f db/schema.rb
+    bin/rails db:drop db:create db:migrate redmine:plugins:migrate >/dev/null
+    bin/rails zeitwerk:check
+    RAILS_ENV=production SECRET_KEY_BASE=test-gem bin/rails runner "$CHECK" "$from" "$PLUGIN" "$ROUTE"
+  done
   bin/rails db:drop >/dev/null'

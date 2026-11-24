@@ -26,28 +26,20 @@ Without it, Redmine stops at boot and names it. Installed as a gem, this plugin 
 
 ## Installation
 
-1. Put the plugin in `plugins/redmine_kit_aws_s3`, and [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in `plugins/redmine_kit_aws`: install the gem ([Gem](#gem)) or clone the repositories ([Without the gem](#without-the-gem)). The order doesn't matter: at boot, Redmine stops and names `redmine_kit_aws` when it is missing ([Required plugins](#required-plugins)).
-2. Run `bundle install`. Redmine's `Gemfile` loads the plugin's, and the plugin adds `aws-sdk-s3` 1.202 or later (which has the full-object checksums, `ChecksumType`, and the conditional writes of `CopyObject`) and `aws-sdk-cloudfront` 1.x.
-3. No migrations are needed.
+1. Install the plugin as a gem ([Gem](#gem)), or put checkouts of it and of [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/), which it requires, in Redmine's `plugins/` ([Without the gem](#without-the-gem)). The order doesn't matter: at boot, Redmine stops and names `redmine_kit_aws` when it is missing ([Required plugins](#required-plugins)).
+2. Run `bundle install` in Redmine's folder.
+3. No migrations are needed. The plugin adds `aws-sdk-s3` 1.202 or later (which has the full-object checksums, `ChecksumType`, and the conditional writes of `CopyObject`) and `aws-sdk-cloudfront` 1.x.
 4. Build the assets, so that the plugin's JavaScript `s3_upload.js` (and `s3_avatar_upload.js` for the avatars of Redmine 7.1) is served (or use Redmine's usual asset step):
 
    ```sh
    bin/rails assets:precompile
    ```
-
 5. Set the environment variables (below). Without `REDMINE_S3_BUCKET`, the plugin stays off and Redmine stores attachments on disk as standard.
+6. Restart Redmine.
 
 ### Gem
 
-`bin/release` publishes each version of the plugin as a gem to GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`, [Releasing](#releasing)). The current version is 0.1.0. Installing from GitHub Packages needs a GitHub token with `read:packages`, even for a public package. The gem holds the plugin's run-time files. The gem depends on the gem `redmine_kit_aws`, so Bundler installs it from the same source, and `Gemfile.local` names only this plugin's gem. Redmine loads plugins only from `plugins/`, so both installed gems are linked there:
-
-Bundler can also install the plugins from their repositories, which needs no token; link them into `plugins/` as above:
-
-```ruby
-# Redmine's Gemfile.local
-gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', tag: 'v0.1.0', require: false
-gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', tag: 'v0.1.0', require: false
-```
+**As a gem** (first choice): add it to Redmine's `Gemfile.local`, in a block of Redmine Kit's registry on GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`, where `bin/release` publishes it: [Releasing](#releasing)). Bundler takes the plugins it requires from there too ([Required plugins](#required-plugins)), and never takes these gems from rubygems.org. The registry needs a GitHub token with `read:packages`, even for a public package, given to Bundler in the environment variable `BUNDLE_RUBYGEMS__PKG__GITHUB__COM` (`<user>:<token>`), never in a file of a repository.
 
 ```ruby
 # Redmine's Gemfile.local
@@ -56,22 +48,26 @@ source 'https://rubygems.pkg.github.com/redmine-kit' do
 end
 ```
 
-```sh
-bundle config set --global rubygems.pkg.github.com <user>:<token>   # or the variable BUNDLE_RUBYGEMS__PKG__GITHUB__COM
-bundle install
-ln -s "$(bundle info --path redmine_kit_aws)" plugins/redmine_kit_aws
-ln -s "$(bundle info --path redmine_kit_aws_s3)" plugins/redmine_kit_aws_s3
+**From the repositories** (for development), Bundler takes the gems from git instead; it doesn't take the plugins a gem requires from git, so their lines come too:
+
+```ruby
+# Redmine's Gemfile.local
+gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', branch: 'main'
+gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', branch: 'main'
 ```
+
+Bundler requires `boot/redmine_kit_aws_s3.rb`, which hands the gem's folder to Redmine's plugin loader (and, from the gems it depends on, Redmine Kit AWS's): Redmine runs the gem's `init.rb`, serves its assets, strings, views and migrations, adds its `lib/` and `app/` to Rails' code loader and draws its routes, as for a plugin in `plugins/`, so no link in `plugins/` is needed. A folder of the same id in `plugins/` wins over the gem. The gem holds the run-time files; the plugin's `Gemfile` is not in it.
 
 ### Without the gem
 
-Clone the repositories into `plugins/redmine_kit_aws` and `plugins/redmine_kit_aws_s3` and install the gems. Nothing of the plugin has to load before Rails starts, so it needs no line in `Gemfile.local`:
+Clone the repositories into Redmine's `plugins/`, in folders named after the plugins' ids, which differ from the repositories' names:
 
 ```sh
 git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_kit_aws
 git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_kit_aws_s3
-bundle install
 ```
+
+Nothing of the plugin has to load before Rails starts, so it needs no line in `Gemfile.local`; Redmine's `Gemfile` loads the plugin's, which adds the gems it uses.
 
 ## Configuration
 
@@ -162,7 +158,7 @@ REDMINE_BRANCH=master bin/test   # on Redmine's master branch (7.1, with avatars
 REDMINE_KIT_AWS_DIR=<dir> bin/test   # Redmine Kit AWS from <dir>
 bin/services --system --down   # stop PostgreSQL, moto, LocalStack and Chromium
 bin/lint                 # RuboCop
-bin/test-gem             # the gems of the plugin and Redmine Kit AWS: built, installed, linked into plugins/, booted
+bin/test-gem             # the gems: built, installed, booted from the gems, then from plugins/
 node test/javascripts/complete_test.mjs # the upload script's complete step
 node test/javascripts/avatar_check_test.mjs # the avatar script's check step
 ```

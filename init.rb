@@ -8,6 +8,10 @@ load File.expand_path('config/dependencies.rb', __dir__)
 # replacements are installed always and do nothing unless REDMINE_S3_BUCKET
 # is set (docs/attachments.md#replaced-code).
 Redmine::Plugin.register :redmine_kit_aws_s3 do
+  # This folder, as Redmine's plugin loader found it: plugins/redmine_kit_aws_s3 (a checkout
+  # or a link), or the installed gem's folder (boot/redmine_kit_aws_s3.rb). Redmine's
+  # default is plugins/<id>, which a gem doesn't have.
+  directory File.dirname(__FILE__)
   requires_redmine version_or_higher: '7.0.0'
   name 'Redmine Kit AWS S3'
   author 'Redmine Kit'

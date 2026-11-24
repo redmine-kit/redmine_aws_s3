@@ -33,30 +33,22 @@ Redmine Kit AWS S3 を使う Redmine サーバーに要るもの (インスト�
 
 ## インストール
 
-1. プラグインを `plugins/redmine_kit_aws_s3` に、これが必要とする [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) を `plugins/redmine_kit_aws` に置きます。gem をインストールするか ([gem](#gem))、リポジトリをクローンします ([gem を使わないとき](#without-the-gem))。順序は問いません。`redmine_kit_aws` がないときは、Redmine が起動時に停止し、その名前を示します ([必須プラグイン](#required-plugins))。
-2. `bundle install` を実行します。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、プラグインが、オブジェクト全体のチェックサム (`ChecksumType`) と `CopyObject` の条件付き書き込みを持つ 1.202 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
-3. migration は不要です。
+1. プラグインを gem としてインストールするか ([gem](#gem))、プラグインと、これが必要とする [Redmine Kit AWS](https://redmine-kit.github.io/redmine_aws/ja/) のチェックアウトを Redmine の `plugins/` に置きます ([gem を使わないとき](#without-the-gem))。順序は問いません。`redmine_kit_aws` がないときは、Redmine が起動時に停止し、その名前を示します ([必須プラグイン](#required-plugins))。
+2. Redmine のフォルダーで `bundle install` を実行します。
+3. マイグレーションは不要です。プラグインは、オブジェクト全体のチェックサム (`ChecksumType`) と `CopyObject` の条件付き書き込みを持つ 1.202 以降の `aws-sdk-s3` と、1.x の `aws-sdk-cloudfront` を追加します。
 4. プラグインの JavaScript `s3_upload.js` (と、Redmine 7.1 のアバター用の `s3_avatar_upload.js`) を配信するために、アセットをビルドします (Redmine のいつものアセットの手順でもかまいません)。
 
    ```sh
    bin/rails assets:precompile
    ```
-
 5. 環境変数を設定します (下記)。`REDMINE_S3_BUCKET` がなければ、プラグインは動かず、Redmine は標準のとおりディスクに添付ファイルを置きます。
+6. Redmine を再起動します。
 
 <a id="gem"></a>
 
 ### gem
 
-`bin/release` が、各バージョンのプラグインを gem として GitHub Packages (`https://rubygems.pkg.github.com/redmine-kit`。[リリース](#releasing)) に公開します。いまのバージョンは 0.1.0 です。GitHub Packages からインストールするには、公開のパッケージでも、`read:packages` の権限を持つ GitHub のトークンが要ります。gem は、プラグインを動かすためのファイルを持ちます。gem は `redmine_kit_aws` の gem に依存するので、Bundler が同じソースからインストールします。`Gemfile.local` に書くのは、このプラグインの gem だけです。Redmine は `plugins/` のプラグインだけを読み込むので、インストールした 2 つの gem をそこにリンクします。
-
-Bundler は、それぞれのリポジトリからもプラグインをインストールできます。この場合、トークンは不要です。`plugins/` へのリンクは上と同じです。
-
-```ruby
-# Redmine の Gemfile.local
-gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', tag: 'v0.1.0', require: false
-gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', tag: 'v0.1.0', require: false
-```
+**gem として** (推奨): Redmine の `Gemfile.local` に、GitHub Packages にある Redmine Kit のレジストリ (`https://rubygems.pkg.github.com/redmine-kit`。`bin/release` が公開します: [リリース](#releasing)) のブロックで追加します。このプラグインが必要とするプラグイン ([必須プラグイン](#required-plugins)) も Bundler がそこから取得し、これらの gem を rubygems.org から取得することはありません。レジストリには、公開のパッケージでも `read:packages` を持つ GitHub のトークンが必要です。Bundler には環境変数 `BUNDLE_RUBYGEMS__PKG__GITHUB__COM` (`<user>:<token>`) で渡し、リポジトリのファイルには書きません。
 
 ```ruby
 # Redmine の Gemfile.local
@@ -65,24 +57,28 @@ source 'https://rubygems.pkg.github.com/redmine-kit' do
 end
 ```
 
-```sh
-bundle config set --global rubygems.pkg.github.com <ユーザー>:<トークン>   # か、変数 BUNDLE_RUBYGEMS__PKG__GITHUB__COM
-bundle install
-ln -s "$(bundle info --path redmine_kit_aws)" plugins/redmine_kit_aws
-ln -s "$(bundle info --path redmine_kit_aws_s3)" plugins/redmine_kit_aws_s3
+**リポジトリから** (開発用): Bundler は gem を git から取得します。Bundler は gem が必要とするプラグインを git からは取得しないので、その行も追加します。
+
+```ruby
+# Redmine の Gemfile.local
+gem 'redmine_kit_aws', git: 'https://github.com/redmine-kit/redmine_aws.git', branch: 'main'
+gem 'redmine_kit_aws_s3', git: 'https://github.com/redmine-kit/redmine_aws_s3.git', branch: 'main'
 ```
+
+Bundler が `boot/redmine_kit_aws_s3.rb` を読み込み、gem のフォルダーと、依存する gem の Redmine Kit AWS のフォルダーを Redmine のプラグインローダーに渡します。Redmine は `plugins/` のプラグインと同じく、gem の `init.rb` を実行し、アセット、文字列、ビュー、マイグレーションを使い、`lib/` と `app/` を Rails のコードローダーに追加し、ルートを追加するので、`plugins/` へのリンクは不要です。`plugins/` に同じ id のフォルダーがあれば、そちらが優先されます。 gem には実行に必要なファイルが入り、プラグインの `Gemfile` は入りません。
 
 <a id="without-the-gem"></a>
 
 ### gem を使わないとき
 
-リポジトリを `plugins/redmine_kit_aws` と `plugins/redmine_kit_aws_s3` にクローンし、gem をインストールします。Rails の起動前に読み込むものがないので、`Gemfile.local` に行を追加する必要はありません。
+リポジトリを Redmine の `plugins/` にクローンします。フォルダー名は、リポジトリ名ではなく、プラグインの ID にします。
 
 ```sh
 git clone https://github.com/redmine-kit/redmine_aws.git plugins/redmine_kit_aws
 git clone https://github.com/redmine-kit/redmine_aws_s3.git plugins/redmine_kit_aws_s3
-bundle install
 ```
+
+Rails の起動前に読み込むものがないので、`Gemfile.local` に行を追加する必要はありません。Redmine の `Gemfile` がプラグインの `Gemfile` を読み込み、使う gem を追加します。
 
 <a id="configuration"></a>
 
@@ -187,7 +183,7 @@ REDMINE_BRANCH=master bin/test   # Redmine の master ブランチで (7.1、ア
 REDMINE_KIT_AWS_DIR=<dir> bin/test   # <dir> の Redmine Kit AWS で
 bin/services --system --down   # PostgreSQL、moto、LocalStack、Chromium を止める
 bin/lint                 # RuboCop
-bin/test-gem             # プラグインと Redmine Kit AWS の gem をビルド・インストールし、plugins/ にリンクして起動する
+bin/test-gem             # gem をビルド・インストールし、gem から、次に plugins/ から起動する
 node test/javascripts/complete_test.mjs # アップロードの JavaScript の完了処理
 node test/javascripts/avatar_check_test.mjs # アバターの JavaScript の確認処理
 ```

@@ -15,7 +15,8 @@ Gem::Specification.new do |spec|
   spec.homepage = 'https://github.com/redmine-kit/redmine_aws_s3'
   # The Ruby versions of Redmine 7.0 (its Gemfile: ruby '>= 3.2.0', '< 4.1.0').
   spec.required_ruby_version = ['>= 3.2', '< 4.1']
-  spec.files = Dir['{init.rb,LICENSE}', '{app,assets,config,db,lib,help}/**/*']
+  spec.require_paths = ['boot']
+  spec.files = Dir['{init.rb,LICENSE}', '{app,boot,assets,config,db,lib,help}/**/*']
   # aws-sdk-s3 1.202.0 (2025-10-28) added the conditional writes of CopyObject
   # (If-None-Match), which the registration of uploads uses, after ChecksumType
   # (FULL_OBJECT, 1.178.0), which it checks; the CloudFront URL signer is in
