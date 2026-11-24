@@ -33,20 +33,7 @@ var SETTINGS = [
 // src/AwsS3Admin.tsx
 /** Redmine's .tabular labels (175px), as the classic page's values line up. */
 var LABEL_WIDTH = 175;
-/**
-* A value with its note muted under it, as Redmine's em.info under a value (the variable a value comes from); a long
-* value (a bucket's or a domain's name) wraps anywhere rather than being cut.
-*/
-function NotedValue({ value, note }) {
-	return /* @__PURE__ */ jsxs("span", {
-		className: "flex min-w-0 flex-col whitespace-normal wrap-anywhere",
-		children: [/* @__PURE__ */ jsx("span", { children: value }), note && /* @__PURE__ */ jsx("span", {
-			className: "text-meta text-text-muted",
-			children: note
-		})]
-	});
-}
-/** Values as label and value pairs, each note muted under its value (the classic page's em.info). */
+/** Values as label and value pairs, each note muted under its value (AttrGrid's note: the classic page's em.info). */
 function Values({ rows }) {
 	return /* @__PURE__ */ jsx("div", {
 		className: "px-gutter",
@@ -55,10 +42,8 @@ function Values({ rows }) {
 			labelWidth: LABEL_WIDTH,
 			items: rows.map((row) => ({
 				label: row.name,
-				value: /* @__PURE__ */ jsx(NotedValue, {
-					value: row.value ?? "",
-					note: row.note
-				})
+				value: row.value ?? "",
+				note: row.note
 			}))
 		})
 	});
@@ -131,7 +116,10 @@ function AwsS3Admin() {
 					"private_key",
 					"malware_scan",
 					"storage_path"
-				].map((name) => ({ label: t(`field_aws_s3_${name}`) }))
+				].map((name) => ({
+					label: t(`field_aws_s3_${name}`),
+					note: true
+				}))
 			})
 		})
 	}) });

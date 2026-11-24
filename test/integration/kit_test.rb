@@ -36,6 +36,20 @@ module RedmineKit
                        screen.slice(:path, :component, :layout, :menu_item, :tab, :position))
         end
 
+        test "Configure opens the tab, and the app's uploads go through the plugin's endpoints while S3 is on" do
+          manifest = assert_kit_manifest(:redmine_kit_aws_s3)
+          assert_equal({ path: '/admin/aws/s3' }, manifest.settings[:plugin])
+          headers = kit_session('admin', 'admin')
+          get '/admin/plugins.json', headers: headers
+          row = response.parsed_body['plugins'].detect { |plugin| plugin['id'] == 'redmine_kit_aws_s3' }
+          assert_equal '/admin/aws/s3', row['settings_path']
+          get '/my/bootstrap.json', headers: KIT
+          assert_nil response.parsed_body['uploads']
+          with_s3(stub_client) { get '/my/bootstrap.json', headers: KIT }
+          assert_equal({ 'presign' => '/s3_uploads/presign', 'complete' => '/s3_uploads/complete' },
+                       response.parsed_body['uploads'])
+        end
+
         test "the tab's JSON: the environment without the private key, the settings" do
           headers = kit_session('admin', 'admin')
           with_s3(stub_client) do

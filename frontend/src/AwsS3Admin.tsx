@@ -41,27 +41,14 @@ interface FindingRow extends DataTableRowBase {
   finding: S3Finding;
 }
 
-/**
- * A value with its note muted under it, as Redmine's em.info under a value (the variable a value comes from); a long
- * value (a bucket's or a domain's name) wraps anywhere rather than being cut.
- */
-function NotedValue({ value, note }: { value: string; note?: string | null }) {
-  return (
-    <span className="flex min-w-0 flex-col whitespace-normal wrap-anywhere">
-      <span>{value}</span>
-      {note && <span className="text-meta text-text-muted">{note}</span>}
-    </span>
-  );
-}
-
-/** Values as label and value pairs, each note muted under its value (the classic page's em.info). */
+/** Values as label and value pairs, each note muted under its value (AttrGrid's note: the classic page's em.info). */
 function Values({ rows }: { rows: S3Row[] }) {
   return (
     <div className="px-gutter">
       <AttrGrid
         columns={1}
         labelWidth={LABEL_WIDTH}
-        items={rows.map((row) => ({ label: row.name, value: <NotedValue value={row.value ?? ''} note={row.note} /> }))}
+        items={rows.map((row) => ({ label: row.name, value: row.value ?? '', note: row.note }))}
       />
     </div>
   );
@@ -105,7 +92,7 @@ export function AwsS3Admin() {
             <AttrGridSkeleton
               columns={1}
               labelWidth={LABEL_WIDTH}
-              items={['bucket', 'region', 'domain', 'key_pair_id', 'private_key', 'malware_scan', 'storage_path'].map((name) => ({ label: t(`field_aws_s3_${name}`) }))}
+              items={['bucket', 'region', 'domain', 'key_pair_id', 'private_key', 'malware_scan', 'storage_path'].map((name) => ({ label: t(`field_aws_s3_${name}`), note: true }))}
             />
           </SkeletonRegion>
         </CardSection>

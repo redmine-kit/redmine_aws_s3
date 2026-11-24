@@ -24,10 +24,6 @@
     max-width: 53.75rem;
   }
 
-  .min-w-0 {
-    min-width: 0;
-  }
-
   .flex-col {
     flex-direction: column;
   }
@@ -60,26 +56,8 @@
     padding-inline: var(--rk-gutter);
   }
 
-  .text-meta {
-    font-size: var(--rk-type-meta-size);
-    line-height: var(--tw-leading, 1.4);
-    font-weight: var(--tw-font-weight, 400);
-  }
-
-  .wrap-anywhere {
-    overflow-wrap: anywhere;
-  }
-
-  .whitespace-normal {
-    white-space: normal;
-  }
-
   .text-accent {
     color: var(--rk-accent);
-  }
-
-  .text-text-muted {
-    color: var(--rk-text-muted);
   }
 
   .text-warning {
